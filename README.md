@@ -1,4 +1,13 @@
 # Hello, My Name is Deby Angelina
 
+I'm a senior at Dankook University and a soon to be software engineer and/or developer, from Semarang, Indonesia. I enjoy debugging and solving complex problems, especially the ecstatic and proud feeling when I finally overcome them. In addition, I'm a resourceful being, one that makes the most of its surrounding, be it people, knowledge, or technology(like google :>); in a positive way.
+
+# Projects
+
+here are some of my note worthy projects from my programming classes:
+1. Shopping App - [Compareit](https://github.com/debdeb18/compareit-frontend-react)(JavaScript, React) 
+2. Android Game - [Sloppy](https://github.com/debdeb18/sloppy-game)(Java, JNI)
+3. MIPS - [Single cycle](https://github.com/debdeb18/MIPS-single-cycle-implementation-in-C), [Pipeline](https://github.com/debdeb18/MIPS-pipeline-implementation-in-C), [Simple Calc](https://github.com/debdeb18/simple-calculator)(C)
+4. Program OOP - [Vending Machine](https://github.com/debdeb18/vending-macine-OOP-project)(C++)
 
 

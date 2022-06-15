@@ -14,4 +14,6 @@ here are some of my note worthy projects from my programming classes:
 
 ## Information
 
-My resume 
+Check out my resume [here](https://drive.google.com/file/d/1ehosL04m51oQFNTltxDc5y1ID40IK3t8/view?usp=sharing)
+or reach out to me via
+####<i class="fa-brands fa-github" href="https://github.com/debdeb18"></i><i class="fa-brands fa-linkedin" href="https://www.linkedin.com/in/dangelina18/"></i>

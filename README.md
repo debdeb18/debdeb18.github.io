@@ -1,3 +1,6 @@
+<img src="29.jpeg" width="100"/>
+> I'm the one in white, I currently dont have a photo with only me so pardon this group photo 
+
 ## Hello, My Name is Deby Angelina
 
 I'm a senior at Dankook University and a soon to be software engineer and/or developer, from Semarang, Indonesia. I enjoy debugging and solving complex problems, especially the ecstatic and proud feeling when I finally overcome them. In addition, I'm a resourceful being, one that makes the most of its surrounding, be it people, knowledge, or technology(like google :>); in a positive way.

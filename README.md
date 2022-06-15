@@ -2,7 +2,7 @@
 
 I'm a senior at Dankook University and a soon to be software engineer and/or developer, from Semarang, Indonesia. I enjoy debugging and solving complex problems, especially the ecstatic and proud feeling when I finally overcome them. In addition, I'm a resourceful being, one that makes the most of its surrounding, be it people, knowledge, or technology(like google :>); in a positive way.
 
-> When I'm not coding or racking my brain, you'll find me in the virtual world *(aka MOBA games)* or in my own
+> When I'm not coding or racking my brain, you'll find me in the virtual world *(aka MOBA games)* or doing art stuff
 
 ## Projects
 

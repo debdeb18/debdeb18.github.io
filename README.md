@@ -16,5 +16,5 @@ here are some of my note worthy projects from my programming classes:
 
 Check out my resume [here](https://drive.google.com/file/d/1ehosL04m51oQFNTltxDc5y1ID40IK3t8/view?usp=sharing)
 
-or reach out to me via @icn-camera
-[@icon-github]("https://github.com/debdeb18")  [@icon-linkedin]("https://www.linkedin.com/in/dangelina18/")
+or reach out to me via
+[![github](/github-brands.svg)]("https://github.com/debdeb18")  [![linkedin](/linkedin-brands.svg)]("https://www.linkedin.com/in/dangelina18/")

@@ -1,4 +1,4 @@
-<img src="29.jpeg" width="100"/>
+<img src="29.jpeg" width="400"/>
 > I'm the one in white, I currently dont have a photo with only me so pardon this group photo 
 
 ## Hello, My Name is Deby Angelina

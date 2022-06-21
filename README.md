@@ -1,6 +1,6 @@
-<img src="33.jpeg" height="200"/ style="float:left">
+<img src="29.jpeg" height="500"/>
 
-> Winner is your nature, so don't worry about it. Setting your focus on what's naturally yours, will just messed up your tempo
+> I'm the one in white, currently I dont have a picture of me alone, so pardon the photo group. These are my siblings by the way :>
 
 ## Hello, My Name is Deby Angelina
 
@@ -23,3 +23,5 @@ Check out my resume [here](https://drive.google.com/file/d/1ehosL04m51oQFNTltxDc
 or reach out to me via
 
 <a href="https://github.com/debdeb18" ><img src="github-brands.svg" alt="github" width="30"/></a>&emsp;<a href="https://www.linkedin.com/in/dangelina18/"><img src="linkedin-brands.svg" alt="linkedin" width="30"/></a>
+
+> Winner is your nature, so don't worry about it. Setting your focus on what's naturally yours, will just messed up your tempo    

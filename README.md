@@ -1,4 +1,4 @@
-<img src="33.jpeg" height="400" align="right"/>
+<img src="34.jpeg" height="400"/>
 
 ## Hello, My Name is Deby Angelina
 

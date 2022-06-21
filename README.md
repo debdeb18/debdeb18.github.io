@@ -1,8 +1,6 @@
-<img src="33.jpeg" height="200"/>
+<img src="33.jpeg" height="200"/ style="float:left">
 
-> Winner is your nature, so don't worry about it.    
-> Setting your focus on what's naturally yours,     
-> will just messed up your tempo
+> Winner is your nature, so don't worry about it. Setting your focus on what's naturally yours, will just messed up your tempo
 
 ## Hello, My Name is Deby Angelina
 

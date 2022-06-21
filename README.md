@@ -1,4 +1,4 @@
-<img src="29.jpeg" width="500"/>
+<img src="28.jpeg" width="500"/>
 
 > I'm the one in white, I currently dont have a photo with only me so pardon this group photo 
 
@@ -22,4 +22,4 @@ Check out my resume [here](https://drive.google.com/file/d/1ehosL04m51oQFNTltxDc
 
 or reach out to me via
 
-<img src="github-brands.svg" href="https://github.com/debdeb18" alt="github" width="30"/>&emsp;<img src="linkedin-brands.svg" href="https://www.linkedin.com/in/dangelina18/" alt="linkedin" width="30"/>
+<a href="https://github.com/debdeb18" ><img src="github-brands.svg" alt="github" width="30"/></a>&emsp;<a href="https://www.linkedin.com/in/dangelina18/"><img src="linkedin-brands.svg" alt="linkedin" width="30"/></a>

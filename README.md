@@ -1,6 +1,8 @@
 <img src="33.jpeg" width="500"/>
 
-> I'm the one in white, I currently dont have a photo with only me so pardon this group photo 
+> Winner is your nature, so don't worry about it.    
+> Don't set your focus on things that is naturally yours,     
+> you'll just messed up your tempo
 
 ## Hello, My Name is Deby Angelina
 

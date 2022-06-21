@@ -1,6 +1,4 @@
-<img src="29.jpeg" height="500"/>
-
-> I'm the one in white, currently I dont have a picture of me alone, so pardon the photo group. These are my siblings by the way :>
+<img src="33.jpeg" height="400" align="right"/>
 
 ## Hello, My Name is Deby Angelina
 

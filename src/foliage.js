@@ -51,64 +51,102 @@ function cardMaterial(kind, ramp) {
   return (mats[kind] = m);
 }
 
+// Split points into separate clumps (bushes on an islet, shrubs in a row of planters): points closer than `gap` join up.
+function clusters(pts, gap) {
+  const cell = new Map(), key = (p) => `${Math.floor(p.x / gap)},${Math.floor(p.y / gap)},${Math.floor(p.z / gap)}`;
+  for (const p of pts) { const k = key(p); if (!cell.has(k)) cell.set(k, []); cell.get(k).push(p); }
+  const seen = new Set(), out = [];
+  for (const start of cell.keys()) {
+    if (seen.has(start)) continue;
+    const group = [], stack = [start]; seen.add(start);
+    while (stack.length) {
+      const k = stack.pop(); group.push(...cell.get(k));
+      const [x, y, z] = k.split(',').map(Number);
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) {
+        const n = `${x + dx},${y + dy},${z + dz}`; if (cell.has(n) && !seen.has(n)) { seen.add(n); stack.push(n); }
+      }
+    }
+    out.push(group);
+  }
+  return out;
+}
+
+const SETTINGS = {
+  broad: { size: 1.25, density: 10, max: 900, shell: 0.72, offset: 0.32 },
+  pine: { size: 0.9, density: 12, max: 900, shell: 0, offset: 0.32 },
+  bush: { size: 0.62, density: 22, max: 220, shell: 0.6, offset: 0.25 },
+};
+
 /**
- * Cover the canopy of a loaded tree model with leaf cards.
- * `isCanopy(material)` says which parts are leaves (Blender lumps or pine tiers). The blobs themselves stay inside, darkened,
- * so gaps between cards show deep shade rather than sky.
+ * Cover the leafy parts of a loaded model with leaf cards.
+ * `isCanopy(material)` says which parts are leaves. The original blobs stay inside, darkened, so gaps between cards show
+ * deep shade rather than sky. With `clumps`, each separate clump (a bush) gets its own round lighting.
  */
-export function leafify(model, kind, isCanopy, ramp) {
+export function leafify(model, kind, isCanopy, ramp, { clumps = false } = {}) {
   model.updateMatrixWorld(true);
-  const pts = [], v = new THREE.Vector3(), box = new THREE.Box3();
-  const blobs = [];
+  const all = [], v = new THREE.Vector3(), blobs = [];
   model.traverse((o) => {
     if (!o.isMesh || !isCanopy(o.material)) return;
     blobs.push(o);
-    const p = o.geometry.attributes.position, step = Math.max(1, Math.floor(p.count / 900));
-    for (let i = 0; i < p.count; i += step) { v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld); pts.push(v.clone()); box.expandByPoint(v); }
+    const p = o.geometry.attributes.position, step = Math.max(1, Math.floor(p.count / (clumps ? 4000 : 900)));
+    for (let i = 0; i < p.count; i += step) all.push(v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld).clone());
   });
-  if (!pts.length) return null;
-  for (const o of blobs) { o.material = o.material.clone(); o.material.color.multiplyScalar(0.62); o.castShadow = true; }   // the dark heart of the canopy
+  if (!all.length) return null;
+  for (const o of blobs) { o.material = o.material.clone(); o.material.color.multiplyScalar(0.62); o.castShadow = true; }   // the dark heart
 
-  const center = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
-  // keep only points on the outer shell of the canopy, so the cards sit on the outside, not inside other blobs
-  const half = size.clone().multiplyScalar(0.5), shell = pts.filter((q) => {
-    const d = q.clone().sub(center).divide(half);
-    return kind === 'pine' ? Math.hypot(d.x, d.z) > 0.55 - 0.35 * d.y : d.length() > 0.72;
-  });
-  if (shell.length > 30) pts.splice(0, pts.length, ...shell);
-  const r = rng(Math.round(center.x * 100 + size.y * 1000) + 7), tones = kind === 'pine' ? PINE_TONES : TONES;
-  const count = Math.min(900, Math.round((size.x * size.z + size.y * size.x) * (kind === 'pine' ? 12 : 10)));
+  const cfg = SETTINGS[kind], tones = kind === 'pine' ? PINE_TONES : TONES;
   const pos = [], nor = [], uv = [], col = [], sway = [], idx = [];
-  const n = new THREE.Vector3(), t1 = new THREE.Vector3(), t2 = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), corner = new THREE.Vector3();
-  for (let c = 0; c < count; c++) {
-    const p = pts[Math.floor(r() * pts.length)];
-    if (kind === 'pine') n.set(p.x - center.x, 0.45 * size.x / size.y, p.z - center.z).normalize();
-    else n.copy(p).sub(center).multiply(new THREE.Vector3(1 / size.x, 1 / size.y, 1 / size.z)).normalize();
-    const s = (kind === 'pine' ? 0.9 : 1.25) * (0.75 + r() * 0.5) * Math.max(0.6, size.y / 6);
-    const at = p.clone().addScaledVector(n, s * 0.32);
-    t1.crossVectors(Math.abs(n.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : up, n).normalize(); t2.crossVectors(n, t1);
-    const spin = r() * 6.283, cs = Math.cos(spin), sn = Math.sin(spin);
-    const a = t1.clone().multiplyScalar(cs).addScaledVector(t2, sn), b = t1.clone().multiplyScalar(-sn).addScaledVector(t2, cs);
-    a.addScaledVector(n, (r() - 0.5) * 0.6).normalize();                     // tilt a little off the surface for depth
-    // colour: height in the canopy plus a little noise picks the tone
-    const h = THREE.MathUtils.clamp((p.y - box.min.y) / size.y + (n.y * 0.25) + (r() - 0.5) * 0.3, 0, 0.999);
-    const tone = tones[Math.floor(h * tones.length)];
-    const base = pos.length / 3;
-    for (const [u, w] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
-      corner.copy(at).addScaledVector(a, u * s / 2).addScaledVector(b, w * s / 2);
-      pos.push(corner.x, corner.y, corner.z);
-      const cn = corner.clone().sub(center).normalize().lerp(n, 0.5).normalize();   // soft, round lighting across the canopy
-      nor.push(cn.x, cn.y, cn.z); uv.push((u + 1) / 2, (w + 1) / 2); col.push(tone.r, tone.g, tone.b);
-      sway.push(0.3 + r() * 0.7);
-    }
-    idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  const groups = clumps ? clusters(all, 0.45) : [all];
+  for (const pts of groups) {
+    if (pts.length < 12) continue;
+    const box = new THREE.Box3().setFromPoints(pts);
+    addCards(pts, box, kind, cfg, tones, { pos, nor, uv, col, sway, idx });
   }
+  if (!pos.length) return null;
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   g.setAttribute('sway', new THREE.Float32BufferAttribute(sway, 1)); g.setIndex(idx);
-  const cards = new THREE.Mesh(g, cardMaterial(kind, ramp));
+  const cards = new THREE.Mesh(g, cardMaterial(kind === 'bush' ? 'broad' : kind, ramp));
   cards.castShadow = false; cards.receiveShadow = true; cards.name = 'leaf_cards';
   model.add(cards);
   return cards;
+}
+
+function addCards(pts0, box, kind, cfg, tones, out) {
+  let pts = pts0;
+  const center = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3()).max(new THREE.Vector3(0.05, 0.05, 0.05));
+  // keep only points on the outer shell, so the cards sit on the outside, not inside other blobs (and not under a bush)
+  const half = size.clone().multiplyScalar(0.5), shell = pts.filter((q) => {
+    const d = q.clone().sub(center).divide(half);
+    if (kind === 'bush' && d.y < -0.55) return false;
+    return kind === 'pine' ? Math.hypot(d.x, d.z) > 0.55 - 0.35 * d.y : d.length() > cfg.shell;
+  });
+  if (shell.length > 12) pts = shell;
+  const r = rng(Math.round(Math.abs(center.x) * 100 + Math.abs(center.z) * 37 + size.y * 1000) + 7);
+  const count = Math.min(cfg.max, Math.max(12, Math.round((size.x * size.z + size.y * size.x) * cfg.density)));
+  const n = new THREE.Vector3(), t1 = new THREE.Vector3(), t2 = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), corner = new THREE.Vector3();
+  const scale = kind === 'bush' ? THREE.MathUtils.clamp(size.y * 1.1, 0.45, 1.1) : Math.max(0.6, size.y / 6);
+  for (let c = 0; c < count; c++) {
+    const p = pts[Math.floor(r() * pts.length)];
+    if (kind === 'pine') n.set(p.x - center.x, 0.45 * size.x / size.y, p.z - center.z).normalize();
+    else n.copy(p).sub(center).multiply(new THREE.Vector3(1 / size.x, 1 / size.y, 1 / size.z)).normalize();
+    const s = cfg.size * (0.75 + r() * 0.5) * scale;
+    const at = p.clone().addScaledVector(n, s * cfg.offset);
+    t1.crossVectors(Math.abs(n.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : up, n).normalize(); t2.crossVectors(n, t1);
+    const spin = r() * 6.283, cs = Math.cos(spin), sn = Math.sin(spin);
+    const a = t1.clone().multiplyScalar(cs).addScaledVector(t2, sn), b = t1.clone().multiplyScalar(-sn).addScaledVector(t2, cs);
+    a.addScaledVector(n, (r() - 0.5) * 0.6).normalize();                     // tilt a little off the surface for depth
+    const h = THREE.MathUtils.clamp((p.y - box.min.y) / size.y + (n.y * 0.25) + (r() - 0.5) * 0.3, 0, 0.999);
+    const tone = tones[Math.floor(h * tones.length)];
+    const base = out.pos.length / 3;
+    for (const [u, w] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      corner.copy(at).addScaledVector(a, u * s / 2).addScaledVector(b, w * s / 2);
+      out.pos.push(corner.x, corner.y, corner.z);
+      const cn = corner.clone().sub(center).normalize().lerp(n, 0.5).normalize();   // soft, round lighting across the clump
+      out.nor.push(cn.x, cn.y, cn.z); out.uv.push((u + 1) / 2, (w + 1) / 2); out.col.push(tone.r, tone.g, tone.b);
+      out.sway.push(0.3 + r() * 0.7);
+    }
+    out.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  }
 }

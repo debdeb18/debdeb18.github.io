@@ -13,7 +13,8 @@ lib.reset()
 lib.set_style(jitter=1.3, lean=1.0, pal=dict(
     wood=0x9A6A45, wood_dark=0x4E3528, wood_pale=0xC9A374, roof=0x41626F, roof_dark=0x2F4B58, cream=0xF1E6CC, stone=0xB9B2A8,
     timber=0x8A5A3C, timber_dark=0x4A3226, plaster=0xF0E4C8, concrete=0xD2CBBC, concrete_dark=0xA39C8F, gravel=0x8F877D, rail=0x7E7A82,
-    grass=0x7DB85A, sand=0xE6D6A8, tree=0x256B45, tree_mid=0x3C8C4C, tree_light=0x7CBC58, tree_hi=0xC2E272, trunk=0x5A3F30, boat=0x4F8FA0, pole=0x54483F, yellow=0xF2C230, canopy=0x5E8F7A, canopy_dark=0x45725F,
+    grass=0x7DB85A, sand=0xE6D6A8, bush=0x3A8547, bush_light=0x6FB04F, bush_dark=0x2A6643,       # bushes get their own colours so the website can find them
+    tree=0x256B45, tree_mid=0x3C8C4C, tree_light=0x7CBC58, tree_hi=0xC2E272, trunk=0x5A3F30, boat=0x4F8FA0, pole=0x54483F, yellow=0xF2C230, canopy=0x5E8F7A, canopy_dark=0x45725F,
     lamp=0xFFD28A, window=0xFFC777, vend=0xE8F0F4, vend_glow=0xBFE6FF, train_red=0xB8403A, train_cream=0xF0E2C0, cloud=0xFFFFFF, hill=0x4F7F86))
 PZ = 0.95                                   # platform height
 
@@ -136,7 +137,7 @@ def fence(xa, xb, y):
 fence(-10.5, 0.4, 3.0); fence(23.6, 34.6, 3.0)
 for x in (-9, -6.3, -3.4, 25, 28, 31):
     box('planter', (1.5, 0.55, 0.42), (x, 2.55, PZ), color='timber', bevel=0.03, jitter=0.015)
-    for i in range(5): lump('shrub', random.uniform(0.2, 0.32), (x + random.uniform(-0.5, 0.5), 2.55 + random.uniform(-0.08, 0.08), PZ + random.uniform(0.45, 0.62)), (1, 1, 0.85), random.choice(('tree_mid', 'tree_light')), rough=1)
+    for i in range(5): lump('shrub', random.uniform(0.2, 0.32), (x + random.uniform(-0.5, 0.5), 2.55 + random.uniform(-0.08, 0.08), PZ + random.uniform(0.45, 0.62)), (1, 1, 0.85), random.choice(('bush', 'bush_light')), rough=1)
 for x in (-8.2, 27.5):
     lib.piece('platform_lamp', (x, 2.4, PZ))
     cyl('lamp_post', 0.07, 0.05, 4.2, (x, 2.4, PZ), color='pole', bevel=0.01)
@@ -205,7 +206,9 @@ def islet(n, x, y, r, feats, fa):
         a = i * 1.57 + 0.4; tube('root', [(x, y, gz(0) + 0.35), (*at(a, 0.55), gz(0.55) + 0.1), (*at(a + 0.2, 1.1), gz(1.1) - 0.06)], [0.16, 0.1, 0.04], 'trunk')
     for i in range(5):                                                           # fireflies
         fx, fy = at(random.uniform(0, 6.283), random.uniform(0.5, 0.9) * r); ball('firefly', 0.03, (fx, fy, random.uniform(0.9, 2.6)), color=0xFFF2A0, emit=6.0)
-    for i in range(3): lump('bush', random.uniform(0.3, 0.5), (*at(fa + 3.1 + i * 0.3, r * 0.5), gz(r * 0.5) + 0.25), (1, 1, 0.8), random.choice(('tree_mid', 'tree_light', 'tree')), rough=1)
+    for b in range(2):                                                           # two leafy bush clumps
+        ba = fa + 2.6 + b * 1.9; bd = r * (0.5 + 0.12 * b); bx, by = at(ba, bd)
+        for i in range(5): lump('bush', random.uniform(0.35, 0.6), (bx + random.uniform(-0.5, 0.5), by + random.uniform(-0.5, 0.5), gz(bd) + random.uniform(0.2, 0.5)), (1, 1, 0.8), random.choice(('bush', 'bush_light', 'bush_dark')), rough=1)
 
     for fi, f in enumerate(feats):
         a = fa + fi * 1.25; rz = deg(a) + 90
@@ -305,7 +308,7 @@ cyl('umbrella_stand', 0.16, 0.2, 0.5, (9.75, 2.8, PZ), color='canopy_dark', beve
 for i, c in enumerate((0xD9532F, 0x3F8FD1, 0xF2C230)): cyl('umbrella', 0.035, 0.02, 0.85, (9.7 + i * 0.06, 2.8 + (i - 1) * 0.05, PZ + 0.1), (random.uniform(-9, 9), random.uniform(-9, 9), 0), c, bevel=0.005, verts=8)
 for x, y, sz in ((5.5, 2.65, 1.0), (6.2, 2.75, 0.7), (16.6, 2.7, 0.9), (1.6, -0.1, 0.8), (22.4, -0.1, 0.8), (17.4, 2.75, 0.6)):
     cyl('pot', 0.2 * sz, 0.26 * sz, 0.34 * sz, (x, y, PZ), color=random.choice((0xC97B5A, 0x6F8FB0, 0xD9B48A)), bevel=0.02)
-    for i in range(4): lump('pot_leaf', 0.17 * sz, (x + random.uniform(-0.1, 0.1) * sz, y + random.uniform(-0.1, 0.1) * sz, PZ + 0.38 * sz + i * 0.07 * sz), (1, 1, 0.9), random.choice(('tree_mid', 'tree_light')), rough=1)
+    for i in range(4): lump('pot_leaf', 0.17 * sz, (x + random.uniform(-0.1, 0.1) * sz, y + random.uniform(-0.1, 0.1) * sz, PZ + 0.38 * sz + i * 0.07 * sz), (1, 1, 0.9), random.choice(('bush', 'bush_light')), rough=1)
     if sz > 0.75:
         for i in range(3): ball('pot_flower', 0.05 * sz, (x + random.uniform(-0.2, 0.2) * sz, y - 0.1 * sz, PZ + 0.62 * sz), color=random.choice((0xFFB7C9, 0xFFE27A, 0xFFFFFF)))
 for i, (x, y, w) in enumerate(((19.2, 2.6, 0.7), (19.95, 2.7, 0.6), (19.5, 2.62, 0.55))): box('crate', (w, w * 0.8, w * 0.7), (x, y, PZ + (0.5 if i == 2 else 0)), (0, 0, random.uniform(-8, 8)), color='wood_pale' if i % 2 else 'wood', bevel=0.02, jitter=0.01)
@@ -405,7 +408,7 @@ for lk in ('Medium High Contrast', 'High Contrast'):
     try: sc.view_settings.look = lk; break
     except Exception: pass
 sc.render.resolution_x, sc.render.resolution_y = 1600, 1000
-for name in (sys.argv[1:] or MOODS):
+for name in ([] if os.environ.get('NORENDER') else (sys.argv[1:] or MOODS)):          # NORENDER=1: export only, skip the slow renders
     m = MOODS[name]
     els[0].position = 0.5; els[1].position = 0.62; els[2].position = 1.0
     for e, c in zip(els, m['sky']): e.color = (*c, 1)

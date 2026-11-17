@@ -271,5 +271,5 @@ function frame() {
 resize();
 const start = location.hash.slice(1);
 enter(worlds[start] ? start : 'terminal');
-window.portfolio = { go, worlds, player, get state() { return state; }, debug: { renderer, composer, bloom, paint, camera, joy, get speed() { return speed; } } };
+window.portfolio = { go, worlds, player, get state() { return state; }, debug: { renderer, composer, bloom, paint, camera, joy, get speed() { return speed; }, view(y, p, d) { yaw = y; pitch = p; dist = d; } } };
 frame();

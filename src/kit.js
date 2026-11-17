@@ -173,12 +173,17 @@ export function makeCrack(color = 0xffffff) {
     tex.needsUpdate = true;
   };
   g.setOpen = (k) => { open = k; g.visible = k > 0.001; };
+  // show a live view of the destination inside the crack (or null for the plain gradient)
+  g.setPortal = (tx) => { inner.material.map = tx || tex; inner.material.needsUpdate = true; };
   g.tick = (t) => {
-    const e = 1 - Math.pow(1 - open, 3);
-    g.scale.set(Math.max(0.001, e * (1 + Math.sin(t * 3) * 0.04)), 0.25 + 0.75 * e, 1);
+    // first 30%: a hairline climbs upward. the rest: it bursts open with a little overshoot.
+    const line = Math.min(1, open / 0.3), wide = Math.max(0, (open - 0.3) / 0.7);
+    const eb = wide <= 0 ? 0 : 1 + 2.70158 * Math.pow(wide - 1, 3) + 1.70158 * Math.pow(wide - 1, 2);
+    g.scale.set(0.03 + eb * (0.97 + Math.sin(t * 3) * 0.04), 0.04 + 0.96 * (1 - Math.pow(1 - line, 3)), 1);
     for (const m of shards) {
       const u = m.userData, a = u.a + t * u.sp * 0.4;
-      m.position.set(Math.cos(a) * u.r, u.y + Math.sin(t * u.sp + u.a) * 0.3, Math.sin(a) * 0.5);
+      m.visible = wide > 0;
+      m.position.set(Math.cos(a) * u.r * (0.2 + 0.8 * eb), u.y + Math.sin(t * u.sp + u.a) * 0.3, Math.sin(a) * 0.5);
       m.rotation.set(t * u.sp, t * u.sp * 0.7, u.a);
     }
   };

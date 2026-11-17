@@ -39,7 +39,18 @@ const hair = sph(body, 0.275, 0x1f1a1c, 0, 0.84, -0.05, 2, { flatShading: false 
 box(body, 0.5, 0.5, 0.14, 0x1f1a1c, 0, 0.4, -0.2);
 for (const x of [-0.1, 0.1]) { const t = new THREE.Mesh(new THREE.TorusGeometry(0.065, 0.012, 6, 14), new THREE.MeshBasicMaterial({ color: 0x2c2b33 })); t.position.set(x, 0.82, 0.235); body.add(t); }
 player.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+function swing(moving, t) {
+  const sw = moving ? Math.sin(walkPhase) * 0.7 : 0;
+  legs[0].rotation.x = sw; legs[1].rotation.x = -sw; arms[0].rotation.x = -sw * 0.8; arms[1].rotation.x = sw * 0.8;
+  body.position.y = 0.45 + (moving ? Math.abs(Math.sin(walkPhase)) * 0.05 : Math.sin(t * 2) * 0.008);
+}
 function pose(sitting) { legs.forEach((l) => { l.rotation.x = sitting ? -Math.PI / 2 : 0; }); arms.forEach((a) => { a.rotation.x = sitting ? -0.5 : 0; }); body.position.y = 0.45; }
+
+// the view you see inside the crack: a live render of the destination
+const portalRT = new THREE.WebGLRenderTarget(512, 896);
+const portalCam = new THREE.PerspectiveCamera(58, 0.57, 0.1, 1000);
+const PORTAL = { home: [[0, 6.5, 19], [0, 1.5, 0]], office: [[7, 13, 17], [0, 0, 0]], market: [[0, 5.5, 21], [0, 2.5, -2]] };
+let dest = null, arriveT = 0;
 
 // ---------- state ----------
 let state = 'walk';            // walk | sit | depart
@@ -47,7 +58,7 @@ let yaw = 0, pitch = 0.5, dist = 10, walkPhase = 0, activeHot = null, panelHot =
 const look = new THREE.Vector3(), tmp = new THREE.Vector3();
 const keys = new Set(), joy = { x: 0, y: 0 };
 
-function enter(name) {
+function enter(name, swoop) {
   world = worlds[name];
   renderPass.scene = world.scene;
   world.scene.add(player);
@@ -59,12 +70,13 @@ function enter(name) {
   $('where').textContent = world.title;
   document.querySelectorAll('#nav button').forEach((b) => b.classList.toggle('on', b.dataset.go === name));
   history.replaceState(null, '', name === 'terminal' ? location.pathname : '#' + name);
-  placeCamera(1);
+  if (swoop && PORTAL[name]) { camera.position.set(...PORTAL[name][0]); look.set(...PORTAL[name][1]); camera.lookAt(look); arriveT = 2.2; }
+  else placeCamera(1);
 }
-function go(name) {
+function go(name, swoop) {
   if (busy || !worlds[name]) return;
   busy = true; $('fade').classList.add('on');
-  setTimeout(() => { enter(name); $('fade').classList.remove('on'); busy = false; }, 480);
+  setTimeout(() => { enter(name, swoop); $('fade').classList.remove('on'); busy = false; }, 480);
 }
 
 const sitHot = worlds.terminal.hots.find((h) => h.action === 'sit');
@@ -97,8 +109,10 @@ $('close').addEventListener('click', closePanel);
 $('stand').addEventListener('click', stand);
 document.querySelectorAll('#tickets [data-dest]').forEach((b) => b.addEventListener('click', () => {
   if (state !== 'sit') return;
-  state = 'depart'; $('tickets').hidden = true;
-  worlds.terminal.depart(b.dataset.dest, () => go(b.dataset.dest));
+  state = 'depart'; $('tickets').hidden = true; dest = b.dataset.dest;
+  portalCam.position.set(...PORTAL[dest][0]); portalCam.lookAt(...PORTAL[dest][1]);
+  worlds.terminal.crack.setPortal(portalRT.texture);
+  worlds.terminal.depart(dest, () => go(dest, true));
 }));
 document.querySelectorAll('#nav button').forEach((b) => b.addEventListener('click', () => go(b.dataset.go)));
 $('start').addEventListener('click', () => $('intro').classList.add('gone'));
@@ -146,9 +160,12 @@ function placeCamera(k) {
     camera.position.lerp(tmp, k);
   } else {
     const c = worlds.terminal.cine;
+    if (c.snap) { k = 1; c.snap = false; }
     camera.position.lerp(c.pos, k); look.lerp(c.look, k);
+    bloom.strength = world.bloom + c.glow;
   }
   camera.lookAt(look);
+  if (state !== 'walk') { const c = worlds.terminal.cine; camera.position.x += (Math.random() - 0.5) * c.shake; camera.position.y += (Math.random() - 0.5) * c.shake; }
 }
 function resize() {
   const w = innerWidth, h = innerHeight;
@@ -180,9 +197,7 @@ function frame() {
       player.rotation.y += d * Math.min(1, dt * 12);
       walkPhase += dt * 11;
     }
-    const sw = moving ? Math.sin(walkPhase) * 0.7 : 0;
-    legs[0].rotation.x = sw; legs[1].rotation.x = -sw; arms[0].rotation.x = -sw * 0.8; arms[1].rotation.x = sw * 0.8;
-    body.position.y = 0.45 + (moving ? Math.abs(Math.sin(walkPhase)) * 0.05 : Math.sin(t * 2) * 0.008);
+    swing(moving, t);
 
     // nearest hotspot
     let best = null, bd = 1e9;
@@ -190,6 +205,18 @@ function frame() {
     if (panelHot && Math.hypot(panelHot.x - player.position.x, panelHot.z - player.position.z) > panelHot.r * 1.7) closePanel();
     activeHot = best;
   } else activeHot = null;
+  if (state === 'depart') {
+    const q = worlds.terminal.seqT;
+    if (q > 5.7) {                       // stand up, walk off the platform and into the crack
+      const k = THREE.MathUtils.clamp((q - 5.95) / 1.5, 0, 1);
+      player.position.set(0, 0.6 - 0.4 * THREE.MathUtils.smoothstep(k, 0.34, 0.48), 1.2 - k * 3.3);
+      walkPhase += dt * 10; swing(k > 0 && k < 1, t);
+    }
+    if (q > 3.6 && dest) {               // render the destination into the crack
+      worlds[dest].update(t, dt);
+      renderer.setRenderTarget(portalRT); renderer.render(worlds[dest].scene, portalCam); renderer.setRenderTarget(null);
+    }
+  }
   const show = activeHot && activeHot !== panelHot && !busy;
   if (show) $('prompt').textContent = activeHot.label;
   $('prompt').hidden = !show;
@@ -197,7 +224,8 @@ function frame() {
   world.update(t, dt);
   sitHot.mark.visible = state === 'walk';
   if (world.sun) { world.sun.target.position.copy(player.position); world.sun.position.copy(player.position).add(world.sun.userData.offset); }
-  placeCamera(1 - Math.exp(-dt * (state === 'walk' ? 7 : 2.5)));
+  arriveT = Math.max(0, arriveT - dt);
+  placeCamera(1 - Math.exp(-dt * (state !== 'walk' ? 2.5 : arriveT > 0 ? 1.6 + (2.2 - arriveT) * 2.4 : 7)));
   composer.render();
   requestAnimationFrame(frame);
 }

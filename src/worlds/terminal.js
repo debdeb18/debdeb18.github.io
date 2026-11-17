@@ -17,9 +17,9 @@ export function buildTerminal() {
   w.bloom = 0.35;
   const TZ = -2.2; // centre line of the track
 
-  sky(s, 0x4f9fe6, 0xcdeaf3, 0xbfe4ea);
+  const skyMesh = sky(s, 0x4f9fe6, 0xcdeaf3, 0xbfe4ea);
   s.fog = new THREE.Fog(0xd7ecef, 45, 190);
-  s.add(new THREE.HemisphereLight(0xe6f6ff, 0x9fc7a8, 1.5));
+  const hemi = new THREE.HemisphereLight(0xe6f6ff, 0x9fc7a8, 1.5); s.add(hemi);
   w.sunlight(0xfff0d0, 2.1, -9, 15, 7);
 
   // --- the sea ---
@@ -183,36 +183,92 @@ export function buildTerminal() {
 
   // --- the dimension crack ---
   const crack = makeCrack();
-  crack.position.set(0, 0.15, TZ);
-  crack.setOpen(0);
-  s.add(crack);
-  const crackLight = new THREE.PointLight(0xffffff, 0, 14);
-  crackLight.position.set(0, 2.5, TZ + 0.8);
-  s.add(crackLight);
+  crack.position.set(0, 0.15, TZ); crack.setOpen(0); s.add(crack);
+  w.crack = crack;
+  const C = new THREE.Vector3(0, 2.7, TZ);
+  const crackLight = new THREE.PointLight(0xffffff, 0, 16);
+  crackLight.position.set(0, 2.5, TZ + 0.8); s.add(crackLight);
+  const fx = { transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, opacity: 0 };
+  // light rays fanning out of the tear
+  const rays = group(s, C.x, C.y, C.z - 0.06), rayMat = new THREE.MeshBasicMaterial(fx);
+  for (let i = 0; i < 12; i++) {
+    const len = 5 + Math.random() * 6;
+    const m = new THREE.Mesh(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-0.1, 0, 0), new THREE.Vector3(0.1, 0, 0), new THREE.Vector3(0, len, 0)]), rayMat);
+    m.rotation.z = (i / 12) * 6.283 + Math.random() * 0.4; rays.add(m);
+  }
+  // shockwave ring at the moment it shatters
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 64), new THREE.MeshBasicMaterial(fx));
+  ring.position.copy(C); s.add(ring);
+  // motes of light pulled into the crack
+  const MN = 240, mp = new Float32Array(MN * 3), ms = [];
+  for (let i = 0; i < MN; i++) ms.push({ a: Math.random() * 6.283, r: 1 + Math.random() * 9, y: (Math.random() - 0.5) * 6, v: 1.5 + Math.random() * 2.5 });
+  const mgeo = new THREE.BufferGeometry(); mgeo.setAttribute('position', new THREE.BufferAttribute(mp, 3));
+  const motes = new THREE.Points(mgeo, new THREE.PointsMaterial({ size: 0.11, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  motes.frustumCulled = false; motes.visible = false; s.add(motes);
 
-  // camera shots used while sitting / departing
-  const seat = { pos: new THREE.Vector3(2.3, 2.5, 5.6), look: new THREE.Vector3(0, 1.7, TZ) };
-  const push = { pos: new THREE.Vector3(0, 2.2, -0.4), look: new THREE.Vector3(0, 2.6, TZ) };
-  w.cine = { pos: seat.pos.clone(), look: seat.look.clone() };
-  let seq = null;
-  w.depart = (dest, onArrive) => {
-    seq = { t: 0, onArrive, done: false };
-    crack.setColor(DEST[dest].color); crackLight.color.set(DEST[dest].color);
-    train.visible = true; train.position.x = -120;
+  // the sky slides into dusk while the train comes
+  const sU = skyMesh.material.uniforms, wU = water.material.uniforms, col = (h) => new THREE.Color(h);
+  const day = { a: sU.a.value.clone(), b: sU.b.value.clone(), c: sU.c.value.clone(), wa: wU.a.value.clone(), wb: wU.b.value.clone(), fog: s.fog.color.clone(), sun: w.sun.color.clone() };
+  const dusk = { a: col(0x232a5c), b: col(0xf6b3a0), c: col(0x7a86b4), wa: col(0x2c6890), wb: col(0xf0bcae), fog: col(0xe8b9b0), sun: col(0xffb38a) };
+  const mood = (k) => {
+    sU.a.value.lerpColors(day.a, dusk.a, k); sU.b.value.lerpColors(day.b, dusk.b, k); sU.c.value.lerpColors(day.c, dusk.c, k);
+    wU.a.value.lerpColors(day.wa, dusk.wa, k); wU.b.value.lerpColors(day.wb, dusk.wb, k);
+    s.fog.color.lerpColors(day.fog, dusk.fog, k); w.sun.color.lerpColors(day.sun, dusk.sun, k);
+    hemi.intensity = 1.5 - 0.55 * k; w.sun.intensity = 2.1 - 0.5 * k;
   };
-  w.reset = () => { seq = null; crack.setOpen(0); crackLight.intensity = 0; train.visible = false; la.material = lb.material = lampOff; w.cine.pos.copy(seat.pos); w.cine.look.copy(seat.look); };
+
+  // the cutscene: four shots, each a slow camera move
+  const END = 7.6, V = (a) => new THREE.Vector3(...a);
+  const shots = [
+    { t: 0, from: V([2.3, 2.5, 5.6]), to: V([1.9, 2.2, 4.9]), look: V([0, 1.7, TZ]) },          // waiting
+    { t: 1.5, from: V([7.6, 0.95, -0.35]), to: V([7.6, 1.15, -0.2]), look: V([-30, 2.4, TZ]) },  // rail-side, train bearing down
+    { t: 3.05, from: V([3.0, 2.2, 6.8]), to: V([1.7, 2.3, 5.3]), look: V([0, 2.3, TZ]) },        // it passes, the air tears
+    { t: 5.7, from: V([1.6, 2.0, 4.8]), to: V([0.3, 1.9, 0.7]), look: V([0, 2.6, TZ]) },         // walking in
+    { t: END },
+  ];
+  w.cine = { pos: shots[0].from.clone(), look: shots[0].look.clone(), snap: false, shake: 0, glow: 0 };
+  w.seqT = 0;
+  let seq = null;
+  const cl = (x) => THREE.MathUtils.clamp(x, 0, 1), ease = (x) => x * x * (3 - 2 * x);
+  w.depart = (dest, onArrive) => {
+    seq = { t: 0, onArrive, done: false, shot: 0 };
+    crack.setColor(DEST[dest].color); crackLight.color.set(DEST[dest].color);
+    rayMat.color.set(DEST[dest].color).multiplyScalar(1.4); ring.material.color.set(DEST[dest].color).multiplyScalar(2); motes.material.color.set(DEST[dest].color).lerp(col(0xffffff), 0.5);
+    train.visible = true; train.position.x = -95;
+  };
+  w.reset = () => {
+    seq = null; w.seqT = 0; crack.setOpen(0); crack.setPortal(null); crackLight.intensity = 0; train.visible = false; motes.visible = false;
+    rayMat.opacity = ring.material.opacity = 0; la.material = lb.material = lampOff; mood(0);
+    Object.assign(w.cine, { snap: false, shake: 0, glow: 0 }); w.cine.pos.copy(shots[0].from); w.cine.look.copy(shots[0].look);
+  };
   w.ticks.push((t, dt) => {
     crack.tick(t);
     if (!seq) return;
-    seq.t += dt;
-    const q = seq.t, blink = Math.floor(q * 3) % 2;
+    const q = (seq.t += dt); w.seqT = q;
+    const blink = Math.floor(q * 3) % 2;
     la.material = blink ? lampOn : lampOff; lb.material = blink ? lampOff : lampOn;
-    train.position.x = -120 + Math.max(0, q - 1.2) * 62;         // train sweeps past
-    const open = THREE.MathUtils.clamp((q - 3.5) / 1.2, 0, 1);    // the air tears in its wake
-    crack.setOpen(open); crackLight.intensity = open * 60;
-    const k = THREE.MathUtils.smoothstep(q, 4.4, 6.4);            // camera drifts into the crack
-    w.cine.pos.lerpVectors(seat.pos, push.pos, k); w.cine.look.lerpVectors(seat.look, push.look, k);
-    if (q > 6 && !seq.done) { seq.done = true; seq.onArrive(); }
+    mood(ease(cl(q / 3.6)));
+    train.position.x = -95 + Math.max(0, q - 1.2) * 52;
+    // camera
+    let i = seq.shot; while (q >= shots[i + 1].t && i < shots.length - 2) i++;
+    if (i !== seq.shot) { seq.shot = i; w.cine.snap = true; }
+    const sh = shots[i];
+    w.cine.pos.lerpVectors(sh.from, sh.to, ease(cl((q - sh.t) / (shots[i + 1].t - sh.t)))); w.cine.look.copy(sh.look);
+    w.cine.shake = 0.09 * Math.exp(-(((train.position.x - 5 - w.cine.pos.x) / 13) ** 2));
+    w.cine.glow = ease(cl((q - 6.4) / 1.1)) * 1.8;
+    // the tear: a hairline climbs, then it shatters open
+    const open = cl((q - 3.75) / 1.5), wide = cl((open - 0.3) / 0.7), qs = q - 4.2;
+    crack.setOpen(open); crackLight.intensity = wide * 90;
+    rayMat.opacity = wide * (0.22 + Math.sin(t * 5) * 0.05); rays.rotation.z = t * 0.15;
+    ring.scale.setScalar(1 + Math.max(0, qs) * 15); ring.material.opacity = qs > 0 ? cl(1 - qs / 0.9) * 0.9 : 0;
+    motes.visible = wide > 0;
+    for (let n = 0; n < MN; n++) {
+      const m = ms[n]; m.r -= dt * m.v * (0.6 + wide); m.a += dt * (1.2 + 3 / (m.r + 0.5));
+      if (m.r < 0.15) { m.r = 6 + Math.random() * 4; m.y = (Math.random() - 0.5) * 6; }
+      mp[n * 3] = C.x + Math.cos(m.a) * m.r; mp[n * 3 + 1] = C.y + m.y * Math.min(1, m.r / 5) + Math.sin(m.a) * m.r * 0.25; mp[n * 3 + 2] = C.z + 0.4 + Math.abs(Math.sin(m.a)) * m.r * 0.5;
+    }
+    mgeo.attributes.position.needsUpdate = true;
+    if (q > END && !seq.done) { seq.done = true; seq.onArrive(); }
   });
 
   return w.finish();

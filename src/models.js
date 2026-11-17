@@ -9,7 +9,7 @@ loader.setMeshoptDecoder(MeshoptDecoder);
 
 // Three flat tones with a soft step between them: the "cel" part of the painted look.
 let ramp;
-function gradient() {
+export function gradient() {
   if (ramp) return ramp;
   const tones = new Uint8Array([92, 92, 92, 255, 168, 168, 168, 255, 222, 222, 222, 255, 255, 255, 255, 255]);
   ramp = new THREE.DataTexture(tones, 4, 1, THREE.RGBAFormat);
@@ -37,6 +37,7 @@ export function toon(object) {
         color: m.color, map: crisp(m.map), gradientMap: gradient(), vertexColors: m.vertexColors,
         emissive: m.emissive, emissiveMap: crisp(m.emissiveMap), emissiveIntensity: m.emissiveIntensity ?? 1, side: m.side,
       });
+      t.name = m.name;
       const kind = surfaceOf(m);                                        // grass, sand, concrete, wood... get a hand-painted texture
       if (kind) painted(t, kind, rimPatch); else rim(t);
       if (m.emissiveMap || (m.emissive && m.emissive.getHex() !== 0)) { t.userData.glow = t.emissiveIntensity; glow.push(t); }
@@ -50,7 +51,7 @@ export function toon(object) {
 }
 
 /** Load every model a world's layout needs, then place each piece. Blender is z-up, so (x, y, z) becomes (x, z, -y). */
-export async function loadLayout(dir, parent, onProgress = () => {}) {
+export async function loadLayout(dir, parent, onProgress = () => {}, prepare = () => {}) {
   const layout = await (await fetch(`${dir}/layout.json`)).json();
   const names = [...new Set(layout.pieces.filter((p) => p.model).map((p) => p.name))];
   const models = {}, glow = [];
@@ -58,6 +59,7 @@ export async function loadLayout(dir, parent, onProgress = () => {}) {
   await Promise.all(names.map(async (n) => {
     const gltf = await loader.loadAsync(`${dir}/${n}.glb`);
     glow.push(...toon(gltf.scene));
+    prepare(n, gltf.scene);                                           // e.g. leaves on the trees, before the copies are made
     models[n] = gltf.scene;
     onProgress(++done, names.length);
   }));

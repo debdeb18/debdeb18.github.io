@@ -4,7 +4,8 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeWorld, sky, stars, cloud, cloudMat, softDot, makeCrack, sign } from '../kit.js';
 import { blob } from '../nature.js';
-import { loadLayout } from '../models.js';
+import { loadLayout, gradient } from '../models.js';
+import { leafify } from '../foliage.js';
 import { painted } from '../paint.js';
 
 export const DEST = {
@@ -133,7 +134,11 @@ export function buildTerminal() {
   // ---------- the Blender station ----------
   let placed = {};
   w.progress = () => {};
-  w.ready = loadLayout('models/terminal', s, (n, of) => w.progress(n, of)).then((r) => {
+  const CANOPY = /^c_(256b45|3c8c4c|7cbc58|c2e272)/;                            // the leafy parts of the Blender trees
+  const isCanopy = (m) => CANOPY.test(m.name || '');
+  w.ready = loadLayout('models/terminal', s, (n, of) => w.progress(n, of), (name, model) => {
+    if (/^tree_|^pine$/.test(name)) leafify(model, name === 'pine' ? 'pine' : 'broad', isCanopy, gradient());
+  }).then((r) => {
     placed = r.placed; w.glowMats = r.glow; w.loaded = true;
     buildSeabed(r.layout.islets || []);
     trees = [...(placed.tree_a || []), ...(placed.tree_b || []), ...(placed.tree_c || []), ...(placed.pine || [])].map((o) => ({ o, ph: Math.random() * 6.28 }));

@@ -11,7 +11,8 @@ Every area follows the same loop: concept render, feedback, split into pieces, b
 - [x] First painted pass: toon shading, rim light, brush-stroke filter (desktop)
 - [x] Hand-painted textures, step 1: ground (grass, sand, concrete, gravel, wood decking, stone)
 - [x] Hand-painted textures, step 2: buildings (plaster, roof tiles, painted timber)
-- [ ] Hand-painted textures, step 3: foliage (trees and bushes as painted leaf clusters), light shafts
+- [x] Hand-painted textures, step 3: trees as painted leaf clusters that flutter in the wind; painted bark
+- [ ] Next for the painted look: bushes and planters as leaf clusters, light shafts through the trees
 
 ## 1. Terminal: a station above the water
 Design in Blender

@@ -116,6 +116,15 @@ const PAINTERS = {
     g.globalAlpha = 0.45; g.strokeStyle = '#6e6e6e'; g.lineWidth = 1.2;
     for (let i = 0; i < 12; i++) { let x = r() * SIZE, y = r() * SIZE; g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 5; k++) { x += (r() - 0.5) * 22; y += r() * 14; g.lineTo(x, y); } g.stroke(); }
   },
+  // Bark (grey, tinted): long vertical strokes, darker furrows, a few lighter ridges catching the light.
+  bark(g, r) {
+    g.fillStyle = '#a8a8a8'; g.fillRect(0, 0, SIZE, SIZE);
+    for (let i = 0; i < 900; i++) {
+      const x = r() * SIZE, y = r() * SIZE, len = 40 + r() * 120, dark = r() < 0.55;
+      wrap(x, y, len, (X, Y) => stroke(g, X, Y, len, 2 + r() * 4, Math.PI / 2 + (r() - 0.5) * 0.12, (r() - 0.5) * 10, dark ? '#5e5e5e' : '#d4d4d4', dark ? 0.45 : 0.35));
+    }
+    for (let i = 0; i < 40; i++) { const x = r() * SIZE, y = r() * SIZE; wrap(x, y, 16, (X, Y) => dab(g, X, Y, 6 + r() * 10, 3 + r() * 4, 0, r() < 0.5 ? '#7c8f6a' : '#4c4c4c', 0.35)); }
+  },
   // Plaster walls (grey, tinted): soft cloudy patches, rain stains running down from the top, a few chips.
   plaster(g, r) {
     const n = fbm(noiseField(r, 3), noiseField(r, 6), noiseField(r, 13));
@@ -153,7 +162,7 @@ const PAINTERS = {
 // How each kind is applied: `replace` uses the painted colours as they are; `tint` multiplies them with the part's own colour.
 const KINDS = { grass: { scale: 1 / 3.2, mode: 'replace' }, sand: { scale: 1 / 4, mode: 'replace' }, concrete: { scale: 1 / 4, mode: 'replace' },
   gravel: { scale: 1 / 2, mode: 'replace' }, wood: { scale: 1 / 2.2, mode: 'tint' }, stone: { scale: 1 / 2.5, mode: 'tint' },
-  plaster: { scale: 1 / 3, mode: 'tint' }, roof: { scale: 1 / 2.4, mode: 'tint' }, paint: { scale: 1 / 1.6, mode: 'tint' } };
+  bark: { scale: 1 / 1.6, mode: 'tint' }, plaster: { scale: 1 / 3, mode: 'tint' }, roof: { scale: 1 / 2.4, mode: 'tint' }, paint: { scale: 1 / 1.6, mode: 'tint' } };
 
 const textures = {};
 export function paintedTexture(kind) {
@@ -169,7 +178,7 @@ export function paintedTexture(kind) {
 export const SURFACES = {
   '7db85a': 'grass', 'e6d6a8': 'sand', d2cbbc: 'concrete', a39c8f: 'concrete', c9bfa8: 'gravel', '8f877d': 'gravel',
   '9a6a45': 'wood', c9a374: 'wood', '8a5a3c': 'wood', '4a3226': 'wood', '4e3528': 'wood', b9b2a8: 'stone',
-  f0e4c8: 'plaster', '41626f': 'roof', '2f4b58': 'roof', '5e8f7a': 'roof', '45725f': 'roof', f1e6cc: 'paint', e8f0f4: 'paint', b8403a: 'paint', f0e2c0: 'paint',
+  '5a3f30': 'bark', f0e4c8: 'plaster', '41626f': 'roof', '2f4b58': 'roof', '5e8f7a': 'roof', '45725f': 'roof', f1e6cc: 'paint', e8f0f4: 'paint', b8403a: 'paint', f0e2c0: 'paint',
 };
 export function surfaceOf(material) { const m = /^c_([0-9a-f]{6})/.exec(material.name || ''); return m ? SURFACES[m[1]] : null; }
 

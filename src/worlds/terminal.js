@@ -5,6 +5,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeWorld, sky, stars, cloud, cloudMat, softDot, makeCrack, sign } from '../kit.js';
 import { blob } from '../nature.js';
 import { loadLayout } from '../models.js';
+import { painted } from '../paint.js';
 
 export const DEST = {
   home: { color: 0x8fb4ff, name: 'Home among the stars' },
@@ -20,7 +21,7 @@ const NUMBERS = new Set(['sunI', 'hemiI', 'lamps', 'stars', 'glow', 'bloom']);  
 const pal = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, NUMBERS.has(k) ? v : new THREE.Color(v)]));
 const NIGHT = pal({ top: 0x070b24, mid: 0x1b2552, bot: 0x0e1638, sun: 0x8fa8ff, sunI: 0.45, sky: 0x3a4a80, ground: 0x182030, hemiI: 0.55, fog: 0x18214a, shallow: 0x1d5a6e, deep: 0x07142e, lamps: 1, cLit: 0x5d68a0, cShade: 0x20264a, cEdge: 0x8c96cc, stars: 1, glow: 0.45, bloom: 0.75 });
 const DAWN = pal({ top: 0x4a6fb0, mid: 0xffc2a0, bot: 0x8aa0c8, sun: 0xffb38a, sunI: 1.3, sky: 0xd8c8e8, ground: 0x8a9a78, hemiI: 1.0, fog: 0xf0c8b8, shallow: 0x7cc4c4, deep: 0x245a80, lamps: 0.5, cLit: 0xffe2d2, cShade: 0x9890c4, cEdge: 0xffd0b4, stars: 0.15, glow: 0.3, bloom: 0.45 });
-const DAY = pal({ top: 0x3f8fe0, mid: 0xbfe4f3, bot: 0xbfe4ea, sun: 0xfff0d8, sunI: 2.4, sky: 0xe6f6ff, ground: 0x9fc7a8, hemiI: 1.5, fog: 0xd2ecf2, shallow: 0x5fd0c8, deep: 0x17639a, lamps: 0, cLit: 0xffffff, cShade: 0xb4cbe6, cEdge: 0xffffff, stars: 0, glow: 0.2, bloom: 0.3 });
+const DAY = pal({ top: 0x2f86e0, mid: 0xbfe4f3, bot: 0xbfe4ea, sun: 0xfff2d6, sunI: 3.0, sky: 0xb4d4f4, ground: 0x8a9c8c, hemiI: 1.2, fog: 0xd2ecf2, shallow: 0x5fd0c8, deep: 0x17639a, lamps: 0, cLit: 0xffffff, cShade: 0xb4cbe6, cEdge: 0xffffff, stars: 0, glow: 0.2, bloom: 0.3 });
 const DUSK = pal({ top: 0x232a5c, mid: 0xf6b3a0, bot: 0x7a86b4, sun: 0xffa070, sunI: 1.5, sky: 0xc8a8c8, ground: 0x6a6a7a, hemiI: 0.95, fog: 0xe8b9b0, shallow: 0x6aa8b4, deep: 0x1a3c6a, lamps: 1, cLit: 0xffd9c4, cShade: 0x8a7bb0, cEdge: 0xffc4a0, stars: 0.1, glow: 0.6, bloom: 0.55 });
 const KEYS = [[0, NIGHT], [5.2, NIGHT], [6.5, DAWN], [8.5, DAY], [16.4, DAY], [18.2, DUSK], [19.7, NIGHT], [24, NIGHT]];
 function mixPal(out, a, b, k) {
@@ -118,7 +119,7 @@ export function buildTerminal() {
   const water = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), makeWater(U));
   water.position.set(55, 0, 0); water.receiveShadow = true; water.renderOrder = 1; water.userData.noShadow = true;
   s.add(water);
-  const floorMat = new THREE.MeshToonMaterial({ color: 0xe6d6a8 });
+  const floorMat = painted(new THREE.MeshToonMaterial({ color: 0xe6d6a8 }), 'sand');
   const deepFloor = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x14304a }));
   deepFloor.position.set(55, -4.3, 0); deepFloor.userData.noShadow = true; s.add(deepFloor);
   function buildSeabed(islets) {

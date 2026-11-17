@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { painted, surfaceOf } from './paint.js';
 
 const loader = new GLTFLoader();
 loader.setMeshoptDecoder(MeshoptDecoder);
@@ -17,14 +18,11 @@ function gradient() {
 }
 
 // A rim of light around every silhouette, like the bright outline painters give backlit shapes.
-function rim(m) {
-  m.onBeforeCompile = (sh) => {
-    sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>',
-      'float rimK = pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 3.0);\noutgoingLight += rimK * 0.22 * (diffuseColor.rgb * 0.6 + 0.4);\n#include <opaque_fragment>');
-  };
-  m.customProgramCacheKey = () => 'rim';
-  return m;
+export function rimPatch(sh) {
+  sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>',
+    'float rimK = pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 3.0);\noutgoingLight += rimK * 0.22 * (diffuseColor.rgb * 0.6 + 0.4);\n#include <opaque_fragment>');
 }
+function rim(m) { m.onBeforeCompile = rimPatch; m.customProgramCacheKey = () => 'rim'; return m; }
 
 const crisp = (t) => { if (t) { t.minFilter = THREE.NearestFilter; t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true; } return t; };
 
@@ -35,10 +33,12 @@ export function toon(object) {
     if (!o.isMesh) return;
     const swap = (m) => {
       if (done.has(m)) return done.get(m);
-      const t = rim(new THREE.MeshToonMaterial({
+      const t = new THREE.MeshToonMaterial({
         color: m.color, map: crisp(m.map), gradientMap: gradient(), vertexColors: m.vertexColors,
         emissive: m.emissive, emissiveMap: crisp(m.emissiveMap), emissiveIntensity: m.emissiveIntensity ?? 1, side: m.side,
-      }));
+      });
+      const kind = surfaceOf(m);                                        // grass, sand, concrete, wood... get a hand-painted texture
+      if (kind) painted(t, kind, rimPatch); else rim(t);
       if (m.emissiveMap || (m.emissive && m.emissive.getHex() !== 0)) { t.userData.glow = t.emissiveIntensity; glow.push(t); }
       done.set(m, t);
       return t;

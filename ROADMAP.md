@@ -9,7 +9,9 @@ Every area follows the same loop: concept render, feedback, split into pieces, b
 - [x] Style: A's shapes, slightly crooked; D's light for dusk and night
 - [x] Load Blender models (`.glb`) into the website (optimized: 18 MB to 3 MB)
 - [x] First painted pass: toon shading, rim light, brush-stroke filter (desktop)
-- [ ] Hand-painted textures, step by step: ground first, then buildings
+- [x] Hand-painted textures, step 1: ground (grass, sand, concrete, gravel, wood decking, stone)
+- [x] Hand-painted textures, step 2: buildings (plaster, roof tiles, painted timber)
+- [ ] Hand-painted textures, step 3: foliage (trees and bushes as painted leaf clusters), light shafts
 
 ## 1. Terminal: a station above the water
 Design in Blender

@@ -9,7 +9,7 @@ for (const world of fs.readdirSync(path.join(root, 'blender/export'))) {
   for (const f of fs.readdirSync(from)) {
     if (f.endsWith('.json')) { fs.copyFileSync(path.join(from, f), path.join(to, f)); continue; }
     if (!f.endsWith('.glb')) continue;
-    execFileSync(bin, ['optimize', path.join(from, f), path.join(to, f), '--compress', 'meshopt', '--texture-compress', 'false', '--simplify', 'false'], { stdio: 'ignore' });
+    execFileSync(bin, ['optimize', path.join(from, f), path.join(to, f), '--compress', 'meshopt', '--texture-compress', 'false', '--simplify', 'false', '--palette', 'false'], { stdio: 'ignore' });
     before += fs.statSync(path.join(from, f)).size; after += fs.statSync(path.join(to, f)).size;
   }
   console.log(`${world}: ${(before / 1e6).toFixed(1)} MB -> ${(after / 1e6).toFixed(1)} MB`);

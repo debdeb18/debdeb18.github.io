@@ -55,7 +55,7 @@ VIEWS = {   # name: camera position, looking at, lens, day?
     'side':       ((-12.5, 7.6, 2.4), (0, 7.6, 1.8), 30, True),
     'rear':       ((5.5, 22.5, 3.2), (0, 9.5, 1.8), 40, True),
     'nose':       ((-2.4, -3.2, 3.4), (0, 1.2, 2.7), 42, True),
-    'inside':     ((-1.35, 6.0, 2.2), (0, 9.0, 1.6), 22, True),
+    'inside':     ((0.3, 3.0, 2.45), (-0.3, 12.0, 1.75), 26, True),
     'dusk':       ((-6.5, -10, 2.0), (0, 3.5, 2.2), 38, False),
 }
 os.makedirs(here + '/concepts', exist_ok=True)

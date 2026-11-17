@@ -39,7 +39,9 @@ def build():
         box('equipment', (1.7, w, 0.45), (0, y, 0.3), color=0x3A3A40, parent=r, bevel=0.06)
     # ---------------- body ----------------
     yc = NOSE + L / 2
-    box('body_low', (W, L, ZB - ZF), (0, yc, ZF), color='maroon', parent=r, bevel=0.14, segs=5)
+    for sx in (-1, 1):                                                       # lower body: two side panels (hollow, so there is a cabin)
+        box('body_low', (0.12, L, ZB - ZF), (sx * (W / 2 - 0.06), yc, ZF), color='maroon', parent=r, bevel=0.05, segs=3)
+    box('body_low_end', (W - 0.1, 0.12, ZB - ZF), (0, NOSE + L - 0.06, ZF), color='maroon', parent=r, bevel=0.04)
     # upper body is hollow: a sill below the windows, a header above them, pillars between (so you can see inside)
     for sx in (-1, 1):
         x = sx * (W / 2 - 0.05)
@@ -49,7 +51,8 @@ def build():
             box('pillar', (0.1, 0.42 if NOSE + 1 < py < NOSE + L - 1 else 0.7, WZ1 - WZ0), (x, py, WZ0), color='cream_car', parent=r, bevel=0.02)
     box('end_wall', (W - 0.1, 0.1, ZR - ZB), (0, NOSE + L - 0.05, ZB), color='cream_car', parent=r, bevel=0.04)
     box('skirt', (W + 0.02, L - 0.2, 0.18), (0, yc, ZF - 0.05), color='maroon_dark', parent=r, bevel=0.06)
-    box('belt', (W + 0.05, L + 0.02, 0.08), (0, yc, ZB - 0.04), color='brass', parent=r, bevel=0.02, rough=0.4)
+    for sx in (-1, 1): box('belt', (0.05, L + 0.02, 0.08), (sx * (W / 2 + 0.005), yc, ZB - 0.04), color='brass', parent=r, bevel=0.015, rough=0.4)
+    box('belt_rear', (W, 0.05, 0.08), (0, NOSE + L + 0.01, ZB - 0.04), color='brass', parent=r, bevel=0.015, rough=0.4)
     box('gutter', (W + 0.08, L + 0.05, 0.05), (0, yc, ZR - 0.03), color='roof_dark', parent=r, bevel=0.02)
     # the rounded nose: the same two colours wrapped round a half-ellipse
     cyl('nose_low', W / 2, W / 2, ZB - ZF, (0, NOSE, ZF), color='maroon', parent=r, verts=40, bevel=0.06).scale = (1, 0.55, 1)

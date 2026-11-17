@@ -1,8 +1,9 @@
 name: Test and deploy
 
+# Every push to dev or main runs the test. Only main publishes: merge dev into main when a batch is ready.
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
   workflow_dispatch:
 

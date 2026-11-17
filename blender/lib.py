@@ -7,6 +7,14 @@ PAL = dict(wood=0xD9A066, wood_dark=0x8F5A3C, wood_pale=0xEBC894, red=0xD8364A, 
            teal=0x3F8F9A, teal_dark=0x2C6670, iron=0x3B3A4A, brass=0xE8B84A, roof=0xD9694A, roof_dark=0xB04E3C,
            glow=0xFFD98A, leaf=0x6FBF73, pink=0xFFB7C9, sky=0x8FB4FF, stone=0xB9B2A8, white=0xFFFFFF)
 
+# The active style: how crooked, how chunky, how rounded, and the studio colours. See blender/styles.py.
+BASE_PAL = dict(PAL)
+STYLE = dict(jitter=1.0, bevel=1.0, chunk=1.0, lean=1.0, emit=1.0, ground=0xBFE3D0, sky=(0.62, 0.78, 1.0), sky_power=0.9, sun=(1, 0.95, 0.85), sun_power=3.2, sun_height=52)
+def set_style(pal=None, **kw):
+    PAL.clear(); PAL.update(BASE_PAL); PAL.update(pal or {})
+    STYLE.update(jitter=1.0, bevel=1.0, chunk=1.0, lean=1.0, emit=1.0, ground=0xBFE3D0, sky=(0.62, 0.78, 1.0), sky_power=0.9, sun=(1, 0.95, 0.85), sun_power=3.2, sun_height=52)
+    STYLE.update(kw); _mats.clear()
+
 def reset():
     bpy.ops.wm.read_factory_settings(use_empty=True)
 
@@ -18,6 +26,7 @@ _mats = {}
 def mat(color, rough=0.75, emit=0.0):
     """A flat cartoon material. `color` is a palette name or a hex int."""
     hexv = PAL[color] if isinstance(color, str) else color
+    emit *= STYLE['emit']
     key = (hexv, rough, emit)
     if key in _mats: return _mats[key]
     m = bpy.data.materials.new('c_%06x' % hexv); m.use_nodes = True
@@ -35,10 +44,10 @@ def root(name):
 def _finish(name, mesh, color, loc, rot, parent, bevel, segs=3, **mk):
     for p in mesh.polygons: p.use_smooth = True
     o = bpy.data.objects.new(name, mesh); bpy.context.scene.collection.objects.link(o)
-    o.location = loc; o.rotation_euler = [math.radians(a) for a in rot]
+    o.location = loc; o.rotation_euler = [math.radians(a * (STYLE['lean'] if abs(a) < 20 else 1)) for a in rot]
     o.data.materials.append(mat(color, **mk))
     if bevel:
-        b = o.modifiers.new('bevel', 'BEVEL'); b.width = bevel; b.segments = segs; b.limit_method = 'ANGLE'; b.angle_limit = math.radians(35)
+        b = o.modifiers.new('bevel', 'BEVEL'); b.width = bevel * STYLE['bevel']; b.segments = segs; b.limit_method = 'ANGLE'; b.angle_limit = math.radians(35)
     o.modifiers.new('normals', 'WEIGHTED_NORMAL')
     if parent: o.parent = parent
     return o
@@ -46,6 +55,8 @@ def _finish(name, mesh, color, loc, rot, parent, bevel, segs=3, **mk):
 def box(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, bevel=0.02, jitter=0.0, taper=1.0, **mk):
     """A rounded box. `loc` is the centre of its base. jitter makes it hand-made and crooked; taper narrows the top."""
     bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1)
+    jitter *= STYLE['jitter']; ch = STYLE['chunk']
+    size = tuple(d * ch if d < 0.16 else d for d in size)      # chunkier styles thicken the thin parts
     for v in bm.verts:
         k = taper if v.co.z > 0 else 1.0
         v.co = Vector((v.co.x * size[0] * k + random.uniform(-jitter, jitter), v.co.y * size[1] * k + random.uniform(-jitter, jitter), (v.co.z + 0.5) * size[2] + random.uniform(-jitter, jitter) * 0.5))
@@ -110,21 +121,21 @@ def _bounds(objs):
             lo = Vector(map(min, lo, w)); hi = Vector(map(max, hi, w))
     return lo, hi
 
-def output(name, out_dir, angle=35, lift=0.42, res=(1000, 800), samples=72):
+def output(name, out_dir, angle=35, lift=0.42, res=(1000, 800), samples=72, export=True, preview=None, zoom=1.0):
     sc = bpy.context.scene
     assets = list(sc.collection.all_objects)
     bpy.ops.object.select_all(action='DESELECT')
     for o in assets: o.select_set(True)
-    bpy.ops.export_scene.gltf(filepath='%s/../models/%s.glb' % (out_dir, name), use_selection=True, export_apply=True)
+    if export: bpy.ops.export_scene.gltf(filepath='%s/../models/%s.glb' % (out_dir, name), use_selection=True, export_apply=True)
     lo, hi = _bounds(assets); c = (lo + hi) / 2; rad = (hi - lo).length / 2
     # studio: soft ground, warm key light, cool fill
     bm = bmesh.new(); bmesh.ops.create_grid(bm, x_segments=1, y_segments=1, size=60); me = bpy.data.meshes.new('ground'); bm.to_mesh(me); bm.free()
-    g = bpy.data.objects.new('_ground', me); sc.collection.objects.link(g); g.data.materials.append(mat(0xBFE3D0, 1.0))
-    sun = bpy.data.lights.new('_sun', 'SUN'); sun.energy = 3.2; sun.angle = math.radians(12); sun.color = (1, 0.95, 0.85)
-    so = bpy.data.objects.new('_sun', sun); sc.collection.objects.link(so); so.rotation_euler = (math.radians(52), 0, math.radians(angle + 70))
-    w = bpy.data.worlds.new('w'); sc.world = w; w.use_nodes = True; bg = w.node_tree.nodes['Background']; bg.inputs[0].default_value = (0.62, 0.78, 1.0, 1); bg.inputs[1].default_value = 0.9
+    g = bpy.data.objects.new('_ground', me); sc.collection.objects.link(g); g.data.materials.append(mat(STYLE['ground'], 1.0))
+    sun = bpy.data.lights.new('_sun', 'SUN'); sun.energy = STYLE['sun_power']; sun.angle = math.radians(12); sun.color = STYLE['sun']
+    so = bpy.data.objects.new('_sun', sun); sc.collection.objects.link(so); so.rotation_euler = (math.radians(STYLE['sun_height']), 0, math.radians(angle + 70))
+    w = bpy.data.worlds.new('w'); sc.world = w; w.use_nodes = True; bg = w.node_tree.nodes['Background']; bg.inputs[0].default_value = (*STYLE['sky'], 1); bg.inputs[1].default_value = STYLE['sky_power']
     cam = bpy.data.cameras.new('_cam'); cam.lens = 70; co = bpy.data.objects.new('_cam', cam); sc.collection.objects.link(co); sc.camera = co
-    a = math.radians(angle); d = rad * 4.6
+    a = math.radians(angle); d = rad * 4.6 / zoom
     co.location = c + Vector((math.sin(a) * d, -math.cos(a) * d, d * lift))
     co.rotation_euler = (c - co.location).to_track_quat('-Z', 'Y').to_euler()
     sc.render.engine = 'CYCLES'; sc.cycles.device = 'CPU'; sc.cycles.samples = samples
@@ -132,8 +143,8 @@ def output(name, out_dir, angle=35, lift=0.42, res=(1000, 800), samples=72):
     except Exception: pass
     sc.view_settings.view_transform = 'Standard'
     sc.render.resolution_x, sc.render.resolution_y = res
-    sc.render.filepath = '%s/previews/%s.png' % (out_dir, name)
+    sc.render.filepath = preview or '%s/previews/%s.png' % (out_dir, name)
     try: bpy.ops.render.render(write_still=True)
     except Exception:
         sc.cycles.use_denoising = False; bpy.ops.render.render(write_still=True)
-    bpy.ops.wm.save_as_mainfile(filepath='%s/files/%s.blend' % (out_dir, name))
+    if export: bpy.ops.wm.save_as_mainfile(filepath='%s/files/%s.blend' % (out_dir, name))

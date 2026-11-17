@@ -2,9 +2,11 @@
   "name": "debdeb18.github.io",
   "private": true,
   "scripts": {
-    "test": "node tests/smoke.cjs"
+    "test": "node tests/smoke.cjs",
+    "models": "node blender/optimize.cjs"
   },
   "devDependencies": {
-    "playwright": "1.63.0"
+    "playwright": "1.63.0",
+    "@gltf-transform/cli": "4.1.1"
   }
 }

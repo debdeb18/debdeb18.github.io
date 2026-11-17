@@ -36,7 +36,7 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
   await page.waitForFunction(() => window.portfolio && window.portfolio.worlds, null, { timeout: 60000 }).catch(() => {});
   check(await page.evaluate(() => !!(window.portfolio && window.portfolio.worlds)), 'the world starts');
   check(await page.isVisible('#intro'), 'the intro card shows');
-  await page.click('#start');
+  await page.click('#start', { timeout: 180000 });                  // the button waits for the station models to arrive
   for (const world of ['home', 'office', 'market', 'terminal']) {
     await page.evaluate((w) => window.portfolio.go(w), world);
     const want = world === 'terminal' ? '' : '#' + world;
@@ -44,6 +44,7 @@ const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (
     check(await page.evaluate((h) => location.hash === h, want), 'can travel to ' + world);
   }
   const hots = await page.evaluate(() => Object.values(window.portfolio.worlds).reduce((n, w) => n + w.hots.length, 0));
+  check(await page.evaluate(() => portfolio.worlds.terminal.loaded === true), 'the station models load');
   check(hots > 20, 'there are things to interact with (' + hots + ')');
   check(errors.length === 0, 'no errors or missing files' + (errors.length ? '\n     ' + errors.join('\n     ') : ''));
 

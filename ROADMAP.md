@@ -7,8 +7,9 @@ Every area follows the same loop: concept render, feedback, split into pieces, b
 - [x] Text content from the resume
 - [x] Blender pipeline (script, `.blend`, render, `.glb`)
 - [x] Style: A's shapes, slightly crooked; D's light for dusk and night
-- [ ] Load Blender models (`.glb`) into the website
-- [ ] Painted anime look in the browser (hard-edged shadows, brush-like colour, soft outlines)
+- [x] Load Blender models (`.glb`) into the website (optimized: 18 MB to 3 MB)
+- [x] First painted pass: toon shading, rim light, brush-stroke filter (desktop)
+- [ ] Hand-painted textures, step by step: ground first, then buildings
 
 ## 1. Terminal: a station above the water
 Design in Blender
@@ -21,14 +22,14 @@ Design in Blender
 - [ ] Review, then fixes (the rowing boat needs a proper hull)
 
 Build in the website
-- [ ] Assemble the station, with walkable areas and collisions
-- [ ] Trilingual name on the sign (어딘가 / Somewhere / Entah di mana)
-- [ ] Animated water: ripples, reflections, depth colour
-- [ ] Train arrival with splash and wake that scale with its speed
-- [ ] Clouds drifting with the wind; trees and lanterns swaying
-- [ ] Sun, sky and shadows following the visitor's real local time
-- [ ] The dimension-crack cutscene in the new station
-- [ ] Hotspots: notice board, vending machine, timetable, cat
+- [x] Assemble the station, with walkable areas and collisions
+- [x] Trilingual name on the sign (어딘가 / Somewhere / Entah di mana)
+- [x] Animated water: ripples, reflections, depth colour
+- [x] Train with splash and wake that scale with its speed; a train passes every 35-55 s
+- [x] Clouds drifting with the wind; trees swaying; gulls
+- [x] Sun, sky and shadows following the visitor's real local time (`?time=HH` to try other hours)
+- [x] The dimension-crack cutscene in the new station
+- [x] Hotspots: chair, timetable, vending machine, station sign, cat
 - [ ] Extra details pass
 
 ## 2. Character

@@ -1,0 +1,1167 @@
+{
+ "note": "Blender coordinates: x right, y away, z up, metres.",
+ "pieces": [
+  {
+   "name": "backdrop",
+   "pos": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": false
+  },
+  {
+   "name": "causeway",
+   "pos": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "platform",
+   "pos": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "station_building",
+   "pos": [
+    11.0,
+    5.6,
+    0.95
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "canopy",
+   "pos": [
+    12.0,
+    0.0,
+    0.95
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "bench",
+   "pos": [
+    14.9,
+    2.6,
+    0.95
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "vending_machine",
+   "pos": [
+    8.95,
+    2.72,
+    0.95
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "bin",
+   "pos": [
+    12.7,
+    2.7,
+    0.95
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "canopy_signs",
+   "pos": [
+    12.0,
+    0.0,
+    0.95
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "chair",
+   "pos": [
+    -2.6,
+    -0.2,
+    0.95
+   ],
+   "rot_z": 0.15,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "suitcase",
+   "pos": [
+    -1.75,
+    -0.25,
+    0.95
+   ],
+   "rot_z": -0.3,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "station_sign",
+   "pos": [
+    -6.2,
+    1.9,
+    0.95
+   ],
+   "rot_z": 0.0,
+   "scale": 0.8,
+   "model": true
+  },
+  {
+   "name": "fences_planters",
+   "pos": [
+    12.0,
+    3.0,
+    0.95
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "platform_lamp",
+   "pos": [
+    -8.2,
+    2.4,
+    0.95
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "platform_lamp",
+   "pos": [
+    27.5,
+    2.4,
+    0.95
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "utility_pole_lamp",
+   "pos": [
+    -7.0,
+    -5.9,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "utility_pole_transformer",
+   "pos": [
+    11.0,
+    -5.9,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "utility_pole_lamp",
+   "pos": [
+    29.0,
+    -5.9,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "utility_pole_transformer",
+   "pos": [
+    47.0,
+    -5.9,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "utility_pole",
+   "pos": [
+    65.0,
+    -5.9,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "utility_pole",
+   "pos": [
+    83.0,
+    -5.9,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "wires",
+   "pos": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": false
+  },
+  {
+   "name": "islet_00",
+   "pos": [
+    0.0,
+    14.0,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "tree_a",
+   "pos": [
+    0.0,
+    14.0,
+    0.534
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "islet_01",
+   "pos": [
+    8.0,
+    15.5,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "tree_b",
+   "pos": [
+    8.0,
+    15.5,
+    0.688
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "islet_02",
+   "pos": [
+    16.0,
+    14.5,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "tree_a",
+   "pos": [
+    16.0,
+    14.5,
+    0.602
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "islet_03",
+   "pos": [
+    24.0,
+    14.0,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "pine",
+   "pos": [
+    24.0,
+    14.0,
+    0.465
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "islet_04",
+   "pos": [
+    -8.0,
+    13.5,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "tree_c",
+   "pos": [
+    -8.0,
+    13.5,
+    0.534
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "islet_05",
+   "pos": [
+    32.0,
+    13.0,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "tree_a",
+   "pos": [
+    32.0,
+    13.0,
+    0.568
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "islet_06",
+   "pos": [
+    41.0,
+    12.0,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "tree_c",
+   "pos": [
+    41.0,
+    12.0,
+    0.499
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "islet_07",
+   "pos": [
+    -17.0,
+    14.0,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "tree_b",
+   "pos": [
+    -17.0,
+    14.0,
+    0.62
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "islet_08",
+   "pos": [
+    4.0,
+    -12.5,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "tree_a",
+   "pos": [
+    4.0,
+    -12.5,
+    0.534
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "islet_09",
+   "pos": [
+    21.0,
+    -13.5,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "tree_b",
+   "pos": [
+    21.0,
+    -13.5,
+    0.688
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "islet_10",
+   "pos": [
+    38.0,
+    -12.0,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "pine",
+   "pos": [
+    38.0,
+    -12.0,
+    0.534
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "islet_11",
+   "pos": [
+    -10.0,
+    -14.0,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "tree_b",
+   "pos": [
+    -10.0,
+    -14.0,
+    0.62
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "islet_12",
+   "pos": [
+    56.0,
+    -12.5,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "tree_c",
+   "pos": [
+    56.0,
+    -12.5,
+    0.62
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "islet_13",
+   "pos": [
+    54.0,
+    13.0,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "tree_a",
+   "pos": [
+    54.0,
+    13.0,
+    0.62
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "islet_14",
+   "pos": [
+    70.0,
+    13.0,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "tree_b",
+   "pos": [
+    70.0,
+    13.0,
+    0.688
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "islet_15",
+   "pos": [
+    76.0,
+    -14.0,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "tree_b",
+   "pos": [
+    76.0,
+    -14.0,
+    0.688
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "footbridge",
+   "pos": [
+    12.5,
+    -13.0,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "far_islands",
+   "pos": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": false
+  },
+  {
+   "name": "train",
+   "pos": [
+    38.0,
+    -3.2,
+    -0.05
+   ],
+   "rot_z": -1.5708,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "spray",
+   "pos": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": false
+  },
+  {
+   "name": "station_props",
+   "pos": [
+    12.0,
+    3.0,
+    0.95
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "cat",
+   "pos": [
+    14.35,
+    2.55,
+    1.44
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "lantern_string",
+   "pos": [
+    12.0,
+    -1.05,
+    0.95
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "roof_extras",
+   "pos": [
+    11.0,
+    5.6,
+    0.95
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "boat",
+   "pos": [
+    12.5,
+    -8.6,
+    0.0
+   ],
+   "rot_z": 0.35,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "mooring",
+   "pos": [
+    14.8,
+    -7.6,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "buoy_red",
+   "pos": [
+    -4.0,
+    -9.5,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "buoy_yellow",
+   "pos": [
+    19.0,
+    -6.6,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "buoy_red",
+   "pos": [
+    30.0,
+    -7.6,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "buoy_yellow",
+   "pos": [
+    48.0,
+    -8.2,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "buoy_yellow",
+   "pos": [
+    -9.0,
+    -6.6,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "lily_pads",
+   "pos": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": true
+  },
+  {
+   "name": "gulls",
+   "pos": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": false
+  },
+  {
+   "name": "clouds",
+   "pos": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot_z": 0.0,
+   "scale": 1.0,
+   "model": false
+  }
+ ],
+ "lights": [
+  {
+   "pos": [
+    3.0,
+    0.6,
+    2.9
+   ],
+   "power": 260,
+   "color": [
+    1,
+    0.72,
+    0.42
+   ]
+  },
+  {
+   "pos": [
+    8.3,
+    0.6,
+    2.9
+   ],
+   "power": 260,
+   "color": [
+    1,
+    0.72,
+    0.42
+   ]
+  },
+  {
+   "pos": [
+    13.7,
+    0.6,
+    2.9
+   ],
+   "power": 260,
+   "color": [
+    1,
+    0.72,
+    0.42
+   ]
+  },
+  {
+   "pos": [
+    19.2,
+    0.6,
+    2.9
+   ],
+   "power": 260,
+   "color": [
+    1,
+    0.72,
+    0.42
+   ]
+  },
+  {
+   "pos": [
+    -8.2,
+    1.2,
+    4.95
+   ],
+   "power": 500,
+   "color": [
+    1,
+    0.75,
+    0.45
+   ]
+  },
+  {
+   "pos": [
+    27.5,
+    1.2,
+    4.95
+   ],
+   "power": 500,
+   "color": [
+    1,
+    0.75,
+    0.45
+   ]
+  },
+  {
+   "pos": [
+    -7.0,
+    -4.6,
+    6.5
+   ],
+   "power": 700,
+   "color": [
+    1,
+    0.8,
+    0.55
+   ]
+  },
+  {
+   "pos": [
+    29.0,
+    -4.6,
+    6.5
+   ],
+   "power": 700,
+   "color": [
+    1,
+    0.8,
+    0.55
+   ]
+  },
+  {
+   "pos": [
+    7.089,
+    13.411,
+    1.419
+   ],
+   "power": 40,
+   "color": [
+    1,
+    0.75,
+    0.45
+   ]
+  },
+  {
+   "pos": [
+    8.788,
+    13.36,
+    1.419
+   ],
+   "power": 40,
+   "color": [
+    1,
+    0.75,
+    0.45
+   ]
+  },
+  {
+   "pos": [
+    16.426,
+    11.981,
+    2.498
+   ],
+   "power": 160,
+   "color": [
+    1,
+    0.7,
+    0.4
+   ]
+  },
+  {
+   "pos": [
+    3.926,
+    -4.775,
+    1.9
+   ],
+   "power": 120,
+   "color": [
+    1,
+    0.75,
+    0.45
+   ]
+  },
+  {
+   "pos": [
+    21.46,
+    -11.268,
+    1.419
+   ],
+   "power": 40,
+   "color": [
+    1,
+    0.75,
+    0.45
+   ]
+  },
+  {
+   "pos": [
+    19.787,
+    -11.57,
+    1.419
+   ],
+   "power": 40,
+   "color": [
+    1,
+    0.75,
+    0.45
+   ]
+  },
+  {
+   "pos": [
+    18.708,
+    -13.102,
+    2.559
+   ],
+   "power": 160,
+   "color": [
+    1,
+    0.7,
+    0.4
+   ]
+  },
+  {
+   "pos": [
+    38.433,
+    -9.721,
+    2.448
+   ],
+   "power": 160,
+   "color": [
+    1,
+    0.7,
+    0.4
+   ]
+  },
+  {
+   "pos": [
+    36.5,
+    -3.2,
+    1.4
+   ],
+   "power": 700,
+   "color": [
+    1,
+    0.9,
+    0.7
+   ]
+  },
+  {
+   "pos": [
+    -4,
+    -9.5,
+    0.95
+   ],
+   "power": 30,
+   "color": [
+    1,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "pos": [
+    19,
+    -6.6,
+    0.95
+   ],
+   "power": 30,
+   "color": [
+    1,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "pos": [
+    30,
+    -7.6,
+    0.95
+   ],
+   "power": 30,
+   "color": [
+    1,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "pos": [
+    48,
+    -8.2,
+    0.95
+   ],
+   "power": 30,
+   "color": [
+    1,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "pos": [
+    -9,
+    -6.6,
+    0.95
+   ],
+   "power": 30,
+   "color": [
+    1,
+    0.8,
+    0.5
+   ]
+  }
+ ],
+ "islets": [
+  [
+   0.0,
+   14.0,
+   3.8
+  ],
+  [
+   8.0,
+   15.5,
+   4.7
+  ],
+  [
+   16.0,
+   14.5,
+   4.2
+  ],
+  [
+   24.0,
+   14.0,
+   3.4
+  ],
+  [
+   -8.0,
+   13.5,
+   3.8
+  ],
+  [
+   32.0,
+   13.0,
+   4.0
+  ],
+  [
+   41.0,
+   12.0,
+   3.6
+  ],
+  [
+   -17.0,
+   14.0,
+   4.3
+  ],
+  [
+   4.0,
+   -12.5,
+   3.8
+  ],
+  [
+   21.0,
+   -13.5,
+   4.7
+  ],
+  [
+   38.0,
+   -12.0,
+   3.8
+  ],
+  [
+   -10.0,
+   -14.0,
+   4.3
+  ],
+  [
+   56.0,
+   -12.5,
+   4.3
+  ],
+  [
+   54.0,
+   13.0,
+   4.3
+  ],
+  [
+   70.0,
+   13.0,
+   4.7
+  ],
+  [
+   76.0,
+   -14.0,
+   4.7
+  ]
+ ]
+}

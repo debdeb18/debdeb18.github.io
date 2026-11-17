@@ -372,7 +372,11 @@ for cx, cy, cz, sz in ((230, 40, 30, 30), (260, -70, 45, 36), (300, 130, 60, 44)
 
 # ---------- write every piece as its own model, plus the layout that puts them back together ----------
 if os.environ.get('EXPORT'):
-    done = lib.export_pieces(os.path.dirname(here) + '/models/terminal', os.path.dirname(here) + '/models/terminal/layout.json', LAMPS)
+    out = here + '/export/terminal'; os.makedirs(out, exist_ok=True)       # raw models; `npm run models` optimizes them into models/terminal
+    done = lib.export_pieces(out, out + '/layout.json', LAMPS)
+    import json; lay = json.load(open(out + '/layout.json'))
+    lay['islets'] = [[x, y, r] for x, y, r, *_ in ISLES]                       # the website rebuilds the sea floor from these
+    json.dump(lay, open(out + '/layout.json', 'w'), indent=1)
     print('EXPORTED', len(done), 'models')
 
 # ---------- camera, sky, light: two moods ----------

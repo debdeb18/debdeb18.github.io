@@ -275,8 +275,8 @@ export function makeWorld(name, title) {
     // A hotspot: walk near it and press E. `action` is a content key or a function.
     hot(x, z, label, action, o = {}) {
       // a soft floating light marks things you can interact with
-      const mark = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDot(), color: new THREE.Color(o.color || 0xffe08a).multiplyScalar(1.8), blending: THREE.AdditiveBlending, depthWrite: false }));
-      mark.scale.setScalar(0.75);
+      const mark = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDot(), color: new THREE.Color(o.color || 0xffe08a).multiplyScalar(1.15), blending: THREE.AdditiveBlending, depthWrite: false }));
+      mark.scale.setScalar(0.5);
       mark.position.set(x, (o.y || 2.2) + w.groundY, z);
       mark.userData.noShadow = true;
       scene.add(mark);
@@ -304,7 +304,7 @@ export function makeWorld(name, title) {
       return w;
     },
     update(t, dt) {
-      for (const h of w.hots) { h.mark.position.y = h.baseY + Math.sin(t * 2 + h.x) * 0.12; h.mark.scale.setScalar(0.7 + Math.sin(t * 3 + h.z) * 0.12); }
+      for (const h of w.hots) { h.mark.position.y = h.baseY + Math.sin(t * 2 + h.x) * 0.12; h.mark.scale.setScalar(0.45 + Math.sin(t * 3 + h.z) * 0.08); }
       for (const f of w.ticks) f(t, dt);
     },
   };

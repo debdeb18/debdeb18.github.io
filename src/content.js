@@ -12,6 +12,15 @@ export const CONTENT = {
       <ul><li><b>Home among the stars</b>: who I am</li><li><b>The Office</b>: my work, projects and how I work</li><li><b>The Night Market</b>: everything outside work</li></ul>
       <p class="hint">In a hurry? The buttons in the top-right corner skip the train.</p>`,
   },
+  station: {
+    kicker: 'Platform · station sign', title: '어딘가 · Somewhere · Entah di mana',
+    body: `<p>The same word, three times: Korean, English and Indonesian, the three languages I live in.</p>
+      <p>The arrows point both ways on purpose. Semarang is where I grew up, Seoul is where I build things, and this station sits somewhere in between.</p>`,
+  },
+  cat: {
+    kicker: 'Platform · bench', title: 'The station cat',
+    body: `<p>She has no ticket and no plans to leave. She is, as far as anyone knows, the only one who has read the whole timetable.</p>`,
+  },
   contact: {
     kicker: 'Say hi', title: 'Let’s build something',
     body: `<p>I like small teams, hard bugs, and systems that people actually depend on. If that sounds like your kind of project, or you just want to talk shop (or games), reach out.</p>`,

@@ -75,3 +75,4 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; }
 
 #fade { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity .45s; }
 #fade.on { opacity: 1; }
+#start:disabled { opacity: .75; cursor: progress; background: var(--soft); }

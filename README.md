@@ -56,3 +56,5 @@ Rebuild with `pip install bpy` then `python blender/make.py chair` (or `all`).
 
 `npm install`, then `npm test` opens the site in a headless browser and checks that every world loads with no errors or missing files.
 Every push to `main` runs that test and, if it passes, publishes the site to GitHub Pages (`.github/workflows/deploy.yml`).
+
+Models: Blender writes raw pieces to `blender/export/<world>/`; `npm run models` shrinks them into `models/<world>/` for the site.

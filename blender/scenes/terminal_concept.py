@@ -19,6 +19,7 @@ PZ = 0.95                                   # platform height
 
 # ---------- the sea, and the railway causeway across it ----------
 # Real water: a clear surface over a body of water that absorbs light, so shallows are see-through and depth goes dark.
+lib.piece('backdrop', export=False)
 sea = box('sea', (900, 900, 7.0), (150, 0, -7.0), color=0xFFFFFF, bevel=0)
 wm = sea.data.materials[0]; wm.name = 'water'; nt = wm.node_tree; b = nt.nodes['Principled BSDF']
 b.inputs['Roughness'].default_value = 0.04; b.inputs['Transmission Weight'].default_value = 1.0; b.inputs['IOR'].default_value = 1.33
@@ -29,6 +30,7 @@ va = nt.nodes.new('ShaderNodeVolumeAbsorption'); va.inputs['Color'].default_valu
 nt.links.new(va.outputs[0], nt.nodes['Material Output'].inputs['Volume'])
 box('deep_floor', (900, 900, 0.1), (150, 0, -4.2), color=0x2A5F78, bevel=0)
 ISLETS = []
+lib.piece('causeway')
 box('causeway', (190, 3.0, 0.3), (55, -3.2, -0.52), color=0xC9BFA8, bevel=0.1)
 for dy in (-0.72, 0.72): box('rail', (190, 0.07, 0.14), (55, -3.2 + dy, -0.19), color='rail', bevel=0.012, rough=0.3)
 x = -22.0
@@ -39,6 +41,7 @@ while x < 110:
     x += 3.0
 
 # ---------- platform ----------
+lib.piece('platform')
 box('platform', (46, 4.6, PZ), (12, 0.8, 0), color='concrete', bevel=0.03)
 box('deck', (34, 7.4, 0.3), (12, 6.7, PZ - 0.3), color='timber', bevel=0.03)                      # timber deck on stilts, behind the platform
 for i in range(22): box('deck_plank', (34, 0.3, 0.03), (12, 3.25 + i * 0.335, PZ - 0.02), color='wood' if i % 3 else 'wood_pale', bevel=0.008, jitter=0.006)
@@ -52,6 +55,7 @@ for i in range(3): box('step', (0.45, 2.2, PZ * (3 - i) / 4), (-11.2 - i * 0.45,
 # ---------- station building ----------
 X0, X1, Y0, Y1, H = 5.0, 17.0, 3.1, 8.1, 3.1
 CX, L = (X0 + X1) / 2, X1 - X0
+lib.piece('station_building', (CX, 5.6, PZ))
 box('walls', (L, Y1 - Y0, H), (CX, (Y0 + Y1) / 2, PZ), color='plaster', bevel=0.02)
 x = X0
 while x < X1 - 0.05:
@@ -84,6 +88,7 @@ for gx in (X0 - 0.02, X1 + 0.02):
 box('chimney', (0.5, 0.5, 1.2), (14.5, 6.6, RZ - 0.9), color='stone', bevel=0.04, jitter=0.02); box('chimney_cap', (0.62, 0.62, 0.1), (14.5, 6.6, RZ + 0.3), color='concrete_dark', bevel=0.02)
 
 # ---------- platform canopy ----------
+lib.piece('canopy', (12, 0, PZ))
 CA0, CA1, CP = 1.0, 23.0, 4.5
 CL, CC = CA1 - CA0, (CA0 + CA1) / 2
 shingles('canopy', CL, 4.25, 5, (CC, -1.1, PZ + 2.5), CP, color='canopy', dark='canopy_dark', tile=0.55)
@@ -104,20 +109,26 @@ for x in (3.0, 8.3, 13.7, 19.2):
     cyl('shade', 0.2, 0.05, 0.12, (x, 0.6, PZ + 2.1), color='canopy_dark', bevel=0.01)
     ball('bulb', 0.07, (x, 0.6, PZ + 2.07), color='lamp', emit=4.0); LAMPS.append(((x, 0.6, PZ + 1.95), 260, (1, 0.72, 0.42)))
 # under the canopy: bench, vending machine, bin, clock
+lib.piece('bench', (14.9, 2.6, PZ))
 for z, y in ((0.45, 2.75), (0.45, 2.55), (0.45, 2.35), (0.8, 2.92), (1.0, 2.94)): box('bench_slat', (2.2, 0.16 if z < 0.5 else 0.03, 0.04 if z < 0.5 else 0.14), (14.9, y, PZ + z), color='wood', bevel=0.012, jitter=0.006)
 for x in (13.95, 15.85): box('bench_leg', (0.07, 0.6, 0.45), (x, 2.6, PZ), color='pole', bevel=0.015)
+lib.piece('vending_machine', (8.95, 2.72, PZ))
 box('vending', (0.95, 0.6, 1.85), (8.95, 2.72, PZ), color='vend', bevel=0.04); box('vending_front', (0.8, 0.02, 0.95), (8.95, 2.41, PZ + 0.78), color='vend_glow', bevel=0, emit=2.0)
 for i in range(8): cyl('can', 0.035, 0.035, 0.11, (8.64 + (i % 4) * 0.205, 2.39, PZ + 1.2 + (i // 4) * 0.25), color=(0xD9532F, 0x3F8FD1, 0xF2C230, 0x5FA46B)[i % 4], bevel=0.005, verts=10)
 box('vending_slot', (0.8, 0.02, 0.22), (8.95, 2.41, PZ + 0.3), color='pole', bevel=0.004)
+lib.piece('bin', (12.7, 2.7, PZ))
 cyl('bin', 0.2, 0.24, 0.6, (12.7, 2.7, PZ), color='canopy_dark', bevel=0.02)
+lib.piece('canopy_signs', (12, 0, PZ))
 cyl('clock', 0.24, 0.24, 0.07, (4.5, -0.55, PZ + 1.95), (90, 0, 0), color='cream', bevel=0.02); cyl('clock_rim', 0.27, 0.27, 0.05, (4.5, -0.53, PZ + 1.95), (90, 0, 0), color='pole', bevel=0.01)
 
 # ---------- the chair, the suitcase, the sign ----------
 c = chair.build(); c.location = (-2.6, -0.2, PZ); c.rotation_euler = (0, 0, 0.15)
 s = suitcase.build(); s.location = (-1.75, -0.25, PZ); s.rotation_euler = (0, 0, -0.3)
 g = station_sign.build(); g.location = (-6.2, 1.9, PZ); g.scale = (0.8, 0.8, 0.8)
+lib.adopt('chair', c); lib.adopt('suitcase', s); lib.adopt('station_sign', g)
 
 # ---------- fences, planters, platform lamps ----------
+lib.piece('fences_planters', (12, 3, PZ))
 def fence(xa, xb, y):
     x = xa
     while x <= xb + 0.01: box('fpost', (0.1, 0.1, 1.05), (x, y, PZ), color='cream', bevel=0.02, jitter=0.01, taper=0.9); x += 1.5
@@ -127,6 +138,7 @@ for x in (-9, -6.3, -3.4, 25, 28, 31):
     box('planter', (1.5, 0.55, 0.42), (x, 2.55, PZ), color='timber', bevel=0.03, jitter=0.015)
     for i in range(5): lump('shrub', random.uniform(0.2, 0.32), (x + random.uniform(-0.5, 0.5), 2.55 + random.uniform(-0.08, 0.08), PZ + random.uniform(0.45, 0.62)), (1, 1, 0.85), random.choice(('tree_mid', 'tree_light')), rough=1)
 for x in (-8.2, 27.5):
+    lib.piece('platform_lamp', (x, 2.4, PZ))
     cyl('lamp_post', 0.07, 0.05, 4.2, (x, 2.4, PZ), color='pole', bevel=0.01)
     tube('lamp_arm', [(x, 2.4, PZ + 4.1), (x, 2.1, PZ + 4.45), (x, 1.5, PZ + 4.5), (x, 1.2, PZ + 4.35)], 0.03, 'pole')
     cyl('lamp_head', 0.2, 0.08, 0.14, (x, 1.2, PZ + 4.2), color='pole', bevel=0.01); ball('lamp_bulb', 0.1, (x, 1.2, PZ + 4.17), color='lamp', emit=5.0)
@@ -135,6 +147,7 @@ for x in (-8.2, 27.5):
 # ---------- utility poles and wires ----------
 POLES = [-7.0, 11.0, 29.0, 47.0, 65.0, 83.0]
 for i, x in enumerate(POLES):
+    lib.piece('utility_pole_transformer' if i in (1, 3) else 'utility_pole_lamp' if i in (0, 2) else 'utility_pole', (x, -5.9, 0))
     cyl('upole', 0.14, 0.1, 9.2, (x, -5.9, 0), (0, random.uniform(-1, 1), 0), color='pole', bevel=0.01)
     cyl('pole_footing', 0.35, 0.3, 0.5, (x, -5.9, -0.2), color='concrete_dark', bevel=0.04, verts=12)
     for z, w in ((8.5, 2.3), (7.7, 1.8)):
@@ -144,6 +157,7 @@ for i, x in enumerate(POLES):
     if i in (0, 2):
         tube('street_arm', [(x, -5.9, 6.4), (x, -5.3, 6.9), (x, -4.6, 6.85)], 0.03, 'pole'); ball('street_bulb', 0.11, (x, -4.6, 6.75), (1.4, 1, 0.6), 'lamp', emit=5.0)
         LAMPS.append(((x, -4.6, 6.5), 700, (1, 0.8, 0.55)))
+lib.piece('wires', export=False)
 for a, b in zip(POLES, POLES[1:]):
     for z, w in ((8.66, 2.3), (7.86, 1.8)):
         for k in (-1, 0, 1):
@@ -152,29 +166,124 @@ for a, b in zip(POLES, POLES[1:]):
 tube('service_wire', [(11, -5.9, 7.2), (11.5, -1, 5.6), (12, 3.2, PZ + 3.2)], 0.012, 'pole')
 tube('service_wire', [(-7, -5.9, 7.2), (-7.6, -1.5, 5.9), (-8.2, 2.4, PZ + 4.2)], 0.012, 'pole')
 
-# ---------- islets with leafy trees, far islands ----------
-def islet(x, y, r):
-    ISLETS.append((x, y, r))
+# ---------- islets: each a little place of its own ----------
+TREES = {'tree_a': (6.5, 4.0, 0, 'broad'), 'tree_b': (8.0, 5.0, 1, 'broad'), 'tree_c': (5.8, 3.6, 2, 'broad'), 'pine': (7.0, 4.0, 0, 'pine')}
+ISLES = [  # x, y, radius, tree, features, the direction the features face (radians)
+    (0, 14, 3.8, 'tree_a', ('swing',), -1.2), (8, 15.5, 4.7, 'tree_b', ('shrine',), -1.6), (16, 14.5, 4.2, 'tree_a', ('lantern',), -1.6), (24, 14, 3.4, 'pine', (), -1.5),
+    (-8, 13.5, 3.8, 'tree_c', ('picnic',), -1.0), (32, 13, 4.0, 'tree_a', ('hammock',), -1.7), (41, 12, 3.6, 'tree_c', (), 0), (-17, 14, 4.3, 'tree_b', (), 0),
+    (4, -12.5, 3.8, 'tree_a', ('jetty', 'swing'), 1.5), (21, -13.5, 4.7, 'tree_b', ('shrine', 'lantern'), 1.75), (38, -12, 3.8, 'pine', ('lantern',), 1.6), (-10, -14, 4.3, 'tree_b', ('picnic', 'hammock'), 1.2),
+    (56, -12.5, 4.3, 'tree_c', (), 0), (54, 13, 4.3, 'tree_a', (), 0), (70, 13, 4.7, 'tree_b', (), 0), (76, -14, 4.7, 'tree_b', (), 0)]
+def islet(n, x, y, r, feats, fa):
+    ISLETS.append((x, y, r)); lib.piece('islet_%02d' % n, (x, y, 0))
+    R = r * 0.86
+    gz = lambda d: 0.03 + R * 0.2 * math.sqrt(max(0, 1 - (d / R) ** 2))
+    at = lambda a, d: (x + math.cos(a) * d, y + math.sin(a) * d)
+    deg = math.degrees
     ball('islet_sand', r, (x, y, -0.05), (1, 1, 0.16), 'sand', rough=1)
-    ball('islet_grass', r * 0.86, (x, y, 0.08), (1, 1, 0.2), 'grass', rough=1)
-    for i in range(int(r * 7)):
-        a, d = random.uniform(0, 6.283), random.uniform(0.1, 0.7) * r; gx, gy = x + math.cos(a) * d, y + math.sin(a) * d; gz = 0.08 + r * 0.86 * 0.2 * math.sqrt(max(0, 1 - (d / (r * 0.86)) ** 2)) - 0.05
-        for k in range(3): box('blade', (0.08, 0.03, random.uniform(0.3, 0.7)), (gx + random.uniform(-0.15, 0.15), gy + random.uniform(-0.15, 0.15), gz), (random.uniform(-18, 18), random.uniform(-18, 18), 0), random.choice(('tree_mid', 'tree_light')), bevel=0, taper=0.2)
-        if i % 5 == 0: ball('flower', 0.07, (gx + 0.2, gy, gz + 0.32), color=random.choice((0xFFFFFF, 0xFFE27A, 0xFFB7C9)))
-    for i in range(int(r)): lump('rock', random.uniform(0.25, 0.5), (x + math.cos(i * 2.4) * r * 0.8, y + math.sin(i * 2.4) * r * 0.8, 0.1), (1.2, 1, 0.7), 'stone', strength=0.2, grain=1.2)
-def bush(x, y, z, r, n=5):
-    for i in range(n): lump('bush', r * random.uniform(0.5, 0.8), (x + random.uniform(-r, r), y + random.uniform(-r, r) * 0.6, z + r * random.uniform(0.2, 0.6)), (1, 1, 0.8), random.choice(('tree_mid', 'tree_light', 'tree')), rough=1)
-for i, (x, y, h, r) in enumerate(((0, 14, 6, 4), (8, 15.5, 8, 5), (16, 14.5, 7, 4.4), (24, 14, 5.5, 3.6), (-8, 13.5, 6.5, 4), (32, 13, 7, 4.2), (41, 12, 6, 3.8), (-17, 14, 7, 4.5),
-                   (4, -12.5, 6.5, 4), (21, -13.5, 8, 5), (38, -12, 6.5, 4), (-10, -14, 7, 4.5), (56, -12.5, 7, 4.5), (54, 13, 7, 4.5), (70, 13, 8, 5), (76, -14, 8, 5))):
-    islet(x, y, r * 0.95)
-    t = tree_asset.build(h, r, seed=i, kind='pine' if i in (3, 10, 13) else 'broad'); t.location = (x, y, 0.3)
-    bush(x + r * 0.5, y - r * 0.45, 0.4, 0.55)
+    ball('islet_grass', R, (x, y, 0.08), (1, 1, 0.2), 'grass', rough=1)
+    for i in range(int(r * 9)):                                                  # grass tufts
+        a, d = random.uniform(0, 6.283), random.uniform(0.1, 0.72) * r; gx, gy = at(a, d)
+        for k in range(3): box('blade', (0.08, 0.03, random.uniform(0.3, 0.7)), (gx + random.uniform(-0.15, 0.15), gy + random.uniform(-0.15, 0.15), gz(d)), (random.uniform(-18, 18), random.uniform(-18, 18), 0), random.choice(('tree_mid', 'tree_light')), bevel=0, taper=0.2)
+    for k in range(3):                                                           # wildflower patches, one colour each
+        a, d = random.uniform(0, 6.283), random.uniform(0.25, 0.65) * r; col = random.choice((0xFFFFFF, 0xFFE27A, 0xFFB7C9, 0xC9B4FF))
+        for i in range(7):
+            fx, fy = at(a + random.uniform(-0.25, 0.25), d + random.uniform(-0.5, 0.5)); dd = math.hypot(fx - x, fy - y)
+            box('stem', (0.02, 0.02, 0.3), (fx, fy, gz(dd)), color='tree_mid', bevel=0); ball('flower', 0.065, (fx, fy, gz(dd) + 0.32), (1, 1, 0.7), col)
+    for i in range(int(r * 1.6)):                                                # rocks, some with moss
+        a = i * 2.4 + random.uniform(-0.3, 0.3); rx, ry = at(a, r * random.uniform(0.74, 0.9)); rr = random.uniform(0.25, 0.55)
+        lump('rock', rr, (rx, ry, 0.12), (1.2, 1, 0.7), 'stone', strength=0.2, grain=1.2)
+        if i % 2 == 0: lump('moss', rr * 0.55, (rx, ry, 0.12 + rr * 0.45), (1.2, 1, 0.35), 'tree_light', strength=0.2, rough=1)
+    for i in range(int(r * 5)):                                                  # reeds and cattails in the shallows
+        a = random.uniform(0, 6.283); rx, ry = at(a, r * random.uniform(0.97, 1.1)); h = random.uniform(0.8, 1.5)
+        for k in range(3): box('reed', (0.05, 0.02, h * random.uniform(0.6, 1)), (rx + random.uniform(-0.1, 0.1), ry + random.uniform(-0.1, 0.1), -0.15), (random.uniform(-9, 9), random.uniform(-9, 9), 0), 0x8FAE5A, bevel=0, taper=0.3)
+        if i % 2: box('cattail_stem', (0.02, 0.02, h), (rx, ry, -0.15), color=0x8FAE5A, bevel=0); cyl('cattail', 0.035, 0.035, 0.2, (rx, ry, h - 0.2), color=0x6B4630, bevel=0.01, verts=8)
+    for i in range(int(r * 2)):                                                  # shells and starfish on the sand
+        sx, sy = at(random.uniform(0, 6.283), r * random.uniform(0.86, 0.93)); ball('shell', 0.06, (sx, sy, 0.1), (1, 1, 0.4), random.choice((0xFFD6DC, 0xFFFFFF, 0xFF9A7A)))
+    for i in range(3):                                                           # mushrooms by the trunk
+        mx, my = at(fa + 2.4 + i * 0.5, 0.75 + i * 0.12); cyl('mush_stem', 0.035, 0.03, 0.16, (mx, my, gz(0.8)), color='cream', bevel=0.005, verts=8); ball('mush_cap', 0.09, (mx, my, gz(0.8) + 0.17), (1, 1, 0.6), 0xD9483B)
+    for i in range(4):                                                           # roots
+        a = i * 1.57 + 0.4; tube('root', [(x, y, gz(0) + 0.35), (*at(a, 0.55), gz(0.55) + 0.1), (*at(a + 0.2, 1.1), gz(1.1) - 0.06)], [0.16, 0.1, 0.04], 'trunk')
+    for i in range(5):                                                           # fireflies
+        fx, fy = at(random.uniform(0, 6.283), random.uniform(0.5, 0.9) * r); ball('firefly', 0.03, (fx, fy, random.uniform(0.9, 2.6)), color=0xFFF2A0, emit=6.0)
+    for i in range(3): lump('bush', random.uniform(0.3, 0.5), (*at(fa + 3.1 + i * 0.3, r * 0.5), gz(r * 0.5) + 0.25), (1, 1, 0.8), random.choice(('tree_mid', 'tree_light', 'tree')), rough=1)
+
+    for fi, f in enumerate(feats):
+        a = fa + fi * 1.25; rz = deg(a) + 90
+        if f == 'swing':                                                         # a rope swing on a low branch
+            tube('swing_branch', [(x, y, 3.3), (*at(a, 1.2), 3.55), (*at(a, 2.5), 3.45)], [0.14, 0.1, 0.06], 'trunk')
+            for d in (1.55, 2.05): tube('swing_rope', [(*at(a, d), 3.5), (*at(a, d), gz(1.8) + 0.62)], 0.012, 'wood_pale')
+            box('swing_seat', (0.24, 0.62, 0.04), (*at(a, 1.8), gz(1.8) + 0.6), (0, 0, rz), color='wood', bevel=0.012)
+        if f == 'shrine':                                                        # a tiny wayside shrine with two stone lanterns
+            px, py = at(a, r * 0.45); z = gz(r * 0.45) - 0.05
+            box('shrine_base', (1.0, 0.8, 0.28), (px, py, z), (0, 0, rz), color='stone', bevel=0.04, jitter=0.02)
+            box('shrine_house', (0.62, 0.48, 0.52), (px, py, z + 0.28), (0, 0, rz), color='wood', bevel=0.02); box('shrine_roof', (1.0, 0.8, 0.34), (px, py, z + 0.78), (0, 0, rz), color='roof', bevel=0.03, taper=0.3)
+            dx, dy = at(a, r * 0.45 + 0.25); box('shrine_door', (0.26, 0.03, 0.32), (dx, dy, z + 0.32), (0, 0, rz), color='wood_dark', bevel=0.008); ball('offering', 0.06, (*at(a, r * 0.45 + 0.33), z + 0.34), color=0xFF9A3A)
+            for s2 in (-1, 1):
+                lx, ly = px + math.cos(a + 1.57) * 0.85 * s2, py + math.sin(a + 1.57) * 0.85 * s2
+                box('slant_base', (0.3, 0.3, 0.12), (lx, ly, z), color='stone', bevel=0.02); cyl('slant_post', 0.06, 0.06, 0.5, (lx, ly, z + 0.12), color='stone', bevel=0.01, verts=10)
+                box('slant_light', (0.24, 0.24, 0.22), (lx, ly, z + 0.62), color='lamp', bevel=0.02, emit=3.0); box('slant_cap', (0.4, 0.4, 0.14), (lx, ly, z + 0.84), color='stone', bevel=0.02, taper=0.3)
+                LAMPS.append(((lx, ly, z + 0.75), 40, (1, 0.75, 0.45)))
+            for k in range(4): d = r * 0.45 + 0.8 + k * 0.6; lump('step_stone', 0.26, (*at(a, d), gz(d) - 0.03), (1.2, 1, 0.3), 'stone', strength=0.15, grain=1.5)
+        if f == 'jetty':                                                         # a plank jetty with a lantern, a bucket and a fishing rod
+            n2 = 13
+            for k in range(n2):
+                d = r * 0.7 + k * 0.42; box('jetty_plank', (1.3, 0.37, 0.05), (*at(a, d), 0.42), (0, 0, rz), color='wood' if k % 3 else 'wood_pale', bevel=0.012, jitter=0.008)
+                if k % 4 == 1:
+                    for s2 in (-1, 1): cyl('jetty_post', 0.07, 0.06, 1.3 if k < n2 - 3 else 1.9, (at(a, d)[0] + math.cos(a + 1.57) * 0.62 * s2, at(a, d)[1] + math.sin(a + 1.57) * 0.62 * s2, -0.6), color='timber_dark', bevel=0.01, verts=10)
+            ex, ey = at(a, r * 0.7 + (n2 - 1) * 0.42); px2, py2 = ex + math.cos(a + 1.57) * 0.62, ey + math.sin(a + 1.57) * 0.62
+            cyl('jetty_lamp_post', 0.045, 0.04, 1.7, (px2, py2, 0.45), color='pole', bevel=0.005, verts=10); cyl('jetty_lantern', 0.1, 0.1, 0.22, (px2, py2, 2.0), color=0xFFD27A, bevel=0.04, emit=3.0, verts=12)
+            LAMPS.append(((px2, py2, 1.9), 120, (1, 0.75, 0.45)))
+            cyl('bucket', 0.12, 0.15, 0.24, (*at(a, r * 0.7 + 4.2), 0.47), color=0x6F8FB0, bevel=0.01, verts=12)
+            tube('fishing_rod', [(*at(a, r * 0.7 + 4.6), 0.5), (*at(a, r * 0.7 + 5.6), 1.5), (*at(a, r * 0.7 + 6.6), 1.9)], [0.018, 0.012, 0.005], 'wood_pale'); tube('fishing_line', [(*at(a, r * 0.7 + 6.6), 1.9), (*at(a, r * 0.7 + 6.7), 0.02)], 0.003, 'cream')
+        if f == 'picnic':                                                        # a checked blanket, a basket and cushions
+            d = r * 0.42; z = gz(d) + 0.02
+            for bi in range(4):
+                for bj in range(4):
+                    bx, by = at(a, d + (bi - 1.5) * 0.36); box('blanket', (0.36, 0.36, 0.02), (bx + math.cos(a + 1.57) * (bj - 1.5) * 0.36, by + math.sin(a + 1.57) * (bj - 1.5) * 0.36, z), (0, 0, rz), color='red' if (bi + bj) % 2 else 'cream', bevel=0)
+            bx, by = at(a + 0.25, d); cyl('basket', 0.2, 0.17, 0.2, (bx, by, z + 0.02), color='wood_pale', bevel=0.02, verts=14); tube('basket_handle', [(bx - 0.17, by, z + 0.2), (bx, by, z + 0.42), (bx + 0.17, by, z + 0.2)], 0.012, 'wood')
+            for k, cc in enumerate((0xFFB7C9, 0x8FB4FF)): ball('cushion', 0.18, (*at(a - 0.3 - k * 0.25, d + 0.3 - k * 0.5), z + 0.07), (1, 1, 0.4), cc)
+            cyl('teapot', 0.08, 0.07, 0.11, (*at(a - 0.1, d - 0.25), z + 0.02), color=0x6FA3C4, bevel=0.02, verts=12); cyl('cup', 0.04, 0.03, 0.05, (*at(a + 0.05, d - 0.45), z + 0.02), color='cream', bevel=0.005, verts=10)
+        if f == 'hammock':                                                       # a striped hammock from the trunk to a post
+            px, py = at(a, r * 0.72); cyl('hammock_post', 0.06, 0.05, 1.7, (px, py, gz(r * 0.72) - 0.1), (0, 0, 0), color='timber_dark', bevel=0.01, verts=10)
+            for k in range(7):
+                o = (k - 3) * 0.085; ox, oy = math.cos(a + 1.57) * o, math.sin(a + 1.57) * o; m = at(a, r * 0.4)
+                tube('hammock', [(at(a, 0.4)[0], at(a, 0.4)[1], 1.6), (m[0] + ox, m[1] + oy, 0.8 + abs(o) * 0.5), (px, py, gz(r * 0.72) + 1.5)], 0.035, 'red' if k % 2 else 'cream')
+            ball('pillow', 0.16, (*at(a, r * 0.28), 1.0), (1, 1, 0.5), 0xFFE9B0)
+        if f == 'lantern':                                                       # a lantern post, a signpost and a birdhouse
+            px, py = at(a, r * 0.6); z = gz(r * 0.6) - 0.05
+            cyl('lpost', 0.06, 0.05, 2.5, (px, py, z), (2, -2, 0), color='timber_dark', bevel=0.01, verts=10); tube('lpost_arm', [(px, py, z + 2.4), (px + 0.25, py, z + 2.6), (px + 0.5, py, z + 2.45)], 0.022, 'pole')
+            cyl('lpost_lantern', 0.11, 0.11, 0.26, (px + 0.5, py, z + 2.12), color=0xFF9A5A, bevel=0.04, emit=3.0, verts=12); LAMPS.append(((px + 0.5, py, z + 2.0), 160, (1, 0.7, 0.4)))
+            sx, sy = at(a + 0.7, r * 0.55); cyl('signpost', 0.045, 0.04, 1.5, (sx, sy, gz(r * 0.55) - 0.05), color='timber', bevel=0.005, verts=8)
+            for k, cc in enumerate(('cream', 'wood_pale')): box('sign_arrow', (0.6, 0.03, 0.15), (sx, sy, gz(r * 0.55) + 1.0 + k * 0.22), (0, 0, rz + 20 + k * 130), color=cc, bevel=0.01, jitter=0.006)
+            box('birdhouse', (0.26, 0.24, 0.26), (*at(a + 2.0, 0.42), 2.7), (0, 0, deg(a) - 20), color=0x6FA3C4, bevel=0.02); box('birdhouse_roof', (0.36, 0.34, 0.14), (*at(a + 2.0, 0.42), 2.96), (0, 0, deg(a) - 20), color='roof', bevel=0.02, taper=0.3)
+for n, (x, y, r, tk, feats, fa) in enumerate(ISLES):
+    islet(n, x, y, r, feats, fa)
+    h, tr_, seed, kind = TREES[tk]; t = tree_asset.build(h, tr_, seed=seed, kind=kind); t.location = (x, y, 0.03 + r * 0.86 * 0.2 - 0.15); lib.adopt(tk, t)
+# an arched footbridge between the two islets across from the platform
+lib.piece('footbridge', (12.5, -13, 0))
+(ax, ay, ar), (bx_, by_, br) = (4, -12.5, 3.8), (21, -13.5, 4.7)
+ang = math.atan2(by_ - ay, bx_ - ax); p0 = (ax + math.cos(ang) * ar * 0.72, ay + math.sin(ang) * ar * 0.72); p1 = (bx_ - math.cos(ang) * br * 0.72, by_ - math.sin(ang) * br * 0.72)
+span = math.hypot(p1[0] - p0[0], p1[1] - p0[1]); NB = int(span / 0.4); tops = {-1: [], 1: []}
+for k in range(NB + 1):
+    t_ = k / NB; px, py = p0[0] + (p1[0] - p0[0]) * t_, p0[1] + (p1[1] - p0[1]) * t_; pz = 0.5 + math.sin(math.pi * t_) * 0.95
+    box('bridge_plank', (1.25, span / NB * 0.94, 0.06), (px, py, pz), (0, 0, math.degrees(ang) + 90), color='wood' if k % 3 else 'wood_pale', bevel=0.012, jitter=0.008)
+    if k % 4 == 0:
+        for s2 in (-1, 1):
+            qx, qy = px + math.cos(ang + 1.57) * 0.58 * s2, py + math.sin(ang + 1.57) * 0.58 * s2
+            box('bridge_post', (0.08, 0.08, 0.85), (qx, qy, pz), color='red', bevel=0.015); tops[s2].append((qx, qy, pz + 0.82))
+for s2 in (-1, 1): tube('bridge_rail', tops[s2], 0.035, 'red')
+for t_ in (0.3, 0.7):
+    for s2 in (-1, 1): cyl('bridge_pile', 0.09, 0.08, 2.6, (p0[0] + (p1[0] - p0[0]) * t_ + math.cos(ang + 1.57) * 0.5 * s2, p0[1] + (p1[1] - p0[1]) * t_ + math.sin(ang + 1.57) * 0.5 * s2, -1.4), color='timber_dark', bevel=0.01, verts=10)
+
+lib.piece('far_islands', export=False)
 for x, y, r, z in ((190, 100, 80, 0.2), (230, -80, 95, 0.22), (140, 190, 70, 0.18), (150, -180, 70, 0.16)):
     ball('island', r, (x, y, -2), (1, 1, z), 'hill', rough=1)
     for k in range(4): box('far_house', (5, 5, 4), (x - r * 0.5 + k * 9, y + (k % 2) * 8 - r * 0.2, r * z * 0.75), color='cream', bevel=0.2); box('far_roof', (6, 6, 1.6), (x - r * 0.5 + k * 9, y + (k % 2) * 8 - r * 0.2, r * z * 0.75 + 4), color='roof', bevel=0.3, taper=0.3)
 
 # ---------- the train, coming down the line ----------
 tr = train.build(2); tr.location = (38, -3.2, -0.05); tr.rotation_euler = (0, 0, math.radians(-90))
+lib.adopt('train', tr)
+lib.piece('spray', export=False)
 LAMPS.append(((36.5, -3.2, 1.4), 700, (1, 0.9, 0.7)))
 for i in range(60):                       # the bow wave and wake the train pushes through the shallow water
     k = random.uniform(0, 1); sy = random.choice((-1, 1))
@@ -182,10 +291,13 @@ for i in range(60):                       # the bow wave and wake the train push
 
 # ---------- small details ----------
 # hanging name board and platform number under the canopy
+lib.piece('canopy_signs', (12, 0, PZ), export=False)
+lib._piece = (lib.PIECES[[n for n, _, _ in lib.PIECES].index('canopy_signs')][1], lib.Matrix.Translation((12, 0, PZ)).inverted()); lib.PIECES.pop()
 box('nameboard', (2.6, 0.06, 0.5), (16.5, -0.2, PZ + 1.72), color='cream', bevel=0.02); box('nameboard_stripe', (2.6, 0.065, 0.07), (16.5, -0.2, PZ + 1.74), color='red', bevel=0.005)
 for dx in (-1.1, 1.1): tube('nameboard_chain', [(16.5 + dx, -0.2, PZ + 2.2), (16.5 + dx, -0.2, PZ + 2.36)], 0.008, 'pole')
 box('platform_no', (0.5, 0.05, 0.5), (6.6, -0.5, PZ + 1.85), color=0x2F6F9A, bevel=0.03)
 # timetable board, mailbox, umbrella stand, potted plants, crates, broom
+lib.piece('station_props', (12, 3, PZ))
 box('timetable', (1.3, 0.05, 0.95), (7.9, Y0 - 0.1, PZ + 1.3), color='wood_dark', bevel=0.02); box('timetable_paper', (1.14, 0.02, 0.8), (7.9, Y0 - 0.13, PZ + 1.375), color='cream', bevel=0.004)
 for i in range(5): box('timetable_line', (0.95, 0.01, 0.03), (7.9, Y0 - 0.145, PZ + 1.5 + i * 0.12), color='pole', bevel=0)
 box('mailbox', (0.42, 0.34, 0.55), (12.75, 2.85, PZ + 0.75), color='red', bevel=0.06); cyl('mailbox_post', 0.04, 0.04, 0.75, (12.75, 2.85, PZ), color='pole', bevel=0.005); box('mail_slot', (0.26, 0.02, 0.04), (12.75, 2.67, PZ + 1.12), color='pole', bevel=0)
@@ -200,30 +312,38 @@ for i, (x, y, w) in enumerate(((19.2, 2.6, 0.7), (19.95, 2.7, 0.6), (19.5, 2.62,
 box('broom_stick', (0.03, 0.03, 1.4), (4.75, 2.9, PZ), (-8, 0, 0), color='wood_pale', bevel=0.005); box('broom_head', (0.3, 0.08, 0.24), (4.75, 2.85, PZ), color=0xD9B46A, bevel=0.02, taper=1.4)
 # a cat asleep on the bench
 cat = root('cat'); cat.location = (14.35, 2.55, PZ + 0.49)
+lib.adopt('cat', cat)
 ball('cat_body', 0.2, (0, 0, 0.11), (1.5, 0.95, 0.72), 0xE8A05A, cat); ball('cat_head', 0.12, (-0.27, -0.05, 0.14), (1, 1, 0.9), 0xE8A05A, cat)
 for sy in (-1, 1): cyl('cat_ear', 0.045, 0.004, 0.08, (-0.29, -0.05 + sy * 0.07, 0.22), color=0xE8A05A, parent=cat, bevel=0, verts=6)
 tube('cat_tail', [(0.27, 0.02, 0.1), (0.36, -0.12, 0.06), (0.22, -0.22, 0.05), (0.02, -0.21, 0.05)], [0.035, 0.032, 0.028, 0.022], 0xD98C45, cat)
 # lanterns strung under the canopy edge
+lib.piece('lantern_string', (12, -1.05, PZ))
 for i in range(9):
     x = 2.2 + i * 2.5
     tube('lantern_string', [(x, -1.05, PZ + 2.24), (x, -1.05, PZ + 2.1)], 0.005, 'pole'); cyl('paper_lantern', 0.1, 0.1, 0.2, (x, -1.05, PZ + 1.9), color=(0xFF8A5A, 0xFFD27A, 0xFF9AB4)[i % 3], bevel=0.04, emit=1.2, verts=12)
 # roof: a weather vane and a little moss
+lib.piece('roof_extras', (CX, 5.6, PZ))
 cyl('vane_post', 0.02, 0.02, 0.8, (7.5, 5.6, RZ + 0.05), color='pole', bevel=0); box('vane_arrow', (0.7, 0.03, 0.1), (7.5, 5.6, RZ + 0.75), (0, 0, 25), color='pole', bevel=0.01, taper=0.4)
 for i in range(7): lump('moss', random.uniform(0.12, 0.22), (random.uniform(6, 16), Y0 - EAVE + 0.5 + random.uniform(0, 1.2), EZ + 0.35 + random.uniform(0, 0.5)), (1.4, 1, 0.35), 'tree_light', strength=0.2, rough=1)
 # on the water: a rowing boat, buoys with lights, lily pads, mooring posts
 bt = root('boat'); bt.location = (12.5, -8.6, 0.0); bt.rotation_euler = (0, 0, 0.35)
+lib.adopt('boat', bt)
 box('hull', (3.2, 1.25, 0.5), (0, 0, -0.12), color='boat', parent=bt, bevel=0.2, segs=4, taper=1.25); box('hull_inside', (2.7, 0.95, 0.06), (0, 0, 0.34), color='wood_dark', parent=bt, bevel=0.02)
 for dx in (-0.6, 0.5): box('thwart', (0.22, 1.3, 0.05), (dx, 0, 0.36), color='wood_pale', parent=bt, bevel=0.015)
 box('oar', (2.3, 0.05, 0.04), (0.2, 0.3, 0.42), (0, 0, 14), color='wood_pale', parent=bt, bevel=0.01); cyl('boat_lamp', 0.07, 0.08, 0.16, (1.35, 0, 0.42), color='lamp', parent=bt, bevel=0.01, emit=4.0)
+lib.piece('mooring', (14.8, -7.6, 0))
 cyl('mooring', 0.1, 0.09, 1.5, (14.8, -7.6, -0.5), (4, 3, 0), color='timber_dark', bevel=0.01, verts=10); tube('rope', [(14.8, -7.6, 0.75), (14.4, -7.9, 0.25), (13.95, -8.1, 0.42)], 0.015, 'wood_pale')
 for x, y, c in ((-4, -9.5, 0xD9532F), (19, -6.6, 0xF2C230), (30, -7.6, 0xD9532F), (48, -8.2, 0xF2C230), (-9, -6.6, 0xF2C230)):
+    lib.piece('buoy_red' if c == 0xD9532F else 'buoy_yellow', (x, y, 0))
     cyl('buoy', 0.28, 0.2, 0.42, (x, y, -0.1), color=c, bevel=0.06, verts=14); cyl('buoy_mast', 0.02, 0.02, 0.5, (x, y, 0.3), color='pole', bevel=0); ball('buoy_light', 0.07, (x, y, 0.82), color='lamp', emit=4.0)
     LAMPS.append(((x, y, 0.95), 30, (1, 0.8, 0.5)))
+lib.piece('lily_pads')
 for i in range(46):
     x, y = random.uniform(-12, 34), random.uniform(-11.5, -5.2)
     rl = random.uniform(0.16, 0.34); cyl('lily', rl, rl, 0.014, (x, y, 0.004), (0, 0, random.uniform(0, 360)), color=random.choice(('tree_mid', 'tree_light')), bevel=0, verts=10)
     if i % 6 == 0: ball('lily_flower', 0.07, (x, y, 0.06), (1, 1, 0.7), 0xFFD6E4)
 # gulls
+lib.piece('gulls', export=False)
 for x, y, z in ((60, 14, 16), (66, 18, 17.5), (72, 12, 15), (90, -30, 22), (97, -26, 23.5), (55, 40, 26)):
     for s in (-1, 1): box('gull_wing', (0.12, 0.9, 0.04), (x, y + s * 0.42, z), (s * 22, 0, 0), color=0xFFFFFF, bevel=0.01)
 
@@ -242,12 +362,18 @@ for pl in me.polygons: pl.use_smooth = True
 sb = bpy.data.objects.new('seabed', me); bpy.context.scene.collection.objects.link(sb); sb.data.materials.append(mat('sand', 1.0))
 
 # ---------- clouds ----------
+lib.piece('clouds', export=False)
 def cloud(cx, cy, cz, size, n=22):
     for i in range(n):
         dx = random.uniform(-1, 1); r = size * random.uniform(0.45, 0.9) * (1 - abs(dx) * 0.45)
         lump('cloud', r, (cx + random.uniform(-0.5, 0.5) * size, cy + dx * size * 2.2, cz + r * 0.55 + random.uniform(0, size * 0.9) * (1 - abs(dx))), (1, 1, 0.8), 'cloud', strength=0.16, grain=0.9, rough=1)
 for cx, cy, cz, sz in ((230, 40, 30, 30), (260, -70, 45, 36), (300, 130, 60, 44), (210, -160, 28, 26), (330, -10, 95, 40), (190, 190, 40, 30), (150, 230, 70, 34), (280, 250, 110, 44), (240, -260, 70, 40)):
     cloud(cx, cy, cz, sz)
+
+# ---------- write every piece as its own model, plus the layout that puts them back together ----------
+if os.environ.get('EXPORT'):
+    done = lib.export_pieces(os.path.dirname(here) + '/models/terminal', os.path.dirname(here) + '/models/terminal/layout.json', LAMPS)
+    print('EXPORTED', len(done), 'models')
 
 # ---------- camera, sky, light: two moods ----------
 sc = bpy.context.scene
@@ -286,4 +412,9 @@ for name in (sys.argv[1:] or MOODS):
     for inp, base in emis: inp.default_value = base * m['emit']
     sc.render.filepath = '%s/concepts/terminal-%s.png' % (here, name)
     bpy.ops.render.render(write_still=True); print('RENDERED', name)
+    if os.environ.get('ISLETS'):          # a second view, from the platform across to the islets
+        keep = (co.location.copy(), co.rotation_euler.copy(), cam.lens)
+        co.location = (20.5, -0.9, 4.8); co.rotation_euler = (Vector((12.5, -13.0, 1.0)) - co.location).to_track_quat('-Z', 'Y').to_euler(); cam.lens = 24
+        sc.render.filepath = '%s/concepts/terminal-islets-%s.png' % (here, name); bpy.ops.render.render(write_still=True)
+        co.location, co.rotation_euler, cam.lens = keep
 bpy.ops.wm.save_as_mainfile(filepath=here + '/files/terminal_concept.blend')

@@ -1,7 +1,7 @@
 """Shared helpers for building the portfolio's props in Blender (run headless with the bpy module).
 Every prop is built at the origin, sitting on the ground (z = 0), facing -Y, in metres."""
 import bpy, bmesh, math, random
-from mathutils import Vector
+from mathutils import Vector, Matrix
 
 PAL = dict(wood=0xD9A066, wood_dark=0x8F5A3C, wood_pale=0xEBC894, red=0xD8364A, red_dark=0xA8243A, cream=0xFFF0DC,
            teal=0x3F8F9A, teal_dark=0x2C6670, iron=0x3B3A4A, brass=0xE8B84A, roof=0xD9694A, roof_dark=0xB04E3C,
@@ -17,7 +17,45 @@ def set_style(pal=None, **kw):
     STYLE.update(jitter=1.0, bevel=1.0, chunk=1.0, lean=1.0, emit=1.0, ground=0xBFE3D0, sky=(0.62, 0.78, 1.0), sky_power=0.9, sun=(1, 0.95, 0.85), sun_power=3.2, sun_height=52)
     STYLE.update(kw); _mats.clear()
 
+# ---------- pieces: named groups of objects that are exported as separate models ----------
+_piece = None
+PIECES = []          # (name, root object, export?) in creation order; repeated names are instances of the same model
+def piece(name, anchor=(0, 0, 0), export=True):
+    """Everything created after this call belongs to the piece `name`, whose origin is `anchor`."""
+    global _piece
+    e = bpy.data.objects.new(name, None); bpy.context.scene.collection.objects.link(e); e.location = anchor
+    _piece = (e, Matrix.Translation(anchor).inverted()); PIECES.append((name, e, export))
+    return e
+def adopt(name, obj, export=True):
+    """Register an object that already has its own root (a prop built by an asset module) as a piece."""
+    PIECES.append((name, obj, export)); return obj
+def _attach(o, parent):
+    if parent: o.parent = parent
+    elif _piece: o.parent = _piece[0]; o.matrix_parent_inverse = _piece[1]
+
+def export_pieces(models_dir, layout_path, lights=()):
+    """Write one .glb per piece (at its own origin) and a layout file saying where every instance goes."""
+    import json
+    layout = dict(note='Blender coordinates: x right, y away, z up, metres.', pieces=[], lights=[dict(pos=[round(v, 3) for v in l[0]], power=l[1], color=list(l[2])) for l in lights])
+    seen = set()
+    def pick(o):
+        o.select_set(True)
+        for c in o.children: pick(c)
+    for name, obj, exp in PIECES:
+        layout['pieces'].append(dict(name=name, pos=[round(v, 3) for v in obj.location], rot_z=round(obj.rotation_euler[2], 4), scale=round(obj.scale[0], 3), model=bool(exp)))
+        if not exp or name in seen: continue
+        seen.add(name)
+        saved = obj.matrix_basis.copy(); obj.matrix_basis = Matrix.Identity(4); bpy.context.view_layer.update()
+        bpy.ops.object.select_all(action='DESELECT'); pick(obj)
+        bpy.ops.export_scene.gltf(filepath='%s/%s.glb' % (models_dir, name), use_selection=True, export_apply=True)
+        obj.matrix_basis = saved
+    bpy.context.view_layer.update()
+    json.dump(layout, open(layout_path, 'w'), indent=1)
+    return sorted(seen)
+
 def reset():
+    global _piece
+    _piece = None; PIECES.clear()
     bpy.ops.wm.read_factory_settings(use_empty=True)
 
 def _lin(c):
@@ -51,7 +89,7 @@ def _finish(name, mesh, color, loc, rot, parent, bevel, segs=3, **mk):
     if bevel:
         b = o.modifiers.new('bevel', 'BEVEL'); b.width = bevel * STYLE['bevel']; b.segments = segs; b.limit_method = 'ANGLE'; b.angle_limit = math.radians(35)
     o.modifiers.new('normals', 'WEIGHTED_NORMAL')
-    if parent: o.parent = parent
+    _attach(o, parent)
     return o
 
 def box(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, bevel=0.02, jitter=0.0, taper=1.0, **mk):
@@ -95,7 +133,7 @@ def lump(name, r, loc=(0, 0, 0), scale=(1, 1, 1), color='leaf', parent=None, str
     o.location = loc; o.scale = scale; o.data.materials.append(mat(color, **mk))
     tex = bpy.data.textures.new('lump', 'VORONOI'); tex.noise_scale = r * grain; tex.distance_metric = 'DISTANCE'
     d = o.modifiers.new('lumps', 'DISPLACE'); d.texture = tex; d.texture_coords = 'GLOBAL'; d.strength = -r * strength * 2.2; d.mid_level = 0.35
-    if parent: o.parent = parent
+    _attach(o, parent)
     return o
 
 def tube(name, pts, radii, color='iron', parent=None, **mk):
@@ -107,21 +145,21 @@ def tube(name, pts, radii, color='iron', parent=None, **mk):
         p.co = co; p.handle_left_type = p.handle_right_type = 'AUTO'; p.radius = r
     o = bpy.data.objects.new(name, cu); bpy.context.scene.collection.objects.link(o)
     cu.materials.append(mat(color, **mk))
-    if parent: o.parent = parent
+    _attach(o, parent)
     return o
 
 def text(name, body, size, loc, rot=(90, 0, 0), color='iron', parent=None):
     cu = bpy.data.curves.new(name, 'FONT'); cu.body = body; cu.size = size; cu.extrude = 0.004; cu.align_x = 'CENTER'; cu.align_y = 'CENTER'
     o = bpy.data.objects.new(name, cu); bpy.context.scene.collection.objects.link(o)
     o.location = loc; o.rotation_euler = [math.radians(a) for a in rot]; cu.materials.append(mat(color))
-    if parent: o.parent = parent
+    _attach(o, parent)
     return o
 
 def shingles(name, width, depth, rows, loc, pitch, color='roof', dark='roof_dark', parent=None, yaw=0, tile=0.22):
     """One slope of a shingled roof: overlapping, slightly crooked tiles. Pivot is the eave (lower edge) centre."""
     e = bpy.data.objects.new(name, None); bpy.context.scene.collection.objects.link(e)
     e.location = loc; e.rotation_euler = (math.radians(pitch), 0, math.radians(yaw))
-    if parent: e.parent = parent
+    _attach(e, parent)
     step = depth / rows; n = max(2, round(width / tile))
     for r in range(rows):
         off = (r % 2) * 0.5
@@ -129,7 +167,7 @@ def shingles(name, width, depth, rows, loc, pitch, color='roof', dark='roof_dark
             x = (i + off) / n * width - width / 2
             if x < -width / 2 - 0.08 or x > width / 2 + 0.08: continue
             box('%s_t' % name, (width / n * 0.96, step * 1.5, 0.035), (x, r * step + step * 0.6, 0.02 + (rows - r) * 0.0), (random.uniform(4, 9), 0, random.uniform(-4, 4)),
-                color if random.random() > 0.3 else dark, e, bevel=0.012, jitter=0.012)
+                color if random.random() > 0.3 else dark, e, bevel=0.012, jitter=0.012, segs=1)
     return e
 
 # ---------- preview render, .blend and .glb ----------

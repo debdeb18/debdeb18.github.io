@@ -13,6 +13,10 @@ Every area follows the same loop: concept render, feedback, split into pieces, b
 - [x] Hand-painted textures, step 2: buildings (plaster, roof tiles, painted timber)
 - [x] Hand-painted textures, step 3: trees as painted leaf clusters that flutter in the wind; painted bark
 - [x] Bushes, planter shrubs and potted plants as leaf clusters
+- [x] Painted cumulus clouds (towers of puffs, flat cream and lavender shading)
+- [x] 3D grass on the islets that sways in the wind and bends away as you walk through
+- [x] Walkable islets behind the station: plank ramp from the deck, wading between islets with ripples
+- [x] Camera pulls in instead of passing through the station building and canopy
 - [ ] Next for the painted look: light shafts through the trees
 
 ## 1. Terminal: a station above the water

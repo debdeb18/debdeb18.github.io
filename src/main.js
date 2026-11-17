@@ -4,7 +4,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { uTime } from './kit.js';
+import { uTime, uPlayer } from './kit.js';
 import { makeCharacter } from './character.js';
 import { CONTENT } from './content.js';
 import { buildTerminal } from './worlds/terminal.js';
@@ -188,12 +188,21 @@ canvas.addEventListener('pointerup', release); canvas.addEventListener('pointerc
 canvas.addEventListener('wheel', (e) => { e.preventDefault(); dist = THREE.MathUtils.clamp(dist * (1 + Math.sign(e.deltaY) * 0.1), 4, 22); }, { passive: false });
 
 // ---------- loop ----------
+const camRay = new THREE.Raycaster(), camDir = new THREE.Vector3();
 function placeCamera(k) {
   if (state === 'walk') {
     tmp.copy(player.position); tmp.y += 1.2;
     look.lerp(tmp, k);
-    tmp.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)).multiplyScalar(dist).add(look);
-    camera.position.lerp(tmp, k);
+    camDir.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
+    // pull in when a wall or roof is between the camera and the traveller, so it never ends up inside a building
+    let d = dist;
+    if (world.camBlockers && world.camBlockers.length) {
+      camRay.set(look, camDir); camRay.far = dist;
+      const hit = camRay.intersectObjects(world.camBlockers, true)[0];
+      if (hit) d = Math.max(0.9, hit.distance - 0.35);
+    }
+    tmp.copy(camDir).multiplyScalar(d).add(look);
+    camera.position.lerp(tmp, d < dist - 0.01 ? Math.max(k, 0.5) : k);
   } else {
     const c = worlds.terminal.cine;
     if (c.snap) { k = 1; c.snap = false; }
@@ -227,6 +236,7 @@ function frame() {
     const p = player.position, mx = vel.x * dt, mz = vel.z * dt;
     if (world.canWalk(p.x + mx, p.z)) p.x += mx; else vel.x = 0;
     if (world.canWalk(p.x, p.z + mz)) p.z += mz; else vel.z = 0;
+    if (world.heightAt) p.y += (world.heightAt(p.x, p.z) - p.y) * Math.min(1, dt * 14);   // follow the ground: islets, ramps, wading
     speed = vel.length() / top;
     if (speed > 0.05) {
       let d = Math.atan2(vel.x, vel.z) - player.rotation.y;
@@ -256,7 +266,7 @@ function frame() {
   if (show) $('prompt').textContent = activeHot.label;
   $('prompt').hidden = !show;
 
-  uTime.value = t;
+  uTime.value = t; uPlayer.value.copy(player.position);
   player.animate(t, dt, speed, sitting);
   world.update(t, dt);
   sitHot.mark.visible = state === 'walk';

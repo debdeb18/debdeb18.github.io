@@ -2,10 +2,12 @@
 // The station itself is built in Blender (models/terminal); this file adds what moves: water, sky, clouds, the train, the cutscene.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { makeWorld, sky, stars, cloud, cloudMat, softDot, makeCrack, sign } from '../kit.js';
+import { makeWorld, sky, stars, softDot, makeCrack, sign, uPlayer } from '../kit.js';
 import { blob } from '../nature.js';
 import { loadLayout, gradient } from '../models.js';
 import { leafify } from '../foliage.js';
+import { cumulus, cumulusMaterial } from '../clouds.js';
+import { grassField } from '../grass.js';
 import { painted } from '../paint.js';
 
 export const DEST = {
@@ -22,7 +24,7 @@ const NUMBERS = new Set(['sunI', 'hemiI', 'lamps', 'stars', 'glow', 'bloom']);  
 const pal = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, NUMBERS.has(k) ? v : new THREE.Color(v)]));
 const NIGHT = pal({ top: 0x070b24, mid: 0x1b2552, bot: 0x0e1638, sun: 0x8fa8ff, sunI: 0.45, sky: 0x3a4a80, ground: 0x182030, hemiI: 0.55, fog: 0x18214a, shallow: 0x1d5a6e, deep: 0x07142e, lamps: 1, cLit: 0x5d68a0, cShade: 0x20264a, cEdge: 0x8c96cc, stars: 1, glow: 0.45, bloom: 0.75 });
 const DAWN = pal({ top: 0x4a6fb0, mid: 0xffc2a0, bot: 0x8aa0c8, sun: 0xffb38a, sunI: 1.3, sky: 0xd8c8e8, ground: 0x8a9a78, hemiI: 1.0, fog: 0xf0c8b8, shallow: 0x7cc4c4, deep: 0x245a80, lamps: 0.5, cLit: 0xffe2d2, cShade: 0x9890c4, cEdge: 0xffd0b4, stars: 0.15, glow: 0.3, bloom: 0.45 });
-const DAY = pal({ top: 0x2f86e0, mid: 0xbfe4f3, bot: 0xbfe4ea, sun: 0xfff2d6, sunI: 3.0, sky: 0xb4d4f4, ground: 0x8a9c8c, hemiI: 1.2, fog: 0xd2ecf2, shallow: 0x5fd0c8, deep: 0x17639a, lamps: 0, cLit: 0xffffff, cShade: 0xb4cbe6, cEdge: 0xffffff, stars: 0, glow: 0.2, bloom: 0.3 });
+const DAY = pal({ top: 0x2f86e0, mid: 0xbfe4f3, bot: 0xbfe4ea, sun: 0xfff2d6, sunI: 3.0, sky: 0xb4d4f4, ground: 0x8a9c8c, hemiI: 1.2, fog: 0xd2ecf2, shallow: 0x5fd0c8, deep: 0x17639a, lamps: 0, cLit: 0xfbf8ee, cShade: 0xa3b0cf, cEdge: 0xffffff, stars: 0, glow: 0.2, bloom: 0.3 });
 const DUSK = pal({ top: 0x232a5c, mid: 0xf6b3a0, bot: 0x7a86b4, sun: 0xffa070, sunI: 1.5, sky: 0xc8a8c8, ground: 0x6a6a7a, hemiI: 0.95, fog: 0xe8b9b0, shallow: 0x6aa8b4, deep: 0x1a3c6a, lamps: 1, cLit: 0xffd9c4, cShade: 0x8a7bb0, cEdge: 0xffc4a0, stars: 0.1, glow: 0.6, bloom: 0.55 });
 const KEYS = [[0, NIGHT], [5.2, NIGHT], [6.5, DAWN], [8.5, DAY], [16.4, DAY], [18.2, DUSK], [19.7, NIGHT], [24, NIGHT]];
 function mixPal(out, a, b, k) {
@@ -65,7 +67,7 @@ function makeWater(U) {
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = 'varying vec3 vW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime;\nuniform vec3 uShallow, uDeep, uSky, uTrain;\n' + DEPTH_GLSL + '\n' + sh.fragmentShader
+    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime;\nuniform vec3 uShallow, uDeep, uSky, uTrain, uPlayer;\n' + DEPTH_GLSL + '\n' + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
         vec2 bp = vec2(vW.x, -vW.z);
         float dep = seaDepth(bp);
@@ -81,6 +83,10 @@ function makeWater(U) {
         float ripple = 0.55 + 0.45 * sin(bp.x * 6.0 + uTime * 9.0) * sin(bp.y * 9.0 - uTime * 6.0);
         float foam = uTrain.y * clamp(bow * 1.4 + wake * ripple, 0.0, 1.0);
         foam += smoothstep(0.6, 0.44, dep) * (0.35 + 0.25 * sin(uTime * 1.4 + bp.x * 2.7 + bp.y * 1.9));   // lace around the shores
+        float pd = length(bp - vec2(uPlayer.x, -uPlayer.z));                     // rings spreading from legs in the water
+        float wet = 1.0 - smoothstep(0.05, 0.25, uPlayer.y);
+        for (int k = 0; k < 2; k++) { float rr = 0.35 + fract(uTime * 0.7 + float(k) * 0.5) * 1.3; foam += wet * (1.0 - smoothstep(0.0, 0.07, abs(pd - rr))) * (1.0 - (rr - 0.35) / 1.3) * 0.8; }
+        foam += wet * (1.0 - smoothstep(0.2, 0.4, pd)) * 0.5;
         foam = clamp(foam, 0.0, 1.0);
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0), foam * 0.85);
         diffuseColor.a = max(diffuseColor.a, foam * 0.9);`)
@@ -116,7 +122,7 @@ export function buildTerminal() {
 
   // ---------- water and sea floor ----------
   const U = { uTime: { value: 0 }, uIslets: { value: Array.from({ length: 16 }, () => new THREE.Vector3(1e4, 1e4, 0)) },
-    uShallow: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uSky: { value: new THREE.Color() }, uTrain: { value: new THREE.Vector3(1e4, 0, 25) } };
+    uShallow: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uSky: { value: new THREE.Color() }, uTrain: { value: new THREE.Vector3(1e4, 0, 25) }, uPlayer };
   const water = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), makeWater(U));
   water.position.set(55, 0, 0); water.receiveShadow = true; water.renderOrder = 1; water.userData.noShadow = true;
   s.add(water);
@@ -143,12 +149,45 @@ export function buildTerminal() {
     if (/^islet_|^fences_planters$|^station_props$/.test(name)) leafify(model, 'bush', isBush, gradient(), { clumps: true });
   }).then((r) => {
     placed = r.placed; w.glowMats = r.glow; w.loaded = true;
+    w.camBlockers = ['station_building', 'canopy', 'roof_extras'].flatMap((n) => placed[n] || []);   // the camera won't pass through these
     buildSeabed(r.layout.islets || []);
+    ISL = r.layout.islets || [];
+    plantGrass(ISL);
+    for (const [x, y] of NORTH()) w.solid(x, -y, 0.9, 0.9);                        // tree trunks
+    S(7.94, 13.4, 1.2, 1.0); S(15.93, 11.98, 0.35, 0.35); S(31.6, 10.15, 0.3, 0.3);   // shrine, lantern post, hammock post
     trees = [...(placed.tree_a || []), ...(placed.tree_b || []), ...(placed.tree_c || []), ...(placed.pine || [])].map((o) => ({ o, ph: Math.random() * 6.28 }));
     train = placed.train[0]; train.userData.home = train.position.clone();
     train.position.x = 1e4; nextTrain = 6;
   });
   let trees = [], train = null, nextTrain = 1e9;
+
+  // ---------- 3D grass on the islets ----------
+  function plantGrass(islets) {
+    const perM2 = matchMedia('(pointer: coarse)').matches ? 22 : 55;
+    let seed = 3; const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+    grassField(s, gradient(), (add) => {
+      for (const [x, y, r] of islets) {
+        const R = r * 0.86 * 0.96, n = Math.round(Math.PI * R * R * perM2);
+        for (let i = 0; i < n; i++) {
+          const a = rnd() * 6.283, d = Math.sqrt(rnd()) * R;
+          if (d < 0.45) continue;                                                  // not inside the trunk
+          const bx = x + Math.cos(a) * d, by = y + Math.sin(a) * d;
+          add(bx, 0.08 + 0.2 * r * 0.86 * Math.sqrt(Math.max(0, 1 - (d / (r * 0.86)) ** 2)), -by);
+        }
+      }
+    }, { max: perM2 > 30 ? 60000 : 24000 });
+  }
+
+  // ---------- a plank ramp from the deck down to the islets ----------
+  const plankMat = painted(new THREE.MeshToonMaterial({ color: 0x9a6a45, gradientMap: gradient() }), 'wood');
+  for (let i = 0; i < 6; i++) {
+    const by = 10.15 + i * 0.3, k = (by - 10.0) / 1.8, z = PZ + (0.41 - PZ) * k;
+    const pl = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.06, 0.28), plankMat); pl.position.copy(B(8, by, z - 0.03)); pl.rotation.x = -0.29;
+    pl.castShadow = pl.receiveShadow = true; s.add(pl);
+  }
+  for (const dx of [-0.72, 0.72]) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.3, 8), plankMat); post.position.copy(B(8 + dx, 11.75, -0.1)); post.castShadow = true; s.add(post);
+  }
 
   // The station name, drawn here so the Korean stays crisp (covers the board on the Blender sign).
   const name = sign(s, ['어딘가', 'SOMEWHERE  ·  ENTAH DI MANA', '←  Semarang                    Seoul  →'], 2.1, 0.82, -6.2, PZ + 1.51, -(1.9 - 0.045 * 0.8),
@@ -175,14 +214,14 @@ export function buildTerminal() {
     }
   }
 
-  // ---------- clouds drifting with the wind ----------
-  const cm = cloudMat(0xffffff, 0xb4cbe6, 0xffffff, [-0.4, 0.6, 0.7]);
+  // ---------- painted cumulus, drifting with the wind ----------
+  const cm = cumulusMaterial();
   const WIND = new THREE.Vector3(1.4, 0, 0.35);
   const clouds = [];
-  for (let i = 0; i < 16; i++) {
-    const a = (i / 16) * 6.283 + Math.random() * 0.3, r = 130 + Math.random() * 140;
-    const c = cloud(s, cm, 55 + Math.cos(a) * r, 28 + Math.random() * 45, Math.sin(a) * r, 3.2 + Math.random() * 2.8, 11);
-    c.rotation.y = Math.random() * 6.28; c.userData.bob = Math.random() * 6.28; clouds.push(c);
+  for (let i = 0; i < 14; i++) {
+    const a = (i / 14) * 6.283 + Math.random() * 0.3, r = 190 + Math.random() * 110;
+    const c = cumulus(s, cm, 55 + Math.cos(a) * r, 8 + Math.random() * 22, Math.sin(a) * r, 55 + Math.random() * 45, i + 1);
+    c.userData.bob = Math.random() * 6.28; clouds.push(c);
   }
 
   // ---------- gulls ----------
@@ -208,10 +247,34 @@ export function buildTerminal() {
   });
 
   // ---------- walking, collisions, things to look at ----------
+  // Where you can walk: the platform, the deck, a plank ramp down to the islets behind the station, the islets
+  // themselves, and the shallow water between them (you wade). Islet data arrives with the models.
+  let ISL = [];
+  const NORTH = () => ISL.filter(([, y]) => y > 9);
+  const RAMP = { x0: 7.25, x1: 8.75, y0: 10.0, y1: 11.8 };
+  const onPlatform = (bx, by) => (bx > -10.8 && bx < 34.8 && by > -1.25 && by < 3.05) || (bx > -4.8 && bx < 28.8 && by > 2.9 && by < 10.2);
+  const onRamp = (bx, by) => bx > RAMP.x0 && bx < RAMP.x1 && by >= RAMP.y0 && by <= RAMP.y1;
+  const isletTop = (bx, by) => {                                                   // height of the sand and grass mounds (Blender z)
+    let h = -1;
+    for (const [x, y, r] of ISL) {
+      const d = Math.hypot(bx - x, by - y), R = r * 0.86;
+      if (d < r) h = Math.max(h, -0.05 + 0.16 * r * Math.sqrt(1 - (d / r) ** 2));
+      if (d < R) h = Math.max(h, 0.08 + 0.2 * R * Math.sqrt(1 - (d / R) ** 2));
+    }
+    return h;
+  };
+  const wading = (bx, by) => by > 10.7 && by < 19 && bx > -22 && bx < 46 && seaDepth(bx, by, ISL) < 0.62;
   w.inside = (x, z) => {
     const bx = x, by = -z;
     if (by > 2.8 && by < 3.2 && (bx < 0.5 || bx > 23.5)) return false;            // the white fences
-    return (bx > -10.8 && bx < 34.8 && by > -1.25 && by < 3.05) || (bx > -4.8 && bx < 28.8 && by > 2.9 && by < 10.2);
+    if (onPlatform(bx, by) || onRamp(bx, by)) return true;
+    return NORTH().some(([ix, iy, ir]) => Math.hypot(bx - ix, by - iy) < ir * 0.93) || wading(bx, by);
+  };
+  w.heightAt = (x, z) => {
+    const bx = x, by = -z;
+    if (onPlatform(bx, by)) return PZ;
+    if (onRamp(bx, by)) { const end = isletTop(8, RAMP.y1); return PZ + (Math.max(end, 0) - PZ) * (by - RAMP.y0) / (RAMP.y1 - RAMP.y0); }
+    return Math.max(isletTop(bx, by), -0.3);                                       // on an islet, or wading
   };
   const S = (bx, by, sx, sy) => w.solid(bx, -by, sx, sy);
   S(11, 5.6, 12.3, 5.3);                                                           // the station building
@@ -270,7 +333,7 @@ export function buildTerminal() {
     hemi.color.copy(p.sky); hemi.groundColor.copy(p.ground); hemi.intensity = p.hemiI;
     s.fog.color.copy(p.fog);
     U.uShallow.value.copy(p.shallow); U.uDeep.value.copy(p.deep); U.uSky.value.copy(p.mid);
-    cm.uniforms.lit.value.copy(p.cLit); cm.uniforms.shade.value.copy(p.cShade); cm.uniforms.edge.value.copy(p.cEdge); cm.uniforms.sun.value.copy(sd);
+    cm.uniforms.lit.value.copy(p.cLit); cm.uniforms.shade.value.copy(p.cShade); cm.uniforms.edge.value.copy(p.cEdge); cm.uniforms.sun.value.copy(sd); cm.uniforms.haze.value.copy(p.mid);
     starField.material.opacity = p.stars;
     for (const l of lamps) l.intensity = p.lamps * 9;
     for (const m of w.glowMats) m.emissiveIntensity = m.userData.glow * (0.25 + 0.75 * Math.max(p.lamps, 0.2));

@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 export const uTime = { value: 0 };   // shared clock for shader animation (grass, etc.)
+export const uPlayer = { value: new THREE.Vector3(0, -100, 0) };   // where the traveller is (grass bends, water ripples)
 
 // Soft clay-like material: smooth shading plus a gentle rim of light around every silhouette.
 function soften(m) {

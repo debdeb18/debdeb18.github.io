@@ -218,11 +218,14 @@ export function buildTerminal() {
   const cm = cumulusMaterial();
   const WIND = new THREE.Vector3(1.4, 0, 0.35);
   const clouds = [];
-  for (let i = 0; i < 14; i++) {
-    const a = (i / 14) * 6.283 + Math.random() * 0.3, r = 190 + Math.random() * 110;
-    const c = cumulus(s, cm, 55 + Math.cos(a) * r, 8 + Math.random() * 22, Math.sin(a) * r, 55 + Math.random() * 45, i + 1);
+  // a busy summer sky: a ring of big towers far out, and plenty of smaller puffs at every distance and height
+  const CLOUDS = [];
+  for (let i = 0; i < 12; i++) CLOUDS.push([(i / 12) * 6.283 + Math.random() * 0.4, 210 + Math.random() * 90, 6 + Math.random() * 20, 55 + Math.random() * 45]);
+  for (let i = 0; i < 26; i++) CLOUDS.push([Math.random() * 6.283, 110 + Math.random() * 190, 25 + Math.random() * 55, 14 + Math.random() * 26]);
+  CLOUDS.forEach(([a, r, y, wd], i) => {
+    const c = cumulus(s, cm, 55 + Math.cos(a) * r, y, Math.sin(a) * r, wd, i + 1);
     c.userData.bob = Math.random() * 6.28; clouds.push(c);
-  }
+  });
 
   // ---------- gulls ----------
   const gulls = [];

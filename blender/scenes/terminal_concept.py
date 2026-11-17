@@ -5,27 +5,40 @@ here = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); sys.path.ins
 import bpy
 from mathutils import Vector
 import lib
-from lib import box, cyl, ball, tube, shingles, mat, gable
-from assets import chair, suitcase, station_sign
+from lib import box, cyl, ball, tube, shingles, mat, gable, lump, root
+from assets import chair, suitcase, station_sign, train, tree as tree_asset
 
 random.seed(11)
 lib.reset()
 lib.set_style(jitter=1.3, lean=1.0, pal=dict(
     wood=0x9A6A45, wood_dark=0x4E3528, wood_pale=0xC9A374, roof=0x41626F, roof_dark=0x2F4B58, cream=0xF1E6CC, stone=0xB9B2A8,
     timber=0x8A5A3C, timber_dark=0x4A3226, plaster=0xF0E4C8, concrete=0xD2CBBC, concrete_dark=0xA39C8F, gravel=0x8F877D, rail=0x7E7A82,
-    grass=0x7DB85A, tree=0x2B6A45, tree_mid=0x3F8A4C, tree_light=0x78B85A, pole=0x54483F, yellow=0xF2C230, canopy=0x5E8F7A, canopy_dark=0x45725F,
+    grass=0x7DB85A, sand=0xE6D6A8, tree=0x256B45, tree_mid=0x3C8C4C, tree_light=0x7CBC58, tree_hi=0xC2E272, trunk=0x5A3F30, boat=0x4F8FA0, pole=0x54483F, yellow=0xF2C230, canopy=0x5E8F7A, canopy_dark=0x45725F,
     lamp=0xFFD28A, window=0xFFC777, vend=0xE8F0F4, vend_glow=0xBFE6FF, train_red=0xB8403A, train_cream=0xF0E2C0, cloud=0xFFFFFF, hill=0x4F7F86))
 PZ = 0.95                                   # platform height
 
-# ---------- ground, track ----------
-box('ground', (500, 500, 0.1), (60, 0, -0.1), color='grass', bevel=0)
-box('ballast', (170, 3.6, 0.28), (45, -3.2, 0), color='gravel', bevel=0.1)
-for dy in (-0.72, 0.72): box('rail', (170, 0.07, 0.14), (45, -3.2 + dy, 0.3), color='rail', bevel=0.012, rough=0.3)
+# ---------- the sea, and the railway causeway across it ----------
+sea = box('sea', (900, 900, 0.1), (150, 0, -0.1), color=0x1F6F86, bevel=0)
+wm = sea.data.materials[0]; nt = wm.node_tree; b = nt.nodes['Principled BSDF']; b.inputs['Roughness'].default_value = 0.07; b.inputs['Alpha'].default_value = 0.68      # see-through, so the sunken rails show
+tco = nt.nodes.new('ShaderNodeTexCoord'); nz = nt.nodes.new('ShaderNodeTexNoise'); nz.inputs['Scale'].default_value = 0.9; nz.inputs['Detail'].default_value = 3
+bp = nt.nodes.new('ShaderNodeBump'); bp.inputs['Strength'].default_value = 0.12
+nt.links.new(tco.outputs['Object'], nz.inputs['Vector']); nt.links.new(nz.outputs[0], bp.inputs['Height']); nt.links.new(bp.outputs['Normal'], b.inputs['Normal'])
+box('seabed', (900, 900, 0.1), (150, 0, -2.5), color=0x2F8FA0, bevel=0)
+box('causeway', (190, 3.0, 0.3), (55, -3.2, -0.52), color='gravel', bevel=0.1)
+for dy in (-0.72, 0.72): box('rail', (190, 0.07, 0.14), (55, -3.2 + dy, -0.19), color='rail', bevel=0.012, rough=0.3)
 x = -22.0
-while x < 95: box('sleeper', (0.24, 2.4, 0.14), (x, -3.2, 0.19), color='timber_dark', bevel=0.02, jitter=0.012); x += 0.7
+while x < 110: box('sleeper', (0.24, 2.4, 0.14), (x, -3.2, -0.3), color='timber_dark', bevel=0.02, jitter=0.012); x += 0.7
+x = -20.0
+while x < 110:
+    for sy in (-1, 1): cyl('pile', 0.11, 0.1, 0.9, (x, -3.2 + sy * 1.62, -0.6), (random.uniform(-3, 3), 0, 0), color='timber_dark', bevel=0.01, verts=10)
+    x += 3.0
 
 # ---------- platform ----------
 box('platform', (46, 4.6, PZ), (12, 0.8, 0), color='concrete', bevel=0.03)
+box('deck', (34, 7.4, 0.3), (12, 6.7, PZ - 0.3), color='timber', bevel=0.03)                      # timber deck on stilts, behind the platform
+for i in range(22): box('deck_plank', (34, 0.3, 0.03), (12, 3.25 + i * 0.335, PZ - 0.02), color='wood' if i % 3 else 'wood_pale', bevel=0.008, jitter=0.006)
+for sx in range(-5, 30, 3):
+    for sy in (3.6, 6.7, 10.1): cyl('stilt', 0.13, 0.12, 1.6, (sx, sy, -0.9), (random.uniform(-2, 2), random.uniform(-2, 2), 0), color='timber_dark', bevel=0.01, verts=10)
 box('platform_base', (46.06, 0.06, 0.55), (12, -1.52, 0), color='concrete_dark', bevel=0.01)
 box('coping', (46.1, 0.55, 0.07), (12, -1.27, PZ - 0.02), color='cream', bevel=0.02)
 box('tactile', (46, 0.3, 0.02), (12, -0.75, PZ), color='yellow', bevel=0.005)
@@ -105,10 +118,9 @@ def fence(xa, xb, y):
     while x <= xb + 0.01: box('fpost', (0.1, 0.1, 1.05), (x, y, PZ), color='cream', bevel=0.02, jitter=0.01, taper=0.9); x += 1.5
     for z in (0.45, 0.85): box('frail', (xb - xa, 0.05, 0.09), ((xa + xb) / 2, y, PZ + z), color='cream', bevel=0.015)
 fence(-10.5, 0.4, 3.0); fence(23.6, 34.6, 3.0)
-def bush(x, y, z, r, n=6):
-    for i in range(n * 2): ball('bush', r * random.uniform(0.35, 0.6), (x + random.uniform(-r, r), y + random.uniform(-r, r) * 0.6, z + r * random.uniform(0.3, 0.8)), (1, 1, 0.8), random.choice(('tree_mid', 'tree_light', 'tree_light')), rough=1)
 for x in (-9, -6.3, -3.4, 25, 28, 31):
-    box('planter', (1.5, 0.55, 0.42), (x, 2.55, PZ), color='timber', bevel=0.03, jitter=0.015); bush(x, 2.55, PZ + 0.35, 0.36)
+    box('planter', (1.5, 0.55, 0.42), (x, 2.55, PZ), color='timber', bevel=0.03, jitter=0.015)
+    for i in range(5): lump('shrub', random.uniform(0.2, 0.32), (x + random.uniform(-0.5, 0.5), 2.55 + random.uniform(-0.08, 0.08), PZ + random.uniform(0.45, 0.62)), (1, 1, 0.85), random.choice(('tree_mid', 'tree_light')), rough=1)
 for x in (-8.2, 27.5):
     cyl('lamp_post', 0.07, 0.05, 4.2, (x, 2.4, PZ), color='pole', bevel=0.01)
     tube('lamp_arm', [(x, 2.4, PZ + 4.1), (x, 2.1, PZ + 4.45), (x, 1.5, PZ + 4.5), (x, 1.2, PZ + 4.35)], 0.03, 'pole')
@@ -119,6 +131,7 @@ for x in (-8.2, 27.5):
 POLES = [-7.0, 11.0, 29.0, 47.0, 65.0, 83.0]
 for i, x in enumerate(POLES):
     cyl('upole', 0.14, 0.1, 9.2, (x, -5.9, 0), (0, random.uniform(-1, 1), 0), color='pole', bevel=0.01)
+    cyl('pole_footing', 0.35, 0.3, 0.5, (x, -5.9, -0.2), color='concrete_dark', bevel=0.04, verts=12)
     for z, w in ((8.5, 2.3), (7.7, 1.8)):
         box('crossarm', (0.1, w, 0.1), (x, -5.9, z), color='pole', bevel=0.015)
         for k in (-1, 0, 1): cyl('insulator', 0.045, 0.03, 0.14, (x, -5.9 + k * w * 0.42, z + 0.1), color='cream', bevel=0.008, verts=10)
@@ -134,39 +147,85 @@ for a, b in zip(POLES, POLES[1:]):
 tube('service_wire', [(11, -5.9, 7.2), (11.5, -1, 5.6), (12, 3.2, PZ + 3.2)], 0.012, 'pole')
 tube('service_wire', [(-7, -5.9, 7.2), (-7.6, -1.5, 5.9), (-8.2, 2.4, PZ + 4.2)], 0.012, 'pole')
 
-# ---------- trees, hills ----------
-def tree(x, y, h, r, n=40):
-    cyl('trunk', r * 0.16, r * 0.1, h, (x, y, 0), (random.uniform(-4, 4), random.uniform(-4, 4), 0), color='timber_dark', bevel=0.02, verts=12)
-    for i in range(n):
-        a, up = random.uniform(0, 6.28), random.uniform(-0.3, 1); d = random.uniform(0.2, 1) * r * (1 - max(0, up) * 0.55)
-        ball('leaf', r * random.uniform(0.24, 0.42), (x + math.cos(a) * d, y + math.sin(a) * d, h + up * r * 0.75), (1, 1, 0.82),
-             'tree_light' if up > 0.55 else 'tree_mid' if up > 0.1 else 'tree', rough=1)
-for x, y, h, r in ((0, 12, 6, 4), (7, 13.5, 8, 5), (15, 12.5, 7, 4.4), (22, 11, 5.5, 3.6), (-7, 10.5, 6.5, 4), (29, 10, 7, 4.2), (37, 9, 6, 3.8), (-15, 12, 7, 4.5),
-                   (3, -11.5, 6.5, 4), (19, -12, 8, 5), (36, -10.5, 6.5, 4), (-9, -12.5, 7, 4.5), (52, -11, 7, 4.5), (50, 9, 7, 4.5), (64, 10, 8, 5), (70, -12, 8, 5)):
-    tree(x, y, h, r)
-for x, y, r in ((6, -7.4, 0.7), (16, -7.6, 0.9), (24, -7.2, 0.6), (-3, -7.6, 0.8), (33, -7.5, 0.8), (20, 9.2, 0.9), (2, 8.6, 0.8)): bush(x, y, 0, r, 7)
-for x, y, r, z in ((170, 90, 80, 0.2), (210, -70, 95, 0.22), (120, 160, 70, 0.18), (130, -150, 70, 0.16)): ball('hill', r, (x, y, -2), (1, 1, z), 'hill', rough=1)
+# ---------- islets with leafy trees, far islands ----------
+def islet(x, y, r):
+    ball('islet_sand', r, (x, y, -0.05), (1, 1, 0.16), 'sand', rough=1)
+    ball('islet_grass', r * 0.86, (x, y, 0.08), (1, 1, 0.2), 'grass', rough=1)
+    for i in range(int(r * 7)):
+        a, d = random.uniform(0, 6.283), random.uniform(0.1, 0.7) * r; gx, gy = x + math.cos(a) * d, y + math.sin(a) * d; gz = 0.08 + r * 0.86 * 0.2 * math.sqrt(max(0, 1 - (d / (r * 0.86)) ** 2)) - 0.05
+        for k in range(3): box('blade', (0.08, 0.03, random.uniform(0.3, 0.7)), (gx + random.uniform(-0.15, 0.15), gy + random.uniform(-0.15, 0.15), gz), (random.uniform(-18, 18), random.uniform(-18, 18), 0), random.choice(('tree_mid', 'tree_light')), bevel=0, taper=0.2)
+        if i % 5 == 0: ball('flower', 0.07, (gx + 0.2, gy, gz + 0.32), color=random.choice((0xFFFFFF, 0xFFE27A, 0xFFB7C9)))
+    for i in range(int(r)): lump('rock', random.uniform(0.25, 0.5), (x + math.cos(i * 2.4) * r * 0.8, y + math.sin(i * 2.4) * r * 0.8, 0.1), (1.2, 1, 0.7), 'stone', strength=0.2, grain=1.2)
+def bush(x, y, z, r, n=5):
+    for i in range(n): lump('bush', r * random.uniform(0.5, 0.8), (x + random.uniform(-r, r), y + random.uniform(-r, r) * 0.6, z + r * random.uniform(0.2, 0.6)), (1, 1, 0.8), random.choice(('tree_mid', 'tree_light', 'tree')), rough=1)
+for i, (x, y, h, r) in enumerate(((0, 14, 6, 4), (8, 15.5, 8, 5), (16, 14.5, 7, 4.4), (24, 14, 5.5, 3.6), (-8, 13.5, 6.5, 4), (32, 13, 7, 4.2), (41, 12, 6, 3.8), (-17, 14, 7, 4.5),
+                   (4, -12.5, 6.5, 4), (21, -13.5, 8, 5), (38, -12, 6.5, 4), (-10, -14, 7, 4.5), (56, -12.5, 7, 4.5), (54, 13, 7, 4.5), (70, 13, 8, 5), (76, -14, 8, 5))):
+    islet(x, y, r * 0.95)
+    t = tree_asset.build(h, r, seed=i, kind='pine' if i in (3, 10, 13) else 'broad'); t.location = (x, y, 0.3)
+    bush(x + r * 0.5, y - r * 0.45, 0.4, 0.55)
+for x, y, r, z in ((190, 100, 80, 0.2), (230, -80, 95, 0.22), (140, 190, 70, 0.18), (150, -180, 70, 0.16)):
+    ball('island', r, (x, y, -2), (1, 1, z), 'hill', rough=1)
+    for k in range(4): box('far_house', (5, 5, 4), (x - r * 0.5 + k * 9, y + (k % 2) * 8 - r * 0.2, r * z * 0.75), color='cream', bevel=0.2); box('far_roof', (6, 6, 1.6), (x - r * 0.5 + k * 9, y + (k % 2) * 8 - r * 0.2, r * z * 0.75 + 4), color='roof', bevel=0.3, taper=0.3)
 
-for i in range(260):
-    x, side = random.uniform(-16, 60), random.choice((-1, 1)); y = -5.3 - random.uniform(0, 3.5) if side < 0 else random.uniform(3.6, 7) if (x < 4.5 or x > 17.5) else 9
-    for k in range(3): box('blade', (0.07, 0.03, random.uniform(0.25, 0.6)), (x + random.uniform(-0.12, 0.12), y + random.uniform(-0.12, 0.12), 0), (random.uniform(-18, 18), random.uniform(-18, 18), 0), random.choice(('tree_mid', 'tree_light')), bevel=0, taper=0.2)
-    if i % 6 == 0: ball('flower', 0.06, (x + 0.2, y, 0.3), color=random.choice((0xFFFFFF, 0xFFE27A, 0xFFB7C9)))
+# ---------- the train, coming down the line ----------
+tr = train.build(2); tr.location = (38, -3.2, -0.05); tr.rotation_euler = (0, 0, math.radians(-90))
+LAMPS.append(((36.5, -3.2, 1.4), 700, (1, 0.9, 0.7)))
+for i in range(60):                       # the bow wave and wake the train pushes through the shallow water
+    k = random.uniform(0, 1); sy = random.choice((-1, 1))
+    lump('spray', random.uniform(0.1, 0.32) * (1 - k * 0.6), (37.6 + k * 16 + random.uniform(-0.3, 0.3), -3.2 + sy * (1.45 + k * 1.3 + random.uniform(0, 0.3)), random.uniform(0.0, 0.5) * (1 - k)), (1.3, 1, 0.7), 0xFFFFFF, strength=0.25, rough=1)
 
-# ---------- the train, far down the line ----------
-TX = 58.0
-box('train_low', (15, 2.7, 1.25), (TX + 7.5, -3.2, 0.5), color='train_red', bevel=0.12)
-box('train_high', (15, 2.7, 1.5), (TX + 7.5, -3.2, 1.75), color='train_cream', bevel=0.12)
-box('train_roof', (15.1, 2.5, 0.25), (TX + 7.5, -3.2, 3.2), color='concrete_dark', bevel=0.1)
-box('train_window', (0.04, 1.9, 0.85), (TX - 0.01, -3.2, 2.05), color='window', bevel=0, emit=1.5)
-for i in range(6): box('train_side_win', (1.5, 0.04, 0.8), (TX + 1.6 + i * 2.3, -3.2 - 1.36, 2.05), color='window', bevel=0, emit=1.5)
-for dy in (-0.85, 0.85): ball('headlight', 0.17, (TX - 0.03, -3.2 + dy, 1.15), color='lamp', emit=30.0)
-LAMPS.append(((TX - 1.5, -3.2, 1.3), 2500, (1, 0.9, 0.7)))
+# ---------- small details ----------
+# hanging name board and platform number under the canopy
+box('nameboard', (2.6, 0.06, 0.5), (16.5, -0.2, PZ + 1.72), color='cream', bevel=0.02); box('nameboard_stripe', (2.6, 0.065, 0.07), (16.5, -0.2, PZ + 1.74), color='red', bevel=0.005)
+for dx in (-1.1, 1.1): tube('nameboard_chain', [(16.5 + dx, -0.2, PZ + 2.2), (16.5 + dx, -0.2, PZ + 2.36)], 0.008, 'pole')
+box('platform_no', (0.5, 0.05, 0.5), (6.6, -0.5, PZ + 1.85), color=0x2F6F9A, bevel=0.03)
+# timetable board, mailbox, umbrella stand, potted plants, crates, broom
+box('timetable', (1.3, 0.05, 0.95), (7.9, Y0 - 0.1, PZ + 1.3), color='wood_dark', bevel=0.02); box('timetable_paper', (1.14, 0.02, 0.8), (7.9, Y0 - 0.13, PZ + 1.375), color='cream', bevel=0.004)
+for i in range(5): box('timetable_line', (0.95, 0.01, 0.03), (7.9, Y0 - 0.145, PZ + 1.5 + i * 0.12), color='pole', bevel=0)
+box('mailbox', (0.42, 0.34, 0.55), (12.75, 2.85, PZ + 0.75), color='red', bevel=0.06); cyl('mailbox_post', 0.04, 0.04, 0.75, (12.75, 2.85, PZ), color='pole', bevel=0.005); box('mail_slot', (0.26, 0.02, 0.04), (12.75, 2.67, PZ + 1.12), color='pole', bevel=0)
+cyl('umbrella_stand', 0.16, 0.2, 0.5, (9.75, 2.8, PZ), color='canopy_dark', bevel=0.02)
+for i, c in enumerate((0xD9532F, 0x3F8FD1, 0xF2C230)): cyl('umbrella', 0.035, 0.02, 0.85, (9.7 + i * 0.06, 2.8 + (i - 1) * 0.05, PZ + 0.1), (random.uniform(-9, 9), random.uniform(-9, 9), 0), c, bevel=0.005, verts=8)
+for x, y, sz in ((5.5, 2.65, 1.0), (6.2, 2.75, 0.7), (16.6, 2.7, 0.9), (1.6, -0.1, 0.8), (22.4, -0.1, 0.8), (17.4, 2.75, 0.6)):
+    cyl('pot', 0.2 * sz, 0.26 * sz, 0.34 * sz, (x, y, PZ), color=random.choice((0xC97B5A, 0x6F8FB0, 0xD9B48A)), bevel=0.02)
+    for i in range(4): lump('pot_leaf', 0.17 * sz, (x + random.uniform(-0.1, 0.1) * sz, y + random.uniform(-0.1, 0.1) * sz, PZ + 0.38 * sz + i * 0.07 * sz), (1, 1, 0.9), random.choice(('tree_mid', 'tree_light')), rough=1)
+    if sz > 0.75:
+        for i in range(3): ball('pot_flower', 0.05 * sz, (x + random.uniform(-0.2, 0.2) * sz, y - 0.1 * sz, PZ + 0.62 * sz), color=random.choice((0xFFB7C9, 0xFFE27A, 0xFFFFFF)))
+for i, (x, y, w) in enumerate(((19.2, 2.6, 0.7), (19.95, 2.7, 0.6), (19.5, 2.62, 0.55))): box('crate', (w, w * 0.8, w * 0.7), (x, y, PZ + (0.5 if i == 2 else 0)), (0, 0, random.uniform(-8, 8)), color='wood_pale' if i % 2 else 'wood', bevel=0.02, jitter=0.01)
+box('broom_stick', (0.03, 0.03, 1.4), (4.75, 2.9, PZ), (-8, 0, 0), color='wood_pale', bevel=0.005); box('broom_head', (0.3, 0.08, 0.24), (4.75, 2.85, PZ), color=0xD9B46A, bevel=0.02, taper=1.4)
+# a cat asleep on the bench
+cat = root('cat'); cat.location = (14.35, 2.55, PZ + 0.49)
+ball('cat_body', 0.2, (0, 0, 0.11), (1.5, 0.95, 0.72), 0xE8A05A, cat); ball('cat_head', 0.12, (-0.27, -0.05, 0.14), (1, 1, 0.9), 0xE8A05A, cat)
+for sy in (-1, 1): cyl('cat_ear', 0.045, 0.004, 0.08, (-0.29, -0.05 + sy * 0.07, 0.22), color=0xE8A05A, parent=cat, bevel=0, verts=6)
+tube('cat_tail', [(0.27, 0.02, 0.1), (0.36, -0.12, 0.06), (0.22, -0.22, 0.05), (0.02, -0.21, 0.05)], [0.035, 0.032, 0.028, 0.022], 0xD98C45, cat)
+# lanterns strung under the canopy edge
+for i in range(9):
+    x = 2.2 + i * 2.5
+    tube('lantern_string', [(x, -1.05, PZ + 2.24), (x, -1.05, PZ + 2.1)], 0.005, 'pole'); cyl('paper_lantern', 0.1, 0.1, 0.2, (x, -1.05, PZ + 1.9), color=(0xFF8A5A, 0xFFD27A, 0xFF9AB4)[i % 3], bevel=0.04, emit=1.2, verts=12)
+# roof: a weather vane and a little moss
+cyl('vane_post', 0.02, 0.02, 0.8, (7.5, 5.6, RZ + 0.05), color='pole', bevel=0); box('vane_arrow', (0.7, 0.03, 0.1), (7.5, 5.6, RZ + 0.75), (0, 0, 25), color='pole', bevel=0.01, taper=0.4)
+for i in range(7): lump('moss', random.uniform(0.12, 0.22), (random.uniform(6, 16), Y0 - EAVE + 0.5 + random.uniform(0, 1.2), EZ + 0.35 + random.uniform(0, 0.5)), (1.4, 1, 0.35), 'tree_light', strength=0.2, rough=1)
+# on the water: a rowing boat, buoys with lights, lily pads, mooring posts
+bt = root('boat'); bt.location = (12.5, -8.6, 0.0); bt.rotation_euler = (0, 0, 0.35)
+box('hull', (3.2, 1.25, 0.5), (0, 0, -0.12), color='boat', parent=bt, bevel=0.2, segs=4, taper=1.25); box('hull_inside', (2.7, 0.95, 0.06), (0, 0, 0.34), color='wood_dark', parent=bt, bevel=0.02)
+for dx in (-0.6, 0.5): box('thwart', (0.22, 1.3, 0.05), (dx, 0, 0.36), color='wood_pale', parent=bt, bevel=0.015)
+box('oar', (2.3, 0.05, 0.04), (0.2, 0.3, 0.42), (0, 0, 14), color='wood_pale', parent=bt, bevel=0.01); cyl('boat_lamp', 0.07, 0.08, 0.16, (1.35, 0, 0.42), color='lamp', parent=bt, bevel=0.01, emit=4.0)
+cyl('mooring', 0.1, 0.09, 1.5, (14.8, -7.6, -0.5), (4, 3, 0), color='timber_dark', bevel=0.01, verts=10); tube('rope', [(14.8, -7.6, 0.75), (14.4, -7.9, 0.25), (13.95, -8.1, 0.42)], 0.015, 'wood_pale')
+for x, y, c in ((-4, -9.5, 0xD9532F), (19, -6.6, 0xF2C230), (30, -7.6, 0xD9532F), (48, -8.2, 0xF2C230), (-9, -6.6, 0xF2C230)):
+    cyl('buoy', 0.28, 0.2, 0.42, (x, y, -0.1), color=c, bevel=0.06, verts=14); cyl('buoy_mast', 0.02, 0.02, 0.5, (x, y, 0.3), color='pole', bevel=0); ball('buoy_light', 0.07, (x, y, 0.82), color='lamp', emit=4.0)
+    LAMPS.append(((x, y, 0.95), 30, (1, 0.8, 0.5)))
+for i in range(46):
+    x, y = random.uniform(-12, 34), random.uniform(-11.5, -5.2)
+    rl = random.uniform(0.16, 0.34); cyl('lily', rl, rl, 0.014, (x, y, 0.004), (0, 0, random.uniform(0, 360)), color=random.choice(('tree_mid', 'tree_light')), bevel=0, verts=10)
+    if i % 6 == 0: ball('lily_flower', 0.07, (x, y, 0.06), (1, 1, 0.7), 0xFFD6E4)
+# gulls
+for x, y, z in ((60, 14, 16), (66, 18, 17.5), (72, 12, 15), (90, -30, 22), (97, -26, 23.5), (55, 40, 26)):
+    for s in (-1, 1): box('gull_wing', (0.12, 0.9, 0.04), (x, y + s * 0.42, z), (s * 22, 0, 0), color=0xFFFFFF, bevel=0.01)
 
 # ---------- clouds ----------
 def cloud(cx, cy, cz, size, n=22):
     for i in range(n):
         dx = random.uniform(-1, 1); r = size * random.uniform(0.45, 0.9) * (1 - abs(dx) * 0.45)
-        ball('cloud', r, (cx + random.uniform(-0.5, 0.5) * size, cy + dx * size * 2.2, cz + r * 0.55 + random.uniform(0, size * 0.9) * (1 - abs(dx))), (1, 1, 0.8), 'cloud', rough=1)
+        lump('cloud', r, (cx + random.uniform(-0.5, 0.5) * size, cy + dx * size * 2.2, cz + r * 0.55 + random.uniform(0, size * 0.9) * (1 - abs(dx))), (1, 1, 0.8), 'cloud', strength=0.16, grain=0.9, rough=1)
 for cx, cy, cz, sz in ((230, 40, 30, 30), (260, -70, 45, 36), (300, 130, 60, 44), (210, -160, 28, 26), (330, -10, 95, 40), (190, 190, 40, 30), (150, 230, 70, 34), (280, 250, 110, 44), (240, -260, 70, 40)):
     cloud(cx, cy, cz, sz)
 
@@ -174,7 +233,7 @@ for cx, cy, cz, sz in ((230, 40, 30, 30), (260, -70, 45, 36), (300, 130, 60, 44)
 sc = bpy.context.scene
 cam = bpy.data.cameras.new('cam'); cam.lens = 25; cam.clip_end = 2000
 co = bpy.data.objects.new('camera', cam); sc.collection.objects.link(co); sc.camera = co
-co.location = (-13.2, -4.6, 1.85); co.rotation_euler = (Vector((11, 1.2, 3.6)) - co.location).to_track_quat('-Z', 'Y').to_euler()
+co.location = (-13.2, -5.0, 2.2); co.rotation_euler = (Vector((11, 1.2, 3.6)) - co.location).to_track_quat('-Z', 'Y').to_euler()
 w = bpy.data.worlds.new('sky'); sc.world = w; w.use_nodes = True; nt = w.node_tree
 bg = nt.nodes['Background']; tc = nt.nodes.new('ShaderNodeTexCoord'); sep = nt.nodes.new('ShaderNodeSeparateXYZ'); ramp = nt.nodes.new('ShaderNodeValToRGB')
 mth = nt.nodes.new('ShaderNodeMath'); mth.operation = 'MULTIPLY_ADD'; mth.inputs[1].default_value = 0.5; mth.inputs[2].default_value = 0.5

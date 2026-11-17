@@ -5,7 +5,9 @@ from mathutils import Vector
 
 PAL = dict(wood=0xD9A066, wood_dark=0x8F5A3C, wood_pale=0xEBC894, red=0xD8364A, red_dark=0xA8243A, cream=0xFFF0DC,
            teal=0x3F8F9A, teal_dark=0x2C6670, iron=0x3B3A4A, brass=0xE8B84A, roof=0xD9694A, roof_dark=0xB04E3C,
-           glow=0xFFD98A, leaf=0x6FBF73, pink=0xFFB7C9, sky=0x8FB4FF, stone=0xB9B2A8, white=0xFFFFFF)
+           glow=0xFFD98A, leaf=0x6FBF73, pink=0xFFB7C9, sky=0x8FB4FF, stone=0xB9B2A8, white=0xFFFFFF,
+           train_red=0xB8403A, train_red_dark=0x8E2E2C, train_cream=0xF0E2C0, train_roof=0x8D8A86, window=0xFFC777, lamp=0xFFD28A,
+           tree=0x2B6A45, tree_mid=0x3F8A4C, tree_light=0x78B85A, tree_hi=0xB4DC6E, trunk=0x5A3F30)
 
 # The active style: how crooked, how chunky, how rounded, and the studio colours. See blender/styles.py.
 BASE_PAL = dict(PAL)
@@ -82,6 +84,18 @@ def ball(name, r, loc=(0, 0, 0), scale=(1, 1, 1), color='wood', parent=None, **m
     bm = bmesh.new(); bmesh.ops.create_uvsphere(bm, u_segments=24, v_segments=14, radius=r)
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
     o = _finish(name, me, color, loc, (0, 0, 0), parent, 0, **mk); o.scale = scale
+    return o
+
+def lump(name, r, loc=(0, 0, 0), scale=(1, 1, 1), color='leaf', parent=None, strength=0.3, grain=0.55, **mk):
+    """A lumpy, cauliflower-like blob: the building block for leafy canopies, bushes and clouds."""
+    bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=3, radius=r)
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    for p in me.polygons: p.use_smooth = True
+    o = bpy.data.objects.new(name, me); bpy.context.scene.collection.objects.link(o)
+    o.location = loc; o.scale = scale; o.data.materials.append(mat(color, **mk))
+    tex = bpy.data.textures.new('lump', 'VORONOI'); tex.noise_scale = r * grain; tex.distance_metric = 'DISTANCE'
+    d = o.modifiers.new('lumps', 'DISPLACE'); d.texture = tex; d.texture_coords = 'GLOBAL'; d.strength = -r * strength * 2.2; d.mid_level = 0.35
+    if parent: o.parent = parent
     return o
 
 def tube(name, pts, radii, color='iron', parent=None, **mk):

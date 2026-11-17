@@ -40,3 +40,14 @@ A small three.js world, no build step. Open it through any static server (`pytho
 - `vendor/`: three.js (MIT).
 
 Direct links: `#home`, `#office`, `#market`.
+
+## Blender props (`blender/`)
+
+Props are designed in Blender first, then loaded into the world as `.glb` files.
+
+- `blender/assets/<name>.py`: the design of one prop, as a script.
+- `blender/files/<name>.blend`: the same prop as a Blender file you can open and edit by hand.
+- `blender/previews/<name>.png`: a render for review.
+- `models/<name>.glb`: what the website loads.
+
+Rebuild with `pip install bpy` then `python blender/make.py chair` (or `all`).

@@ -63,6 +63,14 @@ def box(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, bev
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
     return _finish(name, me, color, loc, rot, parent, bevel, **mk)
 
+def gable(name, span, height, thick, loc=(0, 0, 0), color='cream', parent=None, **mk):
+    """A triangular wall end (under a pitched roof). `span` runs along Y, the point is up."""
+    bm = bmesh.new()
+    vs = [bm.verts.new(c) for c in ((-thick / 2, -span / 2, 0), (-thick / 2, span / 2, 0), (-thick / 2, 0, height), (thick / 2, -span / 2, 0), (thick / 2, span / 2, 0), (thick / 2, 0, height))]
+    for f in ((0, 1, 2), (5, 4, 3), (0, 3, 4, 1), (1, 4, 5, 2), (2, 5, 3, 0)): bm.faces.new([vs[i] for i in f])
+    bm.normal_update(); me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    return _finish(name, me, color, loc, (0, 0, 0), parent, 0, **mk)
+
 def cyl(name, r1, r2, h, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, bevel=0.015, verts=20, **mk):
     """A cylinder or cone standing on its base: r1 at the bottom, r2 at the top."""
     bm = bmesh.new(); bmesh.ops.create_cone(bm, cap_ends=True, segments=verts, radius1=r1, radius2=max(r2, 0.0005), depth=h)
@@ -95,12 +103,12 @@ def text(name, body, size, loc, rot=(90, 0, 0), color='iron', parent=None):
     if parent: o.parent = parent
     return o
 
-def shingles(name, width, depth, rows, loc, pitch, color='roof', dark='roof_dark', parent=None, yaw=0):
+def shingles(name, width, depth, rows, loc, pitch, color='roof', dark='roof_dark', parent=None, yaw=0, tile=0.22):
     """One slope of a shingled roof: overlapping, slightly crooked tiles. Pivot is the eave (lower edge) centre."""
     e = bpy.data.objects.new(name, None); bpy.context.scene.collection.objects.link(e)
     e.location = loc; e.rotation_euler = (math.radians(pitch), 0, math.radians(yaw))
     if parent: e.parent = parent
-    step = depth / rows; n = max(2, round(width / 0.22))
+    step = depth / rows; n = max(2, round(width / tile))
     for r in range(rows):
         off = (r % 2) * 0.5
         for i in range(-1, n + 1):

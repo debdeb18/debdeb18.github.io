@@ -1,4 +1,4 @@
-<img src="34.jpeg" height="400"/>
+<img src="photos/deby-cherry-blossom.jpeg" height="400"/>
 
 ## Hello, My Name is Deby Angelina
 
@@ -23,3 +23,18 @@ or reach out to me via
 <a href="https://github.com/debdeb18" ><img src="github-brands.svg" alt="github" width="30"/></a>&emsp;<a href="https://www.linkedin.com/in/dangelina18/"><img src="linkedin-brands.svg" alt="linkedin" width="30"/></a>
 
 > Winner is your nature, so don't worry about it. Setting your focus on what's naturally yours, will just messed up your tempo    
+
+---
+
+## The 3D portfolio (`index.html`)
+
+A small three.js world, no build step. Open it through any static server (`python3 -m http.server`), or GitHub Pages.
+
+- `src/content.js`: every piece of text. Entries with `todo` are placeholders waiting for real answers.
+- `src/worlds/terminal.js`: the platform by the sea, the chair, the train and the dimension crack.
+- `src/worlds/home.js`, `office.js`, `market.js`: the three destinations.
+- `src/kit.js`: building blocks (boxes, signs, photo frames, the crack, hotspots).
+- `photos/`: pictures used in the world. Add a frame with `photo(parent, 'photos/name.jpg', w, h, x, y, z)`.
+- `vendor/`: three.js (MIT).
+
+Direct links: `#home`, `#office`, `#market`.

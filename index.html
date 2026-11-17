@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Deby Angelina · Somewhere</title>
+<meta name="description" content="Deby Angelina, backend / platform software engineer. A small 3D world: a terminal by the sea, a home in space, an office and a night market.">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/" } }</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div id="where"></div>
+  <nav id="nav" aria-label="Fast travel">
+    <button data-go="terminal">Terminal</button>
+    <button data-go="home">Home</button>
+    <button data-go="office">Office</button>
+    <button data-go="market">Market</button>
+  </nav>
+</div>
+
+<button id="prompt" hidden></button>
+
+<div id="tickets" hidden>
+  <p>The crossing bell is quiet. Where to?</p>
+  <div class="row">
+    <button data-dest="home"><b>Line 1</b>Home among the stars<small>who I am</small></button>
+    <button data-dest="office"><b>Line 2</b>The Office<small>my work</small></button>
+    <button data-dest="market"><b>Line 3</b>The Night Market<small>outside work</small></button>
+  </div>
+  <button id="stand" class="ghost">Stand up</button>
+</div>
+
+<aside id="panel" hidden>
+  <button id="close" aria-label="Close">×</button>
+  <div id="kicker"></div>
+  <h2 id="ptitle"></h2>
+  <div id="pbody"></div>
+  <div id="plinks"></div>
+</aside>
+
+<div id="arcade" hidden>
+  <div class="cab">
+    <div class="bar"><span>BUG SQUASH</span><span id="score"></span><button id="aclose" aria-label="Close">×</button></div>
+    <canvas id="game" width="360" height="270"></canvas>
+    <p>Squash the bugs before they reach production. 20 seconds.</p>
+  </div>
+</div>
+
+<div id="joy" hidden><i></i></div>
+
+<div id="intro">
+  <div class="card">
+    <div class="station">어딘가 · SOMEWHERE · ENTAH DI MANA</div>
+    <h1>Deby Angelina</h1>
+    <p>Backend / platform software engineer. This is a small world about me: a terminal by the sea, and three places the train can take you.</p>
+    <button id="start">Step onto the platform</button>
+    <p class="keys"><span class="desk">WASD / arrows to walk · drag to look · scroll to zoom · E to interact</span><span class="touch">left thumb to walk · drag to look · tap the prompt to interact</span></p>
+  </div>
+</div>
+<div id="fade"></div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

@@ -140,29 +140,52 @@ addEventListener('keydown', (e) => {
 });
 addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 addEventListener('blur', () => keys.clear());
-let drag = null;
-canvas.addEventListener('pointerdown', (e) => { drag = { id: e.pointerId, x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); });
-canvas.addEventListener('pointermove', (e) => {
-  if (!drag || drag.id !== e.pointerId) return;
-  yaw -= (e.clientX - drag.x) * 0.005; pitch = THREE.MathUtils.clamp(pitch + (e.clientY - drag.y) * 0.004, 0.1, 1.4);
-  drag.x = e.clientX; drag.y = e.clientY;
-});
-const endDrag = (e) => { if (drag && drag.id === e.pointerId) drag = null; };
-canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
-canvas.addEventListener('wheel', (e) => { e.preventDefault(); dist = THREE.MathUtils.clamp(dist * (1 + Math.sign(e.deltaY) * 0.1), 4, 22); }, { passive: false });
-if (matchMedia('(pointer: coarse)').matches) {
-  const j = $('joy'), nub = j.firstElementChild; j.hidden = false;
-  const move = (e) => {
-    const r = j.getBoundingClientRect();
-    let x = (e.clientX - r.left - r.width / 2) / (r.width / 2), y = (e.clientY - r.top - r.height / 2) / (r.height / 2);
-    const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; }
-    joy.x = x; joy.y = -y; nub.style.transform = `translate(${x * 34}px, ${y * 34}px)`;
-  };
-  j.addEventListener('pointerdown', (e) => { j.setPointerCapture(e.pointerId); move(e); });
-  j.addEventListener('pointermove', (e) => { if (j.hasPointerCapture(e.pointerId)) move(e); });
-  const up = () => { joy.x = joy.y = 0; nub.style.transform = ''; };
-  j.addEventListener('pointerup', up); j.addEventListener('pointercancel', up);
+// Touch: the left half of the screen is a floating joystick that appears wherever the thumb lands. A short drag walks
+// slowly, a longer one runs. The right half turns the camera with one finger and zooms with a two-finger pinch.
+// Mouse: drag anywhere to turn, scroll to zoom.
+const RUN = 1.8;                                                 // running speed, as a multiple of walking speed
+const joyEl = $('joy'), nub = joyEl.firstElementChild;
+let stick = null;                                                // { id, ox, oy } while a thumb is on the joystick
+const looks = new Map();                                         // pointers turning or zooming the camera
+let pinch = 0;
+const stickRadius = () => Math.min(110, Math.max(70, innerWidth * 0.14));
+function moveStick(x, y) {
+  const R = stickRadius();
+  let dx = x - stick.ox, dy = y - stick.oy, d = Math.hypot(dx, dy);
+  if (d > R) { stick.ox += dx * (1 - R / d); stick.oy += dy * (1 - R / d); dx = x - stick.ox; dy = y - stick.oy; d = R; }   // the base follows a thumb that wanders off
+  const k = d < 8 ? 0 : (d - 8) / (R - 8);                       // how far the thumb is pushed, 0..1
+  joy.x = d ? (dx / d) * k * RUN : 0; joy.y = d ? (-dy / d) * k * RUN : 0;
+  joyEl.style.left = stick.ox + 'px'; joyEl.style.top = stick.oy + 'px';
+  joyEl.style.width = joyEl.style.height = R * 2 + 'px';
+  nub.style.transform = `translate(${dx}px, ${dy}px)`;
+  joyEl.classList.toggle('run', k > 0.62);
 }
+const span = () => { const [a, b] = [...looks.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+canvas.addEventListener('pointerdown', (e) => {
+  canvas.setPointerCapture(e.pointerId);
+  if (e.pointerType !== 'mouse' && !stick && e.clientX < innerWidth / 2) {
+    stick = { id: e.pointerId, ox: e.clientX, oy: e.clientY }; joyEl.hidden = false; moveStick(e.clientX, e.clientY); return;
+  }
+  looks.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (looks.size === 2) pinch = span();
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (stick && stick.id === e.pointerId) return moveStick(e.clientX, e.clientY);
+  const p = looks.get(e.pointerId); if (!p) return;
+  if (looks.size >= 2) {                                         // pinch: fingers apart zooms in, together zooms out
+    p.x = e.clientX; p.y = e.clientY;
+    const now = span(); if (pinch > 0 && now > 0) dist = THREE.MathUtils.clamp(dist * (pinch / now), 4, 22); pinch = now;
+    return;
+  }
+  yaw -= (e.clientX - p.x) * 0.005; pitch = THREE.MathUtils.clamp(pitch + (e.clientY - p.y) * 0.004, 0.1, 1.4);
+  p.x = e.clientX; p.y = e.clientY;
+});
+const release = (e) => {
+  if (stick && stick.id === e.pointerId) { stick = null; joy.x = joy.y = 0; joyEl.hidden = true; nub.style.transform = ''; return; }
+  looks.delete(e.pointerId); pinch = looks.size === 2 ? span() : 0;
+};
+canvas.addEventListener('pointerup', release); canvas.addEventListener('pointercancel', release);
+canvas.addEventListener('wheel', (e) => { e.preventDefault(); dist = THREE.MathUtils.clamp(dist * (1 + Math.sign(e.deltaY) * 0.1), 4, 22); }, { passive: false });
 
 // ---------- loop ----------
 function placeCamera(k) {
@@ -196,9 +219,10 @@ function frame() {
     if (keys.has('s') || keys.has('arrowdown')) iy -= 1;
     if (keys.has('d') || keys.has('arrowright')) ix += 1;
     if (keys.has('a') || keys.has('arrowleft')) ix -= 1;
+    const fast = keys.has('shift') ? RUN : 1;                   // Shift runs; the joystick can ask for anything up to RUN
     const l = Math.hypot(ix, iy), top = 4.4;
     tmp.set(0, 0, 0);
-    if (l > 0.08) { const m = top * Math.min(1, l) / l; tmp.set((Math.cos(yaw) * ix - Math.sin(yaw) * iy) * m, 0, (-Math.sin(yaw) * ix - Math.cos(yaw) * iy) * m); }
+    if (l > 0.08) { const m = top * Math.min(l > 1.01 && !keys.size ? RUN : fast, l) / l; tmp.set((Math.cos(yaw) * ix - Math.sin(yaw) * iy) * m, 0, (-Math.sin(yaw) * ix - Math.cos(yaw) * iy) * m); }
     vel.lerp(tmp, 1 - Math.exp(-dt * (l > 0.08 ? 7 : 10)));           // ease in and out of a walk
     const p = player.position, mx = vel.x * dt, mz = vel.z * dt;
     if (world.canWalk(p.x + mx, p.z)) p.x += mx; else vel.x = 0;
@@ -247,5 +271,5 @@ function frame() {
 resize();
 const start = location.hash.slice(1);
 enter(worlds[start] ? start : 'terminal');
-window.portfolio = { go, worlds, player, get state() { return state; }, debug: { renderer, composer, bloom, paint, camera } };
+window.portfolio = { go, worlds, player, get state() { return state; }, debug: { renderer, composer, bloom, paint, camera, joy, get speed() { return speed; } } };
 frame();

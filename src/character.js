@@ -83,34 +83,36 @@ export function makeCharacter() {
 
   root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
 
-  let phase = 0, walk = 0, sit = 0, blink = 0, turn = 0, lastYaw = 0;
+  let runK = 0, phase = 0, walk = 0, sit = 0, blink = 0, turn = 0, lastYaw = 0;
   const L = THREE.MathUtils.lerp;
   // speed: 0..1 how fast we're moving. sitting: true while on the chair.
   root.animate = (t, dt, speed, sitting) => {
-    walk = L(walk, speed, 1 - Math.exp(-dt * 9));
+    // speed: 0..1 walks, above 1 blends into a run (1.8 = full run)
+    walk = L(walk, Math.min(1, speed), 1 - Math.exp(-dt * 9));
+    runK = L(runK, THREE.MathUtils.clamp((speed - 1) / 0.8, 0, 1), 1 - Math.exp(-dt * 7));
     sit = L(sit, sitting ? 1 : 0, 1 - Math.exp(-dt * 6));
-    phase += dt * (5 + 6.5 * walk) * Math.min(1, walk * 3);
+    phase += dt * (5 + 6.5 * walk + 4.5 * runK) * Math.min(1, walk * 3);
     let dy = root.rotation.y - lastYaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); lastYaw = root.rotation.y;
     turn = L(turn, THREE.MathUtils.clamp(dy / Math.max(dt, 0.001), -4, 4), 1 - Math.exp(-dt * 6));
     const up = 1 - sit, breathe = Math.sin(t * 1.9);
 
     legs.forEach(({ hip, knee }, i) => {
       const ph = phase + i * Math.PI;
-      hip.rotation.x = L(-Math.sin(ph) * 0.72 * walk, -1.5, sit);
-      knee.rotation.x = L((0.12 + Math.max(0, Math.sin(ph - 1.1)) * 1.25) * walk, 1.45, sit);
+      hip.rotation.x = L(-Math.sin(ph) * (0.72 * walk + 0.28 * runK), -1.5, sit);
+      knee.rotation.x = L((0.12 + Math.max(0, Math.sin(ph - 1.1)) * (1.25 + 0.7 * runK)) * walk, 1.45, sit);
     });
     arms.forEach(({ sh, el, s }, i) => {
       const ph = phase + (i + 1) * Math.PI;
-      sh.rotation.x = L(-Math.sin(ph) * 0.62 * walk + breathe * 0.02, -0.55, sit);
-      el.rotation.x = L(-(0.18 + 0.5 * walk + Math.max(0, -Math.sin(ph)) * 0.35 * walk), -0.75, sit);
+      sh.rotation.x = L(-Math.sin(ph) * (0.62 * walk + 0.4 * runK) + breathe * 0.02, -0.55, sit);
+      el.rotation.x = L(-(0.18 + 0.5 * walk + 0.75 * runK + Math.max(0, -Math.sin(ph)) * 0.35 * walk), -0.75, sit);
       sh.rotation.z = s * (0.14 + 0.05 * walk + 0.1 * sit);
     });
-    hips.position.y = 0.62 + Math.abs(Math.sin(phase)) * 0.045 * walk * up - 0.03 * sit + breathe * 0.004;
+    hips.position.y = 0.62 + Math.abs(Math.sin(phase)) * (0.045 * walk + 0.06 * runK) * up - 0.03 * sit + breathe * 0.004;
     hips.position.z = -0.05 * sit;
     hips.rotation.y = Math.sin(phase) * 0.1 * walk;
     torso.rotation.y = -Math.sin(phase) * 0.16 * walk;
     torso.scale.y = 1 + breathe * 0.012;
-    lean.rotation.x = 0.17 * walk * up;
+    lean.rotation.x = (0.17 * walk + 0.2 * runK) * up;
     lean.rotation.z = -turn * 0.05 * walk;
     head.rotation.x = -0.1 * walk + Math.sin(t * 0.7) * 0.04 * (1 - walk) - 0.08 * sit;
     head.rotation.y = Math.sin(t * 0.45) * 0.14 * (1 - walk) + turn * 0.06;
@@ -120,7 +122,7 @@ export function makeCharacter() {
     const ey = blink < 0 ? 0.15 : 1.45; eyes.forEach((e) => { e.scale.y = ey; });
 
     const gust = 0.5 + Math.sin(t * 0.8) * 0.5;
-    tails.sway(t, walk * up, gust * 0.5); hair.sway(t + 1.3, walk * 0.8, gust * 0.4);
+    tails.sway(t, (walk + runK * 0.6) * up, gust * 0.5); hair.sway(t + 1.3, walk * 0.8 + runK * 0.5, gust * 0.4);
   };
   return root;
 }

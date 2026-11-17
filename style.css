@@ -58,10 +58,10 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; }
 .cab p { margin: 8px 0 0; font-size: 12px; opacity: .85; text-align: center; }
 #aclose { color: #fff; top: 4px; }
 
-#joy { position: fixed; left: 24px; bottom: max(24px, env(safe-area-inset-bottom)); width: 112px; height: 112px; border-radius: 50%;
-  background: rgba(251,245,230,.35); border: 2px solid rgba(52,52,74,.5); touch-action: none; }
-#joy i { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px; border-radius: 50%; background: var(--paper); border: 2px solid var(--ink); }
-
+#joy { position: fixed; width: 180px; height: 180px; transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
+  background: radial-gradient(rgba(251,245,230,.12), rgba(251,245,230,.32)); border: 2px solid rgba(251,245,230,.7); box-shadow: 0 0 0 1px rgba(52,52,74,.25); }
+#joy i { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px; border-radius: 50%; background: var(--paper); border: 2px solid var(--ink); }
+#joy.run i { background: #ffd98a; }
 #intro { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; background: linear-gradient(#7db9ea, #cdeaf3 60%, #8fd0d2); transition: opacity .8s; }
 #intro.gone { opacity: 0; pointer-events: none; }
 #intro .card { background: var(--paper); border: 3px solid var(--ink); border-radius: 10px; padding: 28px 30px; width: min(480px, 100%); text-align: center; box-shadow: 0 8px 0 var(--ink); }

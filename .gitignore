@@ -1,2 +1,5 @@
 __pycache__/
 *.blend1
+node_modules/
+_site/
+package-lock.json

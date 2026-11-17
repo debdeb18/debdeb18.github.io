@@ -16,8 +16,9 @@ Design in Blender
 - [x] Train, leafy tree, pine
 - [x] Whole-station concept, day and dusk
 - [x] Water that is clear in the shallows and darker with depth; rails just under the surface; train wake
-- [ ] Review, then fixes
-- [ ] Split into pieces: station building, platform and canopy, causeway, utility poles, lamps, boat, buoys, islets, cat and props
+- [x] Islet details: footbridge, shrine, jetty, swing, hammock, picnic, lantern posts, reeds, rocks, flowers
+- [x] Split into pieces: 47 models and a layout file in `models/terminal/`
+- [ ] Review, then fixes (the rowing boat needs a proper hull)
 
 Build in the website
 - [ ] Assemble the station, with walkable areas and collisions
@@ -65,4 +66,5 @@ Build in the website
 - [ ] Loading screen
 - [ ] Speed on phones and older laptops
 - [ ] Test on real devices
-- [ ] Merge to the main branch
+- [x] Automatic test and publish on every push to `main` (GitHub Actions)
+- [ ] Switch GitHub Pages to the `main` workflow so the new site goes live

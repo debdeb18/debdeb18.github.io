@@ -1,0 +1,10 @@
+{
+  "name": "debdeb18.github.io",
+  "private": true,
+  "scripts": {
+    "test": "node tests/smoke.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

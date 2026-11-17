@@ -18,13 +18,18 @@ lib.set_style(jitter=1.3, lean=1.0, pal=dict(
 PZ = 0.95                                   # platform height
 
 # ---------- the sea, and the railway causeway across it ----------
-sea = box('sea', (900, 900, 0.1), (150, 0, -0.1), color=0x1F6F86, bevel=0)
-wm = sea.data.materials[0]; nt = wm.node_tree; b = nt.nodes['Principled BSDF']; b.inputs['Roughness'].default_value = 0.07; b.inputs['Alpha'].default_value = 0.68      # see-through, so the sunken rails show
+# Real water: a clear surface over a body of water that absorbs light, so shallows are see-through and depth goes dark.
+sea = box('sea', (900, 900, 7.0), (150, 0, -7.0), color=0xFFFFFF, bevel=0)
+wm = sea.data.materials[0]; wm.name = 'water'; nt = wm.node_tree; b = nt.nodes['Principled BSDF']
+b.inputs['Roughness'].default_value = 0.04; b.inputs['Transmission Weight'].default_value = 1.0; b.inputs['IOR'].default_value = 1.33
 tco = nt.nodes.new('ShaderNodeTexCoord'); nz = nt.nodes.new('ShaderNodeTexNoise'); nz.inputs['Scale'].default_value = 0.9; nz.inputs['Detail'].default_value = 3
-bp = nt.nodes.new('ShaderNodeBump'); bp.inputs['Strength'].default_value = 0.12
+bp = nt.nodes.new('ShaderNodeBump'); bp.inputs['Strength'].default_value = 0.1
 nt.links.new(tco.outputs['Object'], nz.inputs['Vector']); nt.links.new(nz.outputs[0], bp.inputs['Height']); nt.links.new(bp.outputs['Normal'], b.inputs['Normal'])
-box('seabed', (900, 900, 0.1), (150, 0, -2.5), color=0x2F8FA0, bevel=0)
-box('causeway', (190, 3.0, 0.3), (55, -3.2, -0.52), color='gravel', bevel=0.1)
+va = nt.nodes.new('ShaderNodeVolumeAbsorption'); va.inputs['Color'].default_value = (0.16, 0.62, 0.72, 1); va.inputs['Density'].default_value = 0.85
+nt.links.new(va.outputs[0], nt.nodes['Material Output'].inputs['Volume'])
+box('deep_floor', (900, 900, 0.1), (150, 0, -4.2), color=0x2A5F78, bevel=0)
+ISLETS = []
+box('causeway', (190, 3.0, 0.3), (55, -3.2, -0.52), color=0xC9BFA8, bevel=0.1)
 for dy in (-0.72, 0.72): box('rail', (190, 0.07, 0.14), (55, -3.2 + dy, -0.19), color='rail', bevel=0.012, rough=0.3)
 x = -22.0
 while x < 110: box('sleeper', (0.24, 2.4, 0.14), (x, -3.2, -0.3), color='timber_dark', bevel=0.02, jitter=0.012); x += 0.7
@@ -149,6 +154,7 @@ tube('service_wire', [(-7, -5.9, 7.2), (-7.6, -1.5, 5.9), (-8.2, 2.4, PZ + 4.2)]
 
 # ---------- islets with leafy trees, far islands ----------
 def islet(x, y, r):
+    ISLETS.append((x, y, r))
     ball('islet_sand', r, (x, y, -0.05), (1, 1, 0.16), 'sand', rough=1)
     ball('islet_grass', r * 0.86, (x, y, 0.08), (1, 1, 0.2), 'grass', rough=1)
     for i in range(int(r * 7)):
@@ -221,6 +227,20 @@ for i in range(46):
 for x, y, z in ((60, 14, 16), (66, 18, 17.5), (72, 12, 15), (90, -30, 22), (97, -26, 23.5), (55, 40, 26)):
     for s in (-1, 1): box('gull_wing', (0.12, 0.9, 0.04), (x, y + s * 0.42, z), (s * 22, 0, 0), color=0xFFFFFF, bevel=0.01)
 
+# ---------- the sea floor: a sand bank under the line, the station and the islets, falling away into deep water ----------
+import bmesh
+def depth(x, y):
+    d = abs(y + 3.2) - 2.2                                                                    # the railway bank
+    d = min(d, max(-11 - x, x - 35, -2.5 - y, y - 11.5, 0) - 1.0)                              # under the station
+    for ix, iy, ir in ISLETS: d = min(d, math.hypot(x - ix, y - iy) - ir * 1.15)
+    k = min(1, max(0, d / 8.0)); k = k * k * (3 - 2 * k)
+    return -0.42 - 3.4 * k + math.sin(x * 0.7) * math.cos(y * 0.9) * 0.05
+bm = bmesh.new(); bmesh.ops.create_grid(bm, x_segments=150, y_segments=90, size=1)
+for v in bm.verts: v.co.x = 55 + v.co.x * 110; v.co.y = v.co.y * 62; v.co.z = depth(v.co.x, v.co.y)
+me = bpy.data.meshes.new('seabed'); bm.to_mesh(me); bm.free()
+for pl in me.polygons: pl.use_smooth = True
+sb = bpy.data.objects.new('seabed', me); bpy.context.scene.collection.objects.link(sb); sb.data.materials.append(mat('sand', 1.0))
+
 # ---------- clouds ----------
 def cloud(cx, cy, cz, size, n=22):
     for i in range(n):
@@ -249,7 +269,7 @@ MOODS = {
     'day': dict(sky=((0.80, 0.93, 1.0), (0.30, 0.62, 1.0), (0.05, 0.25, 0.85)), sky_power=1.15, sun_dir=(0.35, 0.62, -0.7), sun=(1.0, 0.97, 0.9), sun_power=5.0, lamps=0.0, emit=0.5),
     'dusk': dict(sky=((1.0, 0.55, 0.3), (0.2, 0.36, 0.72), (0.03, 0.07, 0.3)), sky_power=0.55, sun_dir=(-0.9, 0.42, -0.16), sun=(1.0, 0.5, 0.28), sun_power=3.2, lamps=1.0, emit=5.0),
 }
-sc.render.engine = 'CYCLES'; sc.cycles.device = 'CPU'; sc.cycles.samples = int(os.environ.get('SAMPLES', 110)); sc.cycles.use_denoising = True
+sc.render.engine = 'CYCLES'; sc.cycles.device = 'CPU'; sc.cycles.samples = int(os.environ.get('SAMPLES', 110)); sc.cycles.use_denoising = True; sc.cycles.max_bounces = 10; sc.cycles.transmission_bounces = 8; sc.cycles.caustics_refractive = True
 sc.view_settings.view_transform = 'Standard'
 for lk in ('Medium High Contrast', 'High Contrast'):
     try: sc.view_settings.look = lk; break

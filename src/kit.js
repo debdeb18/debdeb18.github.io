@@ -1,15 +1,30 @@
 // Small building-block helpers shared by every world.
 import * as THREE from 'three';
 
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+export const uTime = { value: 0 };   // shared clock for shader animation (grass, etc.)
+
+// Soft clay-like material: smooth shading plus a gentle rim of light around every silhouette.
+function soften(m) {
+  m.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>',
+      'float rimK = pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 2.6);\noutgoingLight += rimK * 0.26 * (diffuseColor.rgb * 0.55 + 0.45);\n#include <opaque_fragment>');
+  };
+  m.customProgramCacheKey = () => 'soft';
+  return m;
+}
 const cache = new Map();
 export function M(color, o) {
   if (color && color.isMaterial) return color;
   if (!o) {
-    if (!cache.has(color)) cache.set(color, new THREE.MeshStandardMaterial({ color, roughness: 0.88, flatShading: true }));
+    if (!cache.has(color)) cache.set(color, soften(new THREE.MeshStandardMaterial({ color, roughness: 0.95 })));
     return cache.get(color);
   }
-  return new THREE.MeshStandardMaterial({ color, roughness: 0.88, flatShading: true, ...o });
+  return soften(new THREE.MeshStandardMaterial({ color, roughness: 0.95, ...o }));
 }
+const flat = new Map();
+const MF = (color) => { if (color && color.isMaterial) return color; if (!flat.has(color)) flat.set(color, soften(new THREE.MeshStandardMaterial({ color, roughness: 0.95, flatShading: true }))); return flat.get(color); };
 // Unlit material brighter than 1.0 so the bloom pass picks it up.
 export function glowM(color, k = 2) {
   const m = new THREE.MeshBasicMaterial({ color });
@@ -17,17 +32,62 @@ export function glowM(color, k = 2) {
   return m;
 }
 
-function put(p, geo, color, x, y, z, o) {
-  const m = new THREE.Mesh(geo, M(color, o));
+function put(p, geo, mat, x, y, z) {
+  const m = new THREE.Mesh(geo, mat);
   m.position.set(x, y, z);
   p.add(m);
   return m;
 }
-// y is always the BOTTOM of the shape, so things stack naturally.
-export const box = (p, w, h, d, color, x, y, z, o) => put(p, new THREE.BoxGeometry(w, h, d), color, x, y + h / 2, z, o);
-export const cyl = (p, rt, rb, h, color, x, y, z, seg = 12, o) => put(p, new THREE.CylinderGeometry(rt, rb, h, seg), color, x, y + h / 2, z, o);
-export const cone = (p, r, h, color, x, y, z, seg = 8, o) => put(p, new THREE.ConeGeometry(r, h, seg), color, x, y + h / 2, z, o);
-export const sph = (p, r, color, x, y, z, detail = 1, o) => put(p, new THREE.IcosahedronGeometry(r, detail), color, x, y, z, o);
+// y is always the BOTTOM of the shape, so things stack naturally. Boxes get rounded edges.
+export const box = (p, w, h, d, color, x, y, z, o) => put(p, new RoundedBoxGeometry(w, h, d, 2, Math.min(0.08, Math.min(w, h, d) * 0.32)), M(color, o), x, y + h / 2, z);
+export const cyl = (p, rt, rb, h, color, x, y, z, seg = 12, o) => put(p, new THREE.CylinderGeometry(rt, rb, h, seg > 6 ? Math.max(seg, 20) : seg), seg > 6 || o ? M(color, o) : MF(color), x, y + h / 2, z);
+export const cone = (p, r, h, color, x, y, z, seg = 8, o) => put(p, new THREE.ConeGeometry(r, h, seg > 6 ? Math.max(seg, 20) : seg), seg > 6 || o ? M(color, o) : MF(color), x, y + h / 2, z);
+export const sph = (p, r, color, x, y, z, detail = 1, o) => put(p, new THREE.SphereGeometry(r, 22, 16), M(color, o), x, y, z);
+
+// A soft round dot for particles (instead of square points).
+let dot;
+export function softDot() {
+  if (dot) return dot;
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,.75)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  return (dot = new THREE.CanvasTexture(c));
+}
+
+// Fluffy, backlit cloud stuff. Also used for blossom and foliage.
+export function cloudMat(lit, shade, edge, sun = [-0.5, 0.8, 0.4]) {
+  return new THREE.ShaderMaterial({
+    uniforms: { lit: { value: new THREE.Color(lit) }, shade: { value: new THREE.Color(shade) }, edge: { value: new THREE.Color(edge) }, sun: { value: new THREE.Vector3(...sun).normalize() } },
+    vertexShader: 'varying vec3 vN, vW; void main(){ vN = normalize(mat3(modelMatrix)*normal); vec4 w = modelMatrix*vec4(position,1.); vW = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }',
+    fragmentShader: `uniform vec3 lit, shade, edge, sun; varying vec3 vN, vW;
+      void main(){ vec3 n = normalize(vN), v = normalize(cameraPosition - vW);
+        float d = smoothstep(.2, .9, dot(n, sun)*.5+.5);
+        float f = pow(1. - max(dot(n, v), 0.), 2.2);
+        gl_FragColor = vec4(mix(mix(shade, lit, d), edge, f*.7), 1.); }`,
+  });
+}
+export function cloud(p, mat, x, y, z, s = 1, n = 9) {
+  const g = group(p, x, y, z);
+  for (let i = 0; i < n; i++) {
+    const k = i / (n - 1) - 0.5, r = (1 - Math.abs(k) * 1.3) * (2.2 + Math.random() * 1.4) * s;
+    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), mat);
+    m.position.set(k * 11 * s, r * 0.45 + Math.random() * s, (Math.random() - 0.5) * 3 * s); m.scale.y = 0.72;
+    m.userData.noShadow = true; g.add(m);
+  }
+  return g;
+}
+
+// Grass that sways: an instanced blade whose tip bends with the wind.
+export function windMat(color) {
+  const m = new THREE.MeshStandardMaterial({ color, roughness: 1 });
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uTime = uTime;
+    sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>',
+      '#include <begin_vertex>\nfloat bend = max(0., position.y + .25);\ntransformed.x += sin(uTime*1.7 + instanceMatrix[3].x*.6 + instanceMatrix[3].z*.4) * bend * bend * 1.1;\ntransformed.z += cos(uTime*1.3 + instanceMatrix[3].x*.3) * bend * bend * .5;');
+  };
+  return m;
+}
 
 export function group(p, x = 0, y = 0, z = 0, ry = 0) {
   const g = new THREE.Group();
@@ -88,14 +148,20 @@ export function photo(p, src, w, h, x, y, z, ry = 0) {
   return g;
 }
 
-export function sky(scene, top, mid, bottom) {
+export function sky(scene, top, mid, bottom, sun = null, sunCol = 0xfff2d0) {
   const mat = new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { a: { value: new THREE.Color(top) }, b: { value: new THREE.Color(mid) }, c: { value: new THREE.Color(bottom) } },
-    vertexShader: 'varying float h; void main(){ h = normalize(position).y; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }',
-    fragmentShader: 'uniform vec3 a,b,c; varying float h; void main(){ vec3 col = h>0. ? mix(b,a,pow(h,.55)) : mix(b,c,pow(-h,.4)); gl_FragColor = vec4(col,1.); }',
+    uniforms: { a: { value: new THREE.Color(top) }, b: { value: new THREE.Color(mid) }, c: { value: new THREE.Color(bottom) },
+      sun: { value: new THREE.Vector3(...(sun || [0, -1, 0])).normalize() }, sc: { value: new THREE.Color(sunCol) }, sk: { value: sun ? 1 : 0 } },
+    vertexShader: 'varying vec3 d; void main(){ d = normalize(position); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+    fragmentShader: `uniform vec3 a,b,c,sun,sc; uniform float sk; varying vec3 d;
+      void main(){ vec3 n = normalize(d); float h = n.y;
+        vec3 col = h>0. ? mix(b,a,pow(h,.55)) : mix(b,c,pow(-h,.4));
+        float s = max(dot(n, sun), 0.);
+        col += sc * sk * (pow(s, 6.)*.22 + pow(s, 60.)*.5 + smoothstep(.9985, .9993, s)*1.4);
+        gl_FragColor = vec4(col,1.); }`,
   });
-  const m = new THREE.Mesh(new THREE.SphereGeometry(450, 24, 16), mat);
+  const m = new THREE.Mesh(new THREE.SphereGeometry(450, 32, 20), mat);
   m.userData.noShadow = true;
   scene.add(m);
   return m;
@@ -115,7 +181,7 @@ export function stars(scene, n, rMin, rMax, size = 1.4, upperOnly = false) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size, vertexColors: true, sizeAttenuation: false, fog: false }));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size: size * 2.6, map: softDot(), vertexColors: true, sizeAttenuation: false, fog: false, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   scene.add(pts);
   return pts;
 }
@@ -208,7 +274,9 @@ export function makeWorld(name, title) {
     },
     // A hotspot: walk near it and press E. `action` is a content key or a function.
     hot(x, z, label, action, o = {}) {
-      const mark = new THREE.Mesh(new THREE.OctahedronGeometry(0.16), glowM(o.color || 0xffe08a, 1.6));
+      // a soft floating light marks things you can interact with
+      const mark = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDot(), color: new THREE.Color(o.color || 0xffe08a).multiplyScalar(1.8), blending: THREE.AdditiveBlending, depthWrite: false }));
+      mark.scale.setScalar(0.75);
       mark.position.set(x, (o.y || 2.2) + w.groundY, z);
       mark.userData.noShadow = true;
       scene.add(mark);
@@ -236,7 +304,7 @@ export function makeWorld(name, title) {
       return w;
     },
     update(t, dt) {
-      for (const h of w.hots) { h.mark.position.y = h.baseY + Math.sin(t * 2 + h.x) * 0.12; h.mark.rotation.y = t * 1.5; }
+      for (const h of w.hots) { h.mark.position.y = h.baseY + Math.sin(t * 2 + h.x) * 0.12; h.mark.scale.setScalar(0.7 + Math.sin(t * 3 + h.z) * 0.12); }
       for (const f of w.ticks) f(t, dt);
     },
   };

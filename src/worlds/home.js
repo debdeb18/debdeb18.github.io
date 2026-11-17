@@ -1,5 +1,6 @@
 // Home: a studio floating in space, under a glass dome.
 import * as THREE from 'three';
+import { twistedTree } from '../nature.js';
 import { makeWorld, box, cyl, cone, sph, group, sign, stars, glowM, makeCrack, plant, photo, M } from '../kit.js';
 
 export function buildHome() {
@@ -107,7 +108,7 @@ export function buildHome() {
   cyl(s, 0.04, 0.04, 1.7, 0x5b5560, -1.2, 0, -6.6, 6); cone(s, 0.35, 0.4, glowM(0xffd9a0, 1.6), -1.2, 1.6, -6.6, 10);
   const pl = new THREE.PointLight(0xffc98a, 14, 16); pl.position.set(-1.2, 2.2, -5.8); s.add(pl);
   const pl2 = new THREE.PointLight(0xffc98a, 14, 14); pl2.position.set(2, 2.5, 3); s.add(pl2);
-  plant(s, 7.4, 0, 2.2, 1.3); plant(s, -7.6, 0, -1.2, 1.2); plant(s, 1.8, 0, 7.6, 1); plant(s, -6.2, 0, 4.4, 0.9);
+  cyl(s, 0.55, 0.42, 0.4, 0xc97b5a, 7.3, 0, 2.3, 16); twistedTree(s, 7.3, 0.36, 2.3, 0.6, { ry: 2.5, leaf: [0xd9739a, 0xffd6e2] }); w.solid(7.3, 2.3, 1, 1); plant(s, -7.6, 0, -1.2, 1.2); plant(s, 1.8, 0, 7.6, 1); plant(s, -6.2, 0, 4.4, 0.9);
 
   const crack = makeCrack(0xbfe4ea); crack.position.set(0, 0, 7.4); crack.scale.setScalar(0.7); s.add(crack);
   w.ticks.push((t) => { crack.tick(t); crack.scale.multiplyScalar(0.62); });

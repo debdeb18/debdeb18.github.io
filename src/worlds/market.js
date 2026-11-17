@@ -1,5 +1,6 @@
 // The night market: who I am outside work. Stalls, food trucks, lanterns.
 import * as THREE from 'three';
+import { twistedTree, grass, rock, mound } from '../nature.js';
 import { makeWorld, box, cyl, cone, sph, group, sign, sky, stars, glowM, makeCrack, M } from '../kit.js';
 
 export function buildMarket() {
@@ -19,8 +20,12 @@ export function buildMarket() {
   // plaza
   box(s, 36, 0.5, 25, 0x514a6b, 0, -0.5, 0); box(s, 38, 0.3, 27, 0x3a3552, 0, -0.7, 0);
   for (let i = 0; i < 70; i++) box(s, 0.9 + Math.random(), 0.01, 0.6 + Math.random() * 0.6, 0x5c5578, (Math.random() - 0.5) * 33, 0, (Math.random() - 0.5) * 22);
-  for (const [x, z, r] of [[-30, -22, 9], [28, -26, 12], [40, 6, 8], [-38, 8, 10]]) { cyl(s, 0.5, 0.7, 5, 0x3a2f3a, x, -1, z, 6); sph(s, r * 0.5, 0x2c4a4a, x, 6, z, 1); }
-
+  // twisted trees, rocks and grass around the plaza
+  for (const [x, z, sc, ry] of [[-21, -9, 2.2, 0], [20.5, -10, 2.6, 2], [22, 6, 2, 4], [-22, 7, 2.4, 1], [-9, -15, 2.1, 3], [9, -15.5, 2.3, 5]]) twistedTree(s, x, -0.6, z, sc, { ry, leaf: [0x1f4f5a, 0x5fb89a], dark: 0x5a3a4a, light: 0xc98a5a });
+  mound(s, 0, -1.1, 0, 27, 0.5, 0x3f7a6a, 0x2c5560, 0x2a3550);
+  const gr = grass(s, 1500, 0x1f5f58, 0x6fcf9a);
+  for (let i = 0; i < 250; i++) { const a = Math.random() * 6.28, r = 20.5 + Math.random() * 6, x = Math.cos(a) * r * 1.0, z = Math.sin(a) * r * 0.82; if (Math.abs(x) > 18.6 || Math.abs(z) > 13.2) gr.clump(x, -0.6, z, 0.5 + Math.random() * 0.7); }
+  for (const [x, z, sc] of [[-19.5, -3, 1.1], [-20.5, -1.5, 0.6], [19.6, -4, 0.9], [19.4, 10, 1.2], [-13, 13.6, 0.8], [4, -14, 0.7], [14, 13.8, 0.6]]) rock(s, x, -0.65, z, sc, 0x4a4a6a, 0xa9a4c4);
   const warm = (x, y, z, i = 45) => { const l = new THREE.PointLight(0xffb86b, i, 15); l.position.set(x, y, z); s.add(l); };
 
   // a stall: counter, striped awning, glowing sign, goods
@@ -77,7 +82,7 @@ export function buildMarket() {
   const poles = [[-16, -10], [-5.5, -10], [5.5, -10], [16, -10], [16, 10], [5.5, 10], [-5.5, 10], [-16, 10]];
   poles.forEach(([x, z]) => cyl(s, 0.07, 0.1, 5, 0x3a3552, x, 0, z, 6));
   const links = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 0], [1, 6], [2, 5]];
-  const bulbs = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.11, 0), new THREE.MeshBasicMaterial(), links.length * 14);
+  const bulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.11, 12, 8), new THREE.MeshBasicMaterial(), links.length * 14);
   const mt = new THREE.Matrix4(), col = new THREE.Color(), pal = [0xffd27a, 0xff8fab, 0x8fd0ff, 0xfff3d0];
   let n = 0;
   for (const [a, b] of links) for (let i = 1; i <= 14; i++) {

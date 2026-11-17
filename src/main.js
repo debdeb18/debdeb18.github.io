@@ -3,7 +3,8 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { box, cyl, sph, group } from './kit.js';
+import { uTime } from './kit.js';
+import { makeCharacter } from './character.js';
 import { CONTENT } from './content.js';
 import { buildTerminal } from './worlds/terminal.js';
 import { buildHome } from './worlds/home.js';
@@ -28,23 +29,9 @@ const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.5, 0.6, 1.0);
 composer.addPass(renderPass); composer.addPass(bloom); composer.addPass(new OutputPass());
 
 // ---------- the little traveller ----------
-const player = new THREE.Group();
-const legs = [-0.12, 0.12].map((x) => { const g = group(player, x, 0.45, 0); box(g, 0.17, 0.45, 0.19, 0x2f3b6b, 0, -0.45, 0); return g; });
-const body = group(player, 0, 0.45, 0);
-box(body, 0.52, 0.55, 0.3, 0xd3323f, 0, 0, 0);                 // the red cardigan
-box(body, 0.2, 0.5, 0.31, 0x8f1f2c, 0, 0.05, 0.005);
-const arms = [-0.33, 0.33].map((x) => { const g = group(body, x, 0.52, 0); box(g, 0.13, 0.5, 0.15, 0xd3323f, 0, -0.5, 0); sph(g, 0.07, 0xf2c9a4, 0, -0.55, 0, 0); return g; });
-sph(body, 0.25, 0xf2c9a4, 0, 0.8, 0, 2, { flatShading: false });
-const hair = sph(body, 0.275, 0x1f1a1c, 0, 0.84, -0.05, 2, { flatShading: false }); hair.scale.set(1, 1, 0.95);
-box(body, 0.5, 0.5, 0.14, 0x1f1a1c, 0, 0.4, -0.2);
-for (const x of [-0.1, 0.1]) { const t = new THREE.Mesh(new THREE.TorusGeometry(0.065, 0.012, 6, 14), new THREE.MeshBasicMaterial({ color: 0x2c2b33 })); t.position.set(x, 0.82, 0.235); body.add(t); }
-player.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-function swing(moving, t) {
-  const sw = moving ? Math.sin(walkPhase) * 0.7 : 0;
-  legs[0].rotation.x = sw; legs[1].rotation.x = -sw; arms[0].rotation.x = -sw * 0.8; arms[1].rotation.x = sw * 0.8;
-  body.position.y = 0.45 + (moving ? Math.abs(Math.sin(walkPhase)) * 0.05 : Math.sin(t * 2) * 0.008);
-}
-function pose(sitting) { legs.forEach((l) => { l.rotation.x = sitting ? -Math.PI / 2 : 0; }); arms.forEach((a) => { a.rotation.x = sitting ? -0.5 : 0; }); body.position.y = 0.45; }
+const player = makeCharacter();
+let sitting = false, speed = 0;
+const vel = new THREE.Vector3();
 
 // the view you see inside the crack: a live render of the destination
 const portalRT = new THREE.WebGLRenderTarget(512, 896);
@@ -54,7 +41,7 @@ let dest = null, arriveT = 0;
 
 // ---------- state ----------
 let state = 'walk';            // walk | sit | depart
-let yaw = 0, pitch = 0.5, dist = 10, walkPhase = 0, activeHot = null, panelHot = null, busy = false;
+let yaw = 0, pitch = 0.5, dist = 10, activeHot = null, panelHot = null, busy = false;
 const look = new THREE.Vector3(), tmp = new THREE.Vector3();
 const keys = new Set(), joy = { x: 0, y: 0 };
 
@@ -62,7 +49,7 @@ function enter(name, swoop) {
   world = worlds[name];
   renderPass.scene = world.scene;
   world.scene.add(player);
-  player.position.copy(world.spawn); player.rotation.y = world.spawnYaw; pose(false);
+  player.position.copy(world.spawn); player.rotation.y = world.spawnYaw; sitting = false; vel.set(0, 0, 0);
   ({ yaw, pitch, dist } = world.cam);
   bloom.strength = world.bloom;
   worlds.terminal.reset();
@@ -92,10 +79,10 @@ function showPanel(key, hot) {
 function closePanel() { $('panel').hidden = true; panelHot = null; }
 function sit() {
   state = 'sit'; closePanel();
-  player.position.copy(worlds.terminal.chair); player.position.z += 0.02; player.rotation.y = Math.PI; pose(true);
+  player.position.copy(worlds.terminal.chair); player.position.z += 0.02; player.rotation.y = Math.PI; sitting = true;
   $('tickets').hidden = false;
 }
-function stand() { state = 'walk'; pose(false); player.position.set(0, world.groundY, 2.85); $('tickets').hidden = true; }
+function stand() { state = 'walk'; sitting = false; player.position.set(0, world.groundY, 2.85); $('tickets').hidden = true; }
 function interact() {
   if (state !== 'walk' || !activeHot || busy) return;
   const a = activeHot.action;
@@ -177,27 +164,26 @@ addEventListener('resize', resize);
 const clock = new THREE.Clock();
 function frame() {
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
-  let moving = false;
+  speed = state === 'walk' ? speed : 0;
   if (state === 'walk' && $('arcade').hidden) {
     let ix = joy.x, iy = joy.y;
     if (keys.has('w') || keys.has('arrowup')) iy += 1;
     if (keys.has('s') || keys.has('arrowdown')) iy -= 1;
     if (keys.has('d') || keys.has('arrowright')) ix += 1;
     if (keys.has('a') || keys.has('arrowleft')) ix -= 1;
-    const l = Math.hypot(ix, iy);
-    if (l > 0.08) {
-      moving = true;
-      const sp = 4.6 * Math.min(1, l) * dt / l;
-      const mx = (Math.cos(yaw) * ix - Math.sin(yaw) * iy) * sp, mz = (-Math.sin(yaw) * ix - Math.cos(yaw) * iy) * sp;
-      const p = player.position;
-      if (world.canWalk(p.x + mx, p.z)) p.x += mx;
-      if (world.canWalk(p.x, p.z + mz)) p.z += mz;
-      let d = Math.atan2(mx, mz) - player.rotation.y;
+    const l = Math.hypot(ix, iy), top = 4.4;
+    tmp.set(0, 0, 0);
+    if (l > 0.08) { const m = top * Math.min(1, l) / l; tmp.set((Math.cos(yaw) * ix - Math.sin(yaw) * iy) * m, 0, (-Math.sin(yaw) * ix - Math.cos(yaw) * iy) * m); }
+    vel.lerp(tmp, 1 - Math.exp(-dt * (l > 0.08 ? 7 : 10)));           // ease in and out of a walk
+    const p = player.position, mx = vel.x * dt, mz = vel.z * dt;
+    if (world.canWalk(p.x + mx, p.z)) p.x += mx; else vel.x = 0;
+    if (world.canWalk(p.x, p.z + mz)) p.z += mz; else vel.z = 0;
+    speed = vel.length() / top;
+    if (speed > 0.05) {
+      let d = Math.atan2(vel.x, vel.z) - player.rotation.y;
       d = Math.atan2(Math.sin(d), Math.cos(d));
-      player.rotation.y += d * Math.min(1, dt * 12);
-      walkPhase += dt * 11;
+      player.rotation.y += d * Math.min(1, dt * 9);
     }
-    swing(moving, t);
 
     // nearest hotspot
     let best = null, bd = 1e9;
@@ -210,7 +196,7 @@ function frame() {
     if (q > 5.7) {                       // stand up, walk off the platform and into the crack
       const k = THREE.MathUtils.clamp((q - 5.95) / 1.5, 0, 1);
       player.position.set(0, 0.6 - 0.4 * THREE.MathUtils.smoothstep(k, 0.34, 0.48), 1.2 - k * 3.3);
-      walkPhase += dt * 10; swing(k > 0 && k < 1, t);
+      sitting = false; speed = k > 0 && k < 1 ? 0.75 : 0;
     }
     if (q > 3.6 && dest) {               // render the destination into the crack
       worlds[dest].update(t, dt);
@@ -221,6 +207,8 @@ function frame() {
   if (show) $('prompt').textContent = activeHot.label;
   $('prompt').hidden = !show;
 
+  uTime.value = t;
+  player.animate(t, dt, speed, sitting);
   world.update(t, dt);
   sitHot.mark.visible = state === 'walk';
   if (world.sun) { world.sun.target.position.copy(player.position); world.sun.position.copy(player.position).add(world.sun.userData.offset); }

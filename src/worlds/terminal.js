@@ -1,6 +1,7 @@
 // The terminal: a quiet platform on a railway that runs across the sea.
 import * as THREE from 'three';
-import { makeWorld, box, cyl, cone, sph, group, sign, sky, glowM, makeCrack, M } from '../kit.js';
+import { makeWorld, box, cyl, cone, sph, group, sign, sky, glowM, makeCrack, M, cloud, cloudMat, softDot } from '../kit.js';
+import { twistedTree, grass, flower, rock, blob, mound } from '../nature.js';
 
 export const DEST = {
   home: { color: 0x8fb4ff, name: 'Home among the stars' },
@@ -17,10 +18,11 @@ export function buildTerminal() {
   w.bloom = 0.35;
   const TZ = -2.2; // centre line of the track
 
-  const skyMesh = sky(s, 0x4f9fe6, 0xcdeaf3, 0xbfe4ea);
+  const SUN = [-0.45, 0.42, -0.8];
+  const skyMesh = sky(s, 0x4f9fe6, 0xcdeaf3, 0xbfe4ea, SUN);
   s.fog = new THREE.Fog(0xd7ecef, 45, 190);
   const hemi = new THREE.HemisphereLight(0xe6f6ff, 0x9fc7a8, 1.5); s.add(hemi);
-  w.sunlight(0xfff0d0, 2.1, -9, 15, 7);
+  w.sunlight(0xfff0d0, 2.1, -7, 11, -9);
 
   // --- the sea ---
   const water = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), new THREE.ShaderMaterial({
@@ -56,8 +58,7 @@ export function buildTerminal() {
   box(s, 15, 0.6, 5, 0xddd5c4, 0, 0, 2.5);
   box(s, 15, 0.02, 0.22, 0xf2c94c, 0, 0.6, 0.55);
   box(s, 15.3, 0.12, 5.3, 0xc4bba8, 0, -0.1, 2.5);
-  cyl(s, 8.2, 9.6, 0.6, 0x86c06c, IX, 0, IZ, 20);
-  cyl(s, 9.8, 10.6, 0.14, 0xe9dcb4, IX, -0.08, IZ, 20);
+  mound(s, IX, 0, IZ, 8.0, 0.6);
   w.inside = (x, z) => (Math.abs(x) < 7.2 && z > 0.45 && z < 5.2) || ((x - IX) ** 2 + (z - IZ) ** 2 < 7.6 ** 2 && (x < -7.2 || z >= 5));
 
   // the chair
@@ -115,56 +116,45 @@ export function buildTerminal() {
   w.solid(-9.5, 5.2, 1.7, 1);
   w.hot(-9, 6, 'Read the notice board', 'welcome');
 
-  // cherry blossom tree
+  // cherry blossom tree: a twisted trunk under pink canopies
   const TX = -16.5, TZ2 = 7;
-  const tg = group(s, TX, 0.6, TZ2);
-  cyl(tg, 0.28, 0.45, 2.6, 0x5c4033, 0, 0, 0, 7).rotation.z = 0.08;
-  const b1 = cyl(tg, 0.13, 0.2, 2.2, 0x5c4033, 0.8, 2.2, 0, 6); b1.rotation.z = -0.8;
-  const b2 = cyl(tg, 0.12, 0.18, 2, 0x5c4033, -0.8, 2.3, 0.2, 6); b2.rotation.z = 0.8;
-  const pinks = [0xffc4d6, 0xffd6e2, 0xfbb1c8];
-  for (let i = 0; i < 16; i++) {
-    const a = Math.random() * 6.28, r = Math.random() * 2.3;
-    sph(tg, 0.9 + Math.random() * 0.8, pinks[i % 3], Math.cos(a) * r, 3.6 + Math.random() * 1.9, Math.sin(a) * r, 1);
-  }
-  w.solid(TX, TZ2, 0.9, 0.9);
-  const PN = 140, pp = new Float32Array(PN * 3);
-  for (let i = 0; i < PN; i++) pp.set([TX + (Math.random() - 0.5) * 9, 0.6 + Math.random() * 5, TZ2 + (Math.random() - 0.5) * 9], i * 3);
+  twistedTree(s, TX, 0.6, TZ2, 1.75, { leaf: [0xf08fb0, 0xffe6ee], canopy: 1.3, ry: 0.6 });
+  twistedTree(s, IX - 2, 0.6, IZ - 5.2, 0.8, { leaf: [0xf08fb0, 0xffe6ee], lean: -1, ry: 2 });
+  w.solid(TX, TZ2, 1.2, 1.2); w.solid(IX - 2, IZ - 5.2, 0.7, 0.7);
+  const PN = 160, pp = new Float32Array(PN * 3);
+  for (let i = 0; i < PN; i++) pp.set([TX + (Math.random() - 0.5) * 12, 0.6 + Math.random() * 6, TZ2 + (Math.random() - 0.5) * 12], i * 3);
   const pgeo = new THREE.BufferGeometry(); pgeo.setAttribute('position', new THREE.BufferAttribute(pp, 3));
-  s.add(new THREE.Points(pgeo, new THREE.PointsMaterial({ color: 0xffc9da, size: 0.09 })));
+  s.add(new THREE.Points(pgeo, new THREE.PointsMaterial({ color: 0xffd0df, size: 0.2, map: softDot(), transparent: true, depthWrite: false })));
   w.ticks.push((t, dt) => {
     for (let i = 0; i < PN; i++) {
       pp[i * 3 + 1] -= dt * (0.35 + (i % 5) * 0.06);
-      pp[i * 3] += Math.sin(t + i) * dt * 0.4 - dt * 0.25;
-      if (pp[i * 3 + 1] < 0.6) { pp[i * 3 + 1] = 5.5; pp[i * 3] = TX + (Math.random() - 0.5) * 9; }
+      pp[i * 3] += Math.sin(t + i) * dt * 0.4 + dt * 0.5;
+      if (pp[i * 3 + 1] < 0.6) { pp[i * 3 + 1] = 6.5; pp[i * 3] = TX + (Math.random() - 0.5) * 12; }
     }
     pgeo.attributes.position.needsUpdate = true;
   });
 
-  // grass + flowers on the island
-  const tuft = new THREE.InstancedMesh(new THREE.ConeGeometry(0.09, 0.45, 4), M(0x5fa85a), 260);
-  const fl = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.07, 0), M(0xfff2a8), 60);
-  for (let i = 0; i < 260; i++) {
-    const a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * 7.8, x = IX + Math.cos(a) * r, z = IZ + Math.sin(a) * r, off = x > -7.6 && z < 5.2;
-    tuft.setMatrixAt(i, mt.makeTranslation(x, off ? -5 : 0.8, z));
-    if (i < 60) fl.setMatrixAt(i, mt.makeTranslation(x + 0.2, off ? -5 : 0.72, z + 0.1));
-  }
-  s.add(tuft, fl);
+  // grass, flowers and rocks on the island
+  const onIsland = (r0 = 0, r1 = 7.6) => { for (;;) { const a = Math.random() * 6.28, r = r0 + Math.sqrt(Math.random()) * (r1 - r0), x = IX + Math.cos(a) * r, z = IZ + Math.sin(a) * r; if (!(x > -8 && z < 5.6)) return [x, z]; } };
+  const gr = grass(s, 1800);
+  for (let i = 0; i < 300; i++) { const [x, z] = onIsland(); gr.clump(x, 0.6, z, 0.35 + Math.random() * 0.55); }
+  const petals = [0xffffff, 0xfff2a8, 0xffc4d6, 0xcfe0ff];
+  for (let i = 0; i < 30; i++) { const [x, z] = onIsland(); flower(s, x, 0.6, z, 0.8 + Math.random() * 0.7, petals[i % 4]); }
+  for (const [dx, dz, sz] of [[2.5, -2.6, 0.75], [3.4, -2.2, 0.45], [-4.8, 2.5, 0.9], [-1.5, 5.6, 0.6], [5.6, 2.2, 0.5], [-5.5, -3, 0.55]]) { rock(s, IX + dx, 0.55, IZ + dz, sz); w.solid(IX + dx, IZ + dz, sz * 1.5, sz * 1.3); }
+  for (let i = 0; i < 8; i++) { const [x, z] = onIsland(7.9, 9.4); rock(s, x, 0.0, z, 0.3 + Math.random() * 0.5, 0x7a7488, 0xe6dccf); }
   // a bench-side suitcase, because everyone here is going somewhere
   box(s, 0.5, 0.36, 0.2, 0x4f7f8f, 0.75, 0.6, 2.0); box(s, 0.2, 0.05, 0.05, 0x2c2b33, 0.75, 0.96, 2.0);
 
-  // clouds
+  // clouds: a few drifting overhead, and a bank of them along the horizon
+  const cm = cloudMat(0xffffff, 0xb4cbe6, 0xffffff, SUN);
   const clouds = [];
-  for (let i = 0; i < 12; i++) {
-    const g = group(s, (Math.random() - 0.5) * 300, 22 + Math.random() * 24, -40 - Math.random() * 140);
-    for (let j = 0; j < 5; j++) sph(g, 4 + Math.random() * 4, 0xffffff, (j - 2) * 5, Math.random() * 2, Math.random() * 3, 1, { emissive: 0xffffff, emissiveIntensity: 0.25 }).scale.y = 0.6;
-    g.traverse((o) => { o.userData.noShadow = true; });
-    clouds.push(g);
-  }
+  for (let i = 0; i < 11; i++) clouds.push(cloud(s, cm, (Math.random() - 0.5) * 320, 26 + Math.random() * 30, -50 - Math.random() * 150, 1.6 + Math.random() * 1.8));
+  for (let i = 0; i < 16; i++) { const a = (i / 16) * 6.283 + Math.random() * 0.2, r = 190 + Math.random() * 60; cloud(s, cm, Math.cos(a) * r, -4 + Math.random() * 6, Math.sin(a) * r, 5 + Math.random() * 4, 11).rotation.y = -a + Math.PI / 2; }
   w.ticks.push((t, dt) => { for (const c of clouds) { c.position.x += dt * 0.8; if (c.position.x > 170) c.position.x = -170; } });
   // far islands
   for (const [x, z, r] of [[-70, -90, 16], [50, -120, 22], [110, -60, 12], [-120, -30, 14], [-40, 70, 12]]) {
-    sph(s, r, 0x7fb873, x, -r * 0.55, z, 2).scale.y = 0.7;
-    box(s, 2.4, 2, 2.4, 0xf6efe0, x + 2, r * 0.1, z + r * 0.35); cone(s, 2.2, 1.4, 0xc9604a, x + 2, r * 0.1 + 2, z + r * 0.35, 4).rotation.y = Math.PI / 4;
+    blob(s, x, 0, z, r, 0x3f9a6a, 0xa4e08a, { squash: [1.25, 0.32, 1.1], lump: 0.3 });
+    box(s, 2.4, 2, 2.4, 0xf6efe0, x + 2, r * 0.27, z + r * 0.2); cone(s, 2.2, 1.4, 0xc9604a, x + 2, r * 0.27 + 2, z + r * 0.2, 4).rotation.y = Math.PI / 4;
   }
 
   // --- the train ---
@@ -208,12 +198,14 @@ export function buildTerminal() {
 
   // the sky slides into dusk while the train comes
   const sU = skyMesh.material.uniforms, wU = water.material.uniforms, col = (h) => new THREE.Color(h);
-  const day = { a: sU.a.value.clone(), b: sU.b.value.clone(), c: sU.c.value.clone(), wa: wU.a.value.clone(), wb: wU.b.value.clone(), fog: s.fog.color.clone(), sun: w.sun.color.clone() };
-  const dusk = { a: col(0x232a5c), b: col(0xf6b3a0), c: col(0x7a86b4), wa: col(0x2c6890), wb: col(0xf0bcae), fog: col(0xe8b9b0), sun: col(0xffb38a) };
+  const cU = cm.uniforms;
+  const day = { cl: cU.lit.value.clone(), cs: cU.shade.value.clone(), ce: cU.edge.value.clone(), a: sU.a.value.clone(), b: sU.b.value.clone(), c: sU.c.value.clone(), wa: wU.a.value.clone(), wb: wU.b.value.clone(), fog: s.fog.color.clone(), sun: w.sun.color.clone() };
+  const dusk = { cl: col(0xffd9c4), cs: col(0x8a7bb0), ce: col(0xffc4a0), a: col(0x232a5c), b: col(0xf6b3a0), c: col(0x7a86b4), wa: col(0x2c6890), wb: col(0xf0bcae), fog: col(0xe8b9b0), sun: col(0xffb38a) };
   const mood = (k) => {
     sU.a.value.lerpColors(day.a, dusk.a, k); sU.b.value.lerpColors(day.b, dusk.b, k); sU.c.value.lerpColors(day.c, dusk.c, k);
     wU.a.value.lerpColors(day.wa, dusk.wa, k); wU.b.value.lerpColors(day.wb, dusk.wb, k);
     s.fog.color.lerpColors(day.fog, dusk.fog, k); w.sun.color.lerpColors(day.sun, dusk.sun, k);
+    cU.lit.value.lerpColors(day.cl, dusk.cl, k); cU.shade.value.lerpColors(day.cs, dusk.cs, k); cU.edge.value.lerpColors(day.ce, dusk.ce, k);
     hemi.intensity = 1.5 - 0.55 * k; w.sun.intensity = 2.1 - 0.5 * k;
   };
 
@@ -255,7 +247,7 @@ export function buildTerminal() {
     const sh = shots[i];
     w.cine.pos.lerpVectors(sh.from, sh.to, ease(cl((q - sh.t) / (shots[i + 1].t - sh.t)))); w.cine.look.copy(sh.look);
     w.cine.shake = 0.09 * Math.exp(-(((train.position.x - 5 - w.cine.pos.x) / 13) ** 2));
-    w.cine.glow = ease(cl((q - 6.4) / 1.1)) * 1.8;
+    w.cine.glow = ease(cl((q - 6.8) / 0.8)) * 1.0;
     // the tear: a hairline climbs, then it shatters open
     const open = cl((q - 3.75) / 1.5), wide = cl((open - 0.3) / 0.7), qs = q - 4.2;
     crack.setOpen(open); crackLight.intensity = wide * 90;

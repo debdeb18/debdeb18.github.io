@@ -33,7 +33,9 @@ A small three.js world, no build step. Open it through any static server (`pytho
 - `src/content.js`: every piece of text. Entries with `todo` are placeholders waiting for real answers.
 - `src/worlds/terminal.js`: the platform by the sea, the chair, the train and the dimension crack.
 - `src/worlds/home.js`, `office.js`, `market.js`: the three destinations.
-- `src/kit.js`: building blocks (boxes, signs, photo frames, the crack, hotspots).
+- `src/kit.js`: building blocks (rounded boxes, soft materials, clouds, signs, photo frames, the crack, hotspots).
+- `src/character.js`: the traveller (jointed limbs, flowing hair and cardigan, walk and sit animation).
+- `src/nature.js`: sculpted rocks, twisted trees, swaying grass, flowers, painted ground.
 - `photos/`: pictures used in the world. Add a frame with `photo(parent, 'photos/name.jpg', w, h, x, y, z)`.
 - `vendor/`: three.js (MIT).
 

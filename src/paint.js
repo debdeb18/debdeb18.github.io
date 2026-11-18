@@ -210,12 +210,36 @@ const PAINTERS = {
     for (let i = 0; i < 40; i++) { const x = r() * SIZE, y = r() * SIZE, len = 30 + r() * 60; wrap(x, y, len, (X, Y) => stroke(g, X, Y, len, 2 + r() * 2, (r() - 0.5) * 0.1, 0, '#6a7790', 0.25)); }
     for (let i = 0; i < 14; i++) { const x = r() * SIZE, y = r() * SIZE; wrap(x, y, 14, (X, Y) => dab(g, X, Y, 4 + r() * 6, 2 + r() * 3, r() * 3, '#8a5236', 0.35)); }
   },
+  // Painted cut stone (grey, tinted by each stone's colour): soft cloudy patches, rain streaks running down, faint moss
+  // green near the bottom of the tile, a few chips. Each stone's light top and stained foot are painted on its vertices.
+  brick(g, r) {
+    const n = fbm(noiseField(r, 3), noiseField(r, 6), noiseField(r, 13));
+    g.fillStyle = '#d8d8d8'; g.fillRect(0, 0, SIZE, SIZE);
+    const tones = ['#c2c2c2', '#cccccc', '#d6d6d6', '#e0e0e0', '#eaeaea'];
+    for (let i = 0; i < 900; i++) { const x = r() * SIZE, y = r() * SIZE; wrap(x, y, 40, (X, Y) => dab(g, X, Y, 14 + r() * 26, 8 + r() * 14, r() * 3, pick(tones, n(x, y) * 0.8 + r() * 0.2), 0.35)); }
+    for (let i = 0; i < 90; i++) {                                             // rain streaks (v runs down the wall)
+      const x = r() * SIZE, y = r() * SIZE, len = 30 + r() * 90;
+      wrap(x, y, len, (X, Y) => stroke(g, X, Y, len, 2 + r() * 4, Math.PI / 2 + (r() - 0.5) * 0.04, (r() - 0.5) * 2, r() < 0.7 ? '#a8a8a0' : '#9fae8e', 0.22));
+    }
+    for (let i = 0; i < 30; i++) { const x = r() * SIZE, y = r() * SIZE; wrap(x, y, 30, (X, Y) => dab(g, X, Y, 12 + r() * 20, 6 + r() * 8, 0, '#a9b98f', 0.18)); }
+    for (let i = 0; i < 20; i++) { const x = r() * SIZE, y = r() * SIZE; wrap(x, y, 8, (X, Y) => { dab(g, X, Y, 3 + r() * 4, 2 + r() * 2, r() * 3, '#b0b0b0', 0.4); dab(g, X - 1, Y - 1, 2, 1.4, 0, '#f6f6f6', 0.5); }); }
+  },
+  // Painted paving (grey, tinted): soft cloudy mottling, a few faint scuffs and stains.
+  paving(g, r) {
+    const n = fbm(noiseField(r, 3), noiseField(r, 7), noiseField(r, 15));
+    g.fillStyle = '#dadada'; g.fillRect(0, 0, SIZE, SIZE);
+    const tones = ['#c8c8c8', '#d2d2d2', '#dcdcdc', '#e6e6e6', '#efefef'];
+    for (let i = 0; i < 1100; i++) { const x = r() * SIZE, y = r() * SIZE; wrap(x, y, 40, (X, Y) => dab(g, X, Y, 12 + r() * 24, 8 + r() * 16, r() * 3, pick(tones, n(x, y) * 0.8 + r() * 0.2), 0.32)); }
+    for (let i = 0; i < 24; i++) { const x = r() * SIZE, y = r() * SIZE; wrap(x, y, 30, (X, Y) => dab(g, X, Y, 10 + r() * 22, 6 + r() * 10, r() * 3, '#b4ae9e', 0.16)); }
+    for (let i = 0; i < 40; i++) { const x = r() * SIZE, y = r() * SIZE, len = 10 + r() * 24; wrap(x, y, len, (X, Y) => stroke(g, X, Y, len, 1 + r(), r() * 3, 2, '#bdbdbd', 0.3)); }
+  },
 };
 // How each kind is applied: `replace` uses the painted colours as they are; `tint` multiplies them with the part's own colour.
 const KINDS = { grass: { scale: 1 / 3.2, mode: 'replace' }, sand: { scale: 1 / 4, mode: 'replace' }, concrete: { scale: 1 / 4, mode: 'replace' },
   gravel: { scale: 1 / 2, mode: 'replace' }, ballast: { scale: 1 / 1.6, mode: 'replace' }, wood: { scale: 1 / 2.2, mode: 'tint' }, stone: { scale: 1 / 2.5, mode: 'tint' },
   bark: { scale: 1 / 1.6, mode: 'tint' }, plaster: { scale: 1 / 3, mode: 'tint' }, roof: { scale: 1 / 2.4, mode: 'tint' }, paint: { scale: 1 / 1.6, mode: 'tint' },
-  seatwood: { scale: 1 / 0.7, mode: 'replace' }, seatiron: { scale: 1 / 1.6, mode: 'replace' } };
+  seatwood: { scale: 1 / 0.7, mode: 'replace' }, seatiron: { scale: 1 / 1.6, mode: 'replace' },
+  brick: { scale: 1 / 1.4, mode: 'tint' }, paving: { scale: 1 / 1.5, mode: 'tint' } };
 
 const textures = {};
 export function paintedTexture(kind) {
@@ -233,7 +257,7 @@ export const SURFACES = {
   '7db85a': 'grass', 'e6d6a8': 'sand', d2cbbc: 'concrete', a39c8f: 'concrete', c9bfa8: 'gravel', '8f877d': 'gravel',
   '9a6a45': 'wood', c9a374: 'wood', '8a5a3c': 'wood', '4a3226': 'wood', '4e3528': 'wood', b9b2a8: 'stone',
   '5a3f30': 'bark', f0e4c8: 'plaster', '41626f': 'roof', '2f4b58': 'roof', '5e8f7a': 'roof', '45725f': 'roof', f1e6cc: 'paint', e8f0f4: 'paint', b8403a: 'paint', f0e2c0: 'paint',
-  a0623a: 'seatwood', '2f3036': 'seatiron',
+  a0623a: 'seatwood', c9b79a: 'brick', b7a483: 'brick', d6c7ab: 'brick', d8cbb0: 'paving', cdbf9f: 'paving', e2d7be: 'paving', '2f3036': 'seatiron',
 };
 export function surfaceOf(material) { const m = /^c_([0-9a-f]{6})/.exec(material.name || ''); return m ? SURFACES[m[1]] : null; }
 

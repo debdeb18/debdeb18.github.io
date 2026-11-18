@@ -20,13 +20,13 @@ def stone_face(r, rnd, along, fixed, axis):
         h = min(0.34, TOP - 0.12 - z); a = -along / 2 + (0.3 if row % 2 else 0.0)
         if row % 2:
             l = 0.3
-            if axis == 'x': box('stone', (l - 0.03, 0.06, h - 0.03), (-along / 2 + l / 2, fixed, z), color='stone_b', parent=r, bevel=0.025)
-            else: box('stone', (0.06, l - 0.03, h - 0.03), (fixed, -along / 2 + l / 2, z), color='stone_b', parent=r, bevel=0.025)
+            if axis == 'x': painted_box('stone', (l - 0.03, 0.06, h - 0.03), (-along / 2 + l / 2, fixed, z), color='stone_b', parent=r, bevel=0.025, along='x')
+            else: painted_box('stone', (0.06, l - 0.03, h - 0.03), (fixed, -along / 2 + l / 2, z), color='stone_b', parent=r, bevel=0.025, along='y')
         while a < along / 2 - 0.01:
             l = min(rnd.uniform(0.55, 1.05), along / 2 - a)
             c = rnd.choice(('stone_a', 'stone_b', 'stone_c'))
-            if axis == 'x': box('stone', (l - 0.03, 0.06, h - 0.03), (a + l / 2, fixed, z), color=c, parent=r, bevel=0.025, jitter=0.006)
-            else: box('stone', (0.06, l - 0.03, h - 0.03), (fixed, a + l / 2, z), color=c, parent=r, bevel=0.025, jitter=0.006)
+            if axis == 'x': painted_box('stone', (l - 0.03, 0.06, h - 0.03), (a + l / 2, fixed, z), color=c, parent=r, bevel=0.025, jitter=0.006, along='x')
+            else: painted_box('stone', (0.06, l - 0.03, h - 0.03), (fixed, a + l / 2, z), color=c, parent=r, bevel=0.025, jitter=0.006, along='y')
             a += l
         z += h; row += 1
 
@@ -45,7 +45,7 @@ def fence(r, p0, p1):
     m = int(L / 0.17)
     for i in range(1, m):
         t = i / m; x, y = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
-        cyl('baluster', 0.028, 0.028, 0.72, (x, y, z + 0.18), color='rail_w', parent=r, bevel=0.005, verts=8)
+        box('baluster', (0.06, 0.06, 0.72), (x, y, z + 0.18), (0, 0, ang), 'rail_w', r, bevel=0.009)   # square, with rounded edges
 
 def info_board(r, x, y):
     """The board along the back fence: train times on the left, station notices and a map of the islands on the
@@ -181,7 +181,7 @@ def build():
         for j in range(int(LY / S) + 1):
             yy = -LY / 2 + S / 2 + j * S
             if yy > LY / 2 - 0.1: continue
-            box('tile', (S - 0.03, min(S, LY / 2 - yy + S / 2 - 0.05) - 0.03, 0.04), (-LX / 2 + S / 2 + i * S, yy, TOP - 0.03), color=rnd.choice(('tile_a', 'tile_b', 'tile_c')), parent=r, bevel=0.008, jitter=0.003)
+            painted_box('tile', (S - 0.03, min(S, LY / 2 - yy + S / 2 - 0.05) - 0.03, 0.04), (-LX / 2 + S / 2 + i * S, yy, TOP - 0.03), color=rnd.choice(('tile_a', 'tile_b', 'tile_c')), parent=r, bevel=0.008, jitter=0.003, along='top', band=0.12)
     box('edge_line', (LX - 0.4, 0.12, 0.012), (0, -LY / 2 + 0.45, TOP + 0.01), color=0xE7C14A, parent=r, bevel=0.003)
     # the fence: along the back and the left end
     fence(r, (-LX / 2 + 0.15, LY / 2 - 0.15), (LX / 2 - 0.15, LY / 2 - 0.15))
@@ -193,7 +193,7 @@ def build():
     # the railway-crossing signal at the front left
     crossing_signal(r, -LX / 2 + 0.75, -LY / 2 + 0.75)
     # steps down at the right end, then a small side jetty with a mooring post
-    for k in range(4): box('step', (0.42, 1.6, 0.22), (LX / 2 + 0.21 + k * 0.42, 0.25, TOP - 0.22 - k * 0.2), color='stone_b', parent=r, bevel=0.03)
+    for k in range(4): painted_box('step', (0.42, 1.6, 0.22), (LX / 2 + 0.21 + k * 0.42, 0.25, TOP - 0.22 - k * 0.2), color='stone_b', parent=r, bevel=0.03, along='y')
     JX0, JX1, JZ = LX / 2 + 1.68, LX / 2 + 5.4, 0.12
     for i in range(int((JX1 - JX0) / 0.3)):
         box('jetty_plank', (0.28, 1.6, 0.06), (JX0 + 0.15 + i * 0.3, 0.25, JZ), color='plank' if i % 3 else 'plank_d', parent=r, bevel=0.01, jitter=0.006)

@@ -39,6 +39,8 @@ export function toon(object, opts = {}) {      // opts.smoothMaps: keep painted 
         transparent: m.transparent, opacity: m.opacity, depthWrite: !m.transparent,
       });
       t.name = m.name;
+      const vc = /^c_([0-9a-f]{6})_vc/.exec(m.name || '');                 // vertex-painted parts: the paint multiplies the
+      if (vc) t.color.setHex(parseInt(vc[1], 16), THREE.SRGBColorSpace);    // colour named in the material
       const kind = surfaceOf(m);                                        // grass, sand, concrete, wood... get a hand-painted texture
       if (kind) painted(t, kind, rimPatch); else rim(t);
       if (m.emissiveMap || (m.emissive && m.emissive.getHex() !== 0)) { t.userData.glow = t.emissiveIntensity; glow.push(t); }

@@ -195,6 +195,38 @@ def plank(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, b
     o.modifiers['bevel'].angle_limit = math.radians(60)                      # bevel the board's edges, not the carving
     return o
 
+def painted_box(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='stone', parent=None, bevel=0.02, jitter=0.0, along='x',
+                band=0.18, paint=None, **mk):
+    """A box with hand-painted light and shade on its vertices, like a painted stone or tile: a light band along the
+    top and the left, a darker, stained band along the bottom and the right. `along` is the face's horizontal axis
+    ('x' or 'y'); a flat tile (along='top') gets a light rim all round its top. The colour multiplies `color`."""
+    P = paint or dict(light=0xFFFDF6, mid=0xE8E5DC, low=0xB8B2A0, right=0xD0CABA)
+    C = {k: Vector(((h >> 16 & 255) / 255, (h >> 8 & 255) / 255, (h & 255) / 255)) for k, h in P.items()}
+    bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1)
+    cut = lambda co, no: bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=co, plane_no=no)
+    b = 0.5 - band
+    for k in (-b, b): cut((k, 0, 0), (1, 0, 0)); cut((0, k, 0), (0, 1, 0)); cut((0, 0, k), (0, 0, 1))
+    jitter *= STYLE['jitter']; ch = STYLE['chunk']
+    size = tuple(d * ch if d < 0.16 else d for d in size)
+    col = bm.verts.layers.color.new('Col')
+    for v in bm.verts:
+        x, y, z = v.co.x, v.co.y, v.co.z
+        if along == 'top':
+            c = C['light'] if (z > 0.49 and max(abs(x), abs(y)) > b + 0.01) else (C['mid'] if z > 0.49 else C['low'])
+        else:
+            h = x if along == 'x' else -y
+            c = C['mid']
+            if z > b + 0.01: c = C['light']
+            elif z < -b - 0.01: c = C['low']
+            if h < -b - 0.01: c = c.lerp(C['light'], 0.6)
+            elif h > b + 0.01: c = c.lerp(C['right'], 0.7)
+        v[col] = (c.x, c.y, c.z, 1.0)
+        v.co = Vector((x * size[0] + random.uniform(-jitter, jitter), y * size[1] + random.uniform(-jitter, jitter), (z + 0.5) * size[2] + random.uniform(-jitter, jitter) * 0.5))
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    o = _finish(name, me, color, loc, rot, parent, bevel, **mk)
+    o.data.materials[0] = mat_vc(color)
+    return o
+
 def gable(name, span, height, thick, loc=(0, 0, 0), color='cream', parent=None, **mk):
     """A triangular wall end (under a pitched roof). `span` runs along Y, the point is up."""
     bm = bmesh.new()

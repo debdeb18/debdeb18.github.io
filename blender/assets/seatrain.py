@@ -10,17 +10,26 @@ rails, overhead luggage racks on brackets, hanging ring straps, a curved cream c
 grilles, and an arched doorway through to the next car. Front faces -Y, wheels sit at z = 0."""
 import math
 import bmesh, bpy
-from mathutils import Matrix
+from mathutils import Matrix, Vector
 import lib
 from lib import *
 
 VIEW = dict(angle=35, lift=0.22, res=(1300, 820))
-L, GAP, NOSE = 14.0, 0.8, 0.85                     # car length (nose tip to coupling end), gap between cars, nose depth
-ZB, ZW = 1.95, 2.72                                # window band: bottom and top
+L, GAP, NOSE = 14.0, 0.8, 0.7                     # car length (nose tip to coupling end), gap between cars, nose depth
+ZB, ZW = 1.95, 2.6                                 # window band: bottom and top
 COLOURS = dict(lower=0xC9573E, lower_dark=0x9E3D2F, upper=0xF2C85E, upper_pale=0xF8E6AE, roof_t=0x8E3B31, roof_box=0x7B3129,
                trim=0x3A2A26, glass_t=0x31414F, lamp_t=0xFFE2A0, plank=0xA0683C, plank_dark=0x7E4C2A, wain=0x6E4428, wain_dark=0x5A3720,
                cushion=0xD9707A, cushion_dark=0xB9505C, wall_in=0xF2DDB8, ceil=0xF6E6C8, pole=0x8A6A48, brass_t=0xD9A441,
-               ring=0xEDE2C8, iron=0x2E2D33, rack=0x5E4A3A)
+               ring=0xEDE2C8, iron=0x2E2D33, rack=0x5E4A3A, amber=0xFFA43A, slat_line=0x7E2F24, screen=0x2A3440)
+# the wood-and-brass scheme of the close-up reference: brown slatted lower body, tan upper, dark brown roof
+FILM = dict(lower=0xC9573E, lower_dark=0x9E3D2F, upper=0xF2C85E, upper_pale=0xF8E6AE, roof_t=0x8E3B31, roof_box=0x7B3129, skirt=0x7E2F24)
+WOOD = dict(lower=0x7A3B26, lower_dark=0x5C2A1B, slat_line=0x4E2416, upper=0xC9A066, upper_pale=0xE9D2A2, roof_t=0x4A2E28, roof_box=0x3E2622)
+import os
+# default: the cream-and-brown of the toy references
+COLOURS.update(lower=0x9C5B33, lower_dark=0x7A4326, upper=0xF2D98C, upper_pale=0xFBF0CF, roof_t=0x7B3F2A, roof_box=0x6A3624, skirt=0x6B3A22,
+               silver=0xC9CCD1, lamp_red=0xE04A3A)
+if os.environ.get('LIVERY') == 'wood': COLOURS.update(WOOD)
+if os.environ.get('LIVERY') == 'film': COLOURS.update(FILM)
 
 # The cross-section (half of it, x >= 0), from the skirt up to the roof crown. Rows between points become bands:
 # 0..3 lower body, 3..4 the window band, 4..5 the cream strip above the windows, 5.. the roof.
@@ -34,7 +43,7 @@ def xat(z):
         if z0 <= z <= z1: return x0 + (x1 - x0) * (z - z0) / (z1 - z0)
     return HALF[0][0]
 
-def grid(name, rows, color, parent, solid=0.0, **mk):
+def grid(name, rows, color, parent, solid=0.0, flat=False, **mk):
     """A smooth surface through a grid of 3D points (rows x cols), optionally given thickness."""
     bm = bmesh.new(); vs = [[bm.verts.new(p) for p in row] for row in rows]
     for i in range(len(rows) - 1):
@@ -44,6 +53,10 @@ def grid(name, rows, color, parent, solid=0.0, **mk):
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5); bm.normal_update()
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
     o = lib._finish(name, me, color, (0, 0, 0), (0, 0, 0), parent, 0, **mk)
+    if flat:                                                       # crisp facets (no smoothing) for the slats
+        for pl in o.data.polygons: pl.use_smooth = False
+        for m in list(o.modifiers):
+            if m.type == 'WEIGHTED_NORMAL': o.modifiers.remove(m)
     if solid:
         m = o.modifiers.new('solid', 'SOLIDIFY'); m.thickness = solid; m.offset = 0
         o.modifiers.move(len(o.modifiers) - 1, 0)
@@ -60,47 +73,78 @@ def across(k0, k1):
 def loft(name, pts, ya, yb, color, parent, **mk):
     return grid(name, [[(x, ya, z), (x, yb, z)] for x, z in pts], color, parent, **mk)
 
+WEDGE = 1.3                                        # how far the point of the nose sticks out (about the half-width: a 45 degree wedge)
+
 def nose_point(X, z, th, yj, f):
-    """A point on the nose: the cross-section swept round a half-ellipse in plan, raked back above the window sill."""
-    d = NOSE * (0.88 + 0.12 * min(1, (z - 0.55) / 0.7)) if z <= ZB else max(0.05, NOSE - (z - ZB) * 0.62)
-    return (X * math.cos(th), yj + f * d * math.sin(th), z)
+    """A point on the nose. From above it is a gentle oval. From the side it is a trapezium: upright below the waist, the
+    windscreen leaning well back, and the roof overhanging forward again as a brow."""
+    plan = math.sin(th)                                                      # an ellipse: 1 at the front, 0 at the sides
+    D = 0.62
+    if z <= ZB: d = D * (0.9 + 0.1 * min(1, (z - 0.55) / 0.5))
+    elif z <= ZW: d = D - (z - ZB) / (ZW - ZB) * 0.42                          # the windscreen leans back
+    elif z <= 2.95: d = D - 0.42 + (z - ZW) / (2.95 - ZW) * 0.5                # the brow comes forward again
+    else: d = (D + 0.08) * max(0.0, (3.31 - z) / (3.31 - 2.95)) ** 0.7        # and the roof rounds over it
+    d += max(0.0, X - xat(z))                                                 # anything set proud of the body stands proud at the front too
+    return (X * math.cos(th), yj + f * d * plan, z)
 
 def nose(r, yj, f):
-    """The rounded, raked nose built on the join plane yj, facing f (-1: toward -Y)."""
-    ths = [i * math.pi / 24 for i in range(25)]                       # 0 .. pi: from the +x side round the front to -x
+    """The front, after the close-up reference: a rounded V, two big rounded windscreen panes in thick bezels, an
+    overhanging brow with one headlight, vertical slats below, a name plate, amber lamps, a pale skirt with buffers."""
+    N = 72
+    ths = [i * math.pi / N for i in range(N + 1)]                     # 0 .. pi: from the +x side round the front to -x
     for k in range(len(HALF) - 1):
-        rows = [[nose_point(HALF[kk][0], HALF[kk][1], th, yj, f) for th in ths] for kk in (k, k + 1)]
         col = BAND(k)
-        if col == 'window': col = 'glass_t'
-        grid('nose_%d' % k, rows, col, r, solid=0.05, rough=0.15 if col == 'glass_t' else 0.75)
-    # windscreen frames along the sill and the top of the glass, three posts between the panes, two wipers
-    for z in (ZB + 0.01, ZW - 0.01):
-        tube('screen_rail', [nose_point(xat(z) + 0.012, z, th, yj, f) for th in ths[2:23]], 0.035, 'trim', r)
-    for th in (math.radians(32), math.pi / 2, math.radians(148)):
-        tube('screen_post', [nose_point(xat(z) + 0.015, z, th, yj, f) for z in (ZB, (ZB + ZW) / 2, ZW)], 0.045, 'trim', r)
-    for th in (math.radians(68), math.radians(112)):
-        p = nose_point(xat(ZB + 0.12) + 0.03, ZB + 0.12, th, yj, f)
-        q = nose_point(xat(ZB + 0.55) + 0.03, ZB + 0.55, th + 0.12 * (1 if th < 1.57 else -1), yj, f)
+        if k == 0: col = 'skirt'                                       # the dark skirt
+        if col == 'window': col = 'upper'                              # the bezel colour; the glass goes on top
+        if k in (1, 2):                                                # vertical slats: every other column stands proud
+            rows = [[nose_point(HALF[kk][0] + (0.035 if (i // 2) % 2 else 0), HALF[kk][1], th, yj, f) for i, th in enumerate(ths)] for kk in (k, k + 1)]
+        else:
+            rows = [[nose_point(HALF[kk][0], HALF[kk][1], th, yj, f) for th in ths] for kk in (k, k + 1)]
+        grid('nose_%d' % k, rows, col, r, solid=0.05, flat=k in (1, 2))
+    # two big windscreen panes with rounded corners, on either side of a centre post
+    za, zb = ZB + 0.06, ZW - 0.02
+    for t0, t1 in ((math.radians(22), math.radians(84)), (math.radians(96), math.radians(158))):
+        gth = [t0 + (t1 - t0) * i / 16 for i in range(17)]
+        gz = [za + (zb - za) * i / 6 for i in range(7)]
+        grid('windscreen', [[nose_point(xat(z) + 0.04, z, th, yj, f) for th in gth] for z in gz], 'screen', r, rough=0.08)
+        tm, zm, a, b = (t0 + t1) / 2, (za + zb) / 2, (t1 - t0) / 2, (zb - za) / 2
+        bez = []
+        for k in range(49):                                              # a rounded rectangle (superellipse) traced on the surface
+            u = k / 48 * 2 * math.pi; cu, su = math.cos(u), math.sin(u)
+            pw = 0.25 if su < 0 else 0.6                                     # square-ish bottom corners, round top corners
+            th = tm + a * math.copysign(abs(cu) ** pw, cu); z = zm + b * math.copysign(abs(su) ** pw, su)
+            bez.append(nose_point(xat(z) + 0.03, z, th, yj, f))
+        tube('bezel', bez, 0.055, 'upper_pale', r)
+    tube('centre_post', [nose_point(xat(z) + 0.03, z, math.pi / 2, yj, f) for z in (ZB + 0.02, (ZB + ZW) / 2, ZW - 0.02)], 0.06, 'upper_pale', r)
+    for th in (math.radians(50), math.radians(130)):                   # wipers
+        p = nose_point(xat(za + 0.05) + 0.05, za + 0.05, th, yj, f); q = nose_point(xat(za + 0.45) + 0.05, za + 0.45, th + 0.18 * (1 if th < 1.57 else -1), yj, f)
         tube('wiper', [p, q], 0.012, 'iron', r)
-    for z in (0.95, 1.2, 1.45, 1.7):                                  # ribs round the lower nose
-        tube('nose_rib', [nose_point(xat(z) + 0.012, z, th, yj, f) for th in ths], 0.014, 'lower_dark', r)
-    for th in (math.radians(52), math.radians(128)):                  # two headlights low on the nose, marker lamps
-        x, y, z = nose_point(xat(1.25) + 0.05, 1.25, th, yj, f)
-        cyl('head_body', 0.15, 0.13, 0.14, (x, y, z - 0.07), (f * -90, 0, 0), 'iron', r, bevel=0.03, verts=20)
-        ball('head_light', 0.11, (x, y + f * 0.1, z), (1, 0.45, 1), 'lamp_t', r, emit=4.0 if f < 0 else 0.5)
-        mx, my, mz = nose_point(xat(1.75) + 0.03, 1.75, th + (0.35 if th < 1.57 else -0.35), yj, f)
-        ball('marker', 0.05, (mx, my, mz), (1, 0.6, 1), 0xFF6A4A, r, emit=1.2)
-    px, py, pz = nose_point(0, 1.45, math.pi / 2, yj, f)                # a name plate with three painted marks
-    box('plate', (0.62, 0.05, 0.36), (px, py + f * 0.02, pz - 0.18), color='trim', parent=r, bevel=0.03)
-    box('plate_face', (0.52, 0.03, 0.26), (px, py + f * 0.045, pz - 0.13), color='upper_pale', parent=r, bevel=0.02)
-    for k in range(3): box('plate_mark', (0.08, 0.02, 0.14), (px - 0.14 + k * 0.14, py + f * 0.06, pz - 0.08), color='trim', parent=r, bevel=0.005)
-    rx, ry, rz = nose_point(0, 3.18, math.pi / 2, yj, f)                # the roof headlight
-    cyl('roof_lamp', 0.17, 0.15, 0.24, (rx, ry - f * 0.12, rz + 0.05), (f * -90, 0, 0), 'iron', r, bevel=0.03, verts=22)
-    ball('roof_light', 0.13, (rx, ry + f * 0.02, rz + 0.05), (1, 0.4, 1), 'lamp_t', r, emit=6.0 if f < 0 else 0.6)
-    bx, by, bz = nose_point(0, 0.6, math.pi / 2, yj, f)                 # bumper, buffers, coupler
-    box('bumper', (2.0, 0.24, 0.24), (0, by + f * 0.04, 0.36), color='iron', parent=r, bevel=0.08)
-    for sx in (-1, 1): cyl('buffer', 0.12, 0.12, 0.2, (sx * 0.72, by + f * 0.15, 0.48), (f * -90, 0, 0), 'iron', r, bevel=0.03, verts=16)
-    box('coupler', (0.28, 0.4, 0.18), (0, by + f * 0.12, 0.32), color='iron', parent=r, bevel=0.05)
+    # the brow: the roof edge overhangs the windscreen, with a round headlight on top in the middle
+    tube('brow', [nose_point(xat(ZW + 0.1) + 0.07, ZW + 0.1, th, yj, f) for th in ths[4:-4]], 0.06, 'roof_t', r)
+    hx, hy, hz = nose_point(xat(ZW + 0.2), ZW + 0.2, math.pi / 2, yj, f)
+    cyl('head_body', 0.19, 0.17, 0.26, (hx, hy - f * 0.18, hz + 0.1), (f * -90, 0, 0), 'iron', r, bevel=0.03, verts=24)
+    cyl('head_rim', 0.17, 0.17, 0.04, (hx, hy + f * 0.07, hz + 0.1), (f * -90, 0, 0), 'brass_t', r, bevel=0.01, verts=24, rough=0.3)
+    ball('headlight', 0.14, (hx, hy + f * 0.11, hz + 0.1), (1, 0.4, 1), 'lamp_t', r, emit=6.0 if f < 0 else 0.6)
+    # the lower front: a vertical name plate on the centre, a small amber lamp on each side
+    px, py, pz = nose_point(xat(1.55) + 0.06, 1.55, math.pi / 2, yj, f)
+    box('plate', (0.3, 0.05, 0.6), (px, py, pz - 0.3), color='lamp_red', parent=r, bevel=0.03)
+    box('plate_face', (0.24, 0.03, 0.52), (px, py + f * 0.025, pz - 0.26), color='upper_pale', parent=r, bevel=0.02)
+    for k in range(2): box('plate_mark', (0.12, 0.02, 0.16), (px, py + f * 0.04, pz - 0.16 - k * 0.22), color='lamp_red', parent=r, bevel=0.005)
+    tube('belt', [nose_point(xat(ZB - 0.03) + 0.045, ZB - 0.03, th, yj, f) for th in ths], 0.03, 'silver', r, rough=0.3)   # the silver waist strip
+    for th in (math.radians(58), math.radians(122)):
+        sx = 1 if th < math.pi / 2 else -1
+        n = Vector((sx * WEDGE, f * xat(1.6), 0)).normalized()
+        x, y, z = nose_point(xat(1.6) + 0.03, 1.6, th, yj, f)
+        lb = cyl('lamp_body', 0.1, 0.09, 0.08, (x, y, z), (0, 0, 0), 'silver', r, bevel=0.02, verts=16, rough=0.3); lb.rotation_euler = n.to_track_quat('Z', 'Y').to_euler()
+        ball('red_lamp', 0.065, (x + n.x * 0.08, y + n.y * 0.08, z), (1, 1, 1), 'lamp_red', r, emit=2.0)
+    # the skirt: big round buffers and a coupler
+    bx, by, bz = nose_point(xat(0.6), 0.6, math.pi / 2, yj, f)
+    for sx in (-1, 1):
+        n = Vector((sx * WEDGE, f * xat(0.6), 0)).normalized()
+        x, y, z = nose_point(xat(0.62), 0.62, math.radians(62 if sx > 0 else 118), yj, f)
+        st = cyl('buffer_stem', 0.07, 0.07, 0.2, (x, y, 0.5), (0, 0, 0), 'iron', r, bevel=0.01, verts=12); st.rotation_euler = n.to_track_quat('Z', 'Y').to_euler()
+        ball('buffer', 0.17, (x + n.x * 0.22, y + n.y * 0.22, 0.5), (1, 1, 1), 'iron', r, rough=0.4)
+    box('coupler', (0.32, 0.45, 0.2), (0, by + f * 0.15, 0.32), color='iron', parent=r, bevel=0.05)
 
 def car(r, y0, flip):
     f = 1 if flip else -1                                              # the nose points this way
@@ -110,11 +154,13 @@ def car(r, y0, flip):
     yc = (ya + yb) / 2
     inward = 1 if ye < yj else -1                                      # from the coupling end toward the middle of the car
     # ---------- shell: lower sides, window band (only between windows), cream strip, roof ----------
-    for side in (-1, 1): loft('lower', band_rows(0, 3, side), ya, yb, 'lower', r, solid=0.05)
+    for side in (-1, 1):
+        loft('skirt', band_rows(0, 1, side), ya, yb, 'skirt', r, solid=0.05)
+        loft('lower', band_rows(1, 3, side), ya, yb, 'lower', r, solid=0.05)
     loft('upper', across(4, 10), ya, yb, 'upper', r, solid=0.05)
     loft('roof', [(x * 1.006, z + 0.006) for x, z in across(5, 10)], ya, yb, 'roof_t', r, solid=0.04)
     doors = (ya + 1.05, yb - 1.05)
-    n = 13; w0, w1 = ya + 1.95, yb - 1.95; step = (w1 - w0) / n; PW = 0.34; ww = step - PW     # small windows, wide pillars
+    n = 10; w0, w1 = ya + 1.95, yb - 1.95; step = (w1 - w0) / n; PW = 0.26; ww = step - PW     # near-square windows
     solids = [(ya, w0 + PW / 2)] + [(w0 + i * step - PW / 2, w0 + i * step + PW / 2) for i in range(1, n)] + [(w1 - PW / 2, yb)]
     for side in (-1, 1):
         for a, b in solids: loft('pillar', band_rows(3, 4, side), a, b, 'upper', r, solid=0.05)
@@ -122,8 +168,7 @@ def car(r, y0, flip):
         for i in range(n):                                             # wood frames, a glazing bar and lower-sash glass
             cy = w0 + (i + 0.5) * step
             for z, x in ((ZB + 0.02, x0), (ZW - 0.02, x1)): box('win_rail', (0.07, ww + 0.02, 0.04), (x * 0.985, cy, z - 0.02), color='trim', parent=r, bevel=0.01)
-            box('win_bar', (0.05, ww, 0.03), ((x0 + x1) / 2 * 0.985, cy, ZB + (ZW - ZB) * 0.5), (0, side * 4.5, 0), 'trim', r, bevel=0.008)
-            box('glass', (0.015, ww, (ZW - ZB) * 0.47), ((x0 + x1) / 2 * 0.975, cy, ZB + 0.03), (0, side * 4.5, 0), 'glass_t', r, bevel=0, rough=0.1)
+            box('glass', (0.015, ww, ZW - ZB - 0.04), ((x0 + x1) / 2 * 0.975, cy, ZB + 0.02), (0, side * 4.5, 0), 'glass_t', r, bevel=0, rough=0.1)
         for dy in doors:                                               # doors: cream panel, window, kick plate, step, grab handles
             xd = side * (HALF[2][0] + 0.015)
             box('door', (0.04, 0.95, ZW - 0.6), (xd, dy, 0.6), color='upper', parent=r, bevel=0.02)
@@ -131,17 +176,21 @@ def car(r, y0, flip):
             box('door_kick', (0.05, 0.95, 0.16), (xd + side * 0.01, dy, 0.6), color='lower_dark', parent=r, bevel=0.01)
             box('step', (0.24, 0.9, 0.05), (side * 1.42, dy, 0.42), color='iron', parent=r, bevel=0.015)
             for o in (-0.56, 0.56): tube('grab', [(side * 1.43, dy + o, 1.1), (side * 1.45, dy + o, 1.4), (side * 1.43, dy + o, 1.75)], 0.016, 'brass_t', r, rough=0.3)
-        for z in (0.95, 1.2, 1.45, 1.7):                               # horizontal ribs along the lower body, broken at the doors
-            xr = side * (xat(z) + 0.012)
-            for a, b in ((ya + 0.05, doors[0] - 0.5), (doors[0] + 0.5, doors[1] - 0.5), (doors[1] + 0.5, yb - 0.05)):
-                tube('rib', [(xr, a, z), (xr, b, z)], 0.014, 'lower_dark', r)
+        # vertical slats along the lower body: a corrugated panel, every other strip standing proud
+        for a, b in ((ya + 0.05, doors[0] - 0.5), (doors[0] + 0.5, doors[1] - 0.5), (doors[1] + 0.5, yb - 0.05)):
+            ys = [a + k * 0.06 for k in range(int((b - a) / 0.06) + 1)]
+            cols = [[(side * (x + 0.012 + (0.03 if (k // 2) % 2 else 0)), y, z) for k, y in enumerate(ys)] for x, z in HALF[1:4]]
+            grid('slats', cols, 'lower', r, flat=True)
         tube('drip_rail', [(side * 1.285, ya, 2.9), (side * 1.285, yb, 2.9)], 0.02, 'roof_box', r)
+        tube('belt', [(side * (xat(ZB - 0.03) + 0.045), ya, ZB - 0.03), (side * (xat(ZB - 0.03) + 0.045), yb, ZB - 0.03)], 0.03, 'silver', r, rough=0.3)
         box('number_plate', (0.03, 0.42, 0.16), (side * (xat(1.35) + 0.015), yc, 1.27), color='upper_pale', parent=r, bevel=0.01)
     nose(r, yj, f)
     # ---------- roof: ventilators with lids, a horn ----------
-    for dy, ln in ((-4.2, 1.6), (0.0, 2.8), (4.2, 1.6)):
-        box('ventilator', (0.95, ln, 0.22), (0, yc + dy, 3.27), color='roof_box', parent=r, bevel=0.09)
-        box('vent_lid', (1.08, ln + 0.1, 0.05), (0, yc + dy, 3.47), color='roof_t', parent=r, bevel=0.02)
+    # roof: one long low raised panel in the middle, a round mushroom ventilator toward each end
+    box('roof_panel', (1.0, 5.0, 0.12), (0, yc, 3.27), color='roof_box', parent=r, bevel=0.05)
+    for dy in (-4.6, 4.6):
+        cyl('vent_stem', 0.16, 0.16, 0.12, (0, yc + dy, 3.26), color='roof_box', parent=r, bevel=0.02, verts=20)
+        ball('vent_cap', 0.24, (0, yc + dy, 3.38), (1, 1, 0.4), 'roof_t', r)
     cyl('horn', 0.05, 0.1, 0.32, (0.55, yj - f * 0.6, 3.3), (f * -90, 0, 0), 'brass_t', r, bevel=0.01, rough=0.3)
     # ---------- the coupling end: a wall in the shape of the cross-section, with an arched doorway cut through ----------
     def resample(pts, n):

@@ -12,8 +12,9 @@ permissions:
   pages: write
   id-token: write
 
+# one queue per branch: a push to dev never cancels a deploy from main
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

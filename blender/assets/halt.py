@@ -96,6 +96,7 @@ def floor_slabs(r, rnd, joints):
         while x < LX / 2 - 0.05:
             w = rnd.uniform(0.8, 1.3); x0, x1 = max(x, -LX / 2 + 0.02), min(x + w, LX / 2 - 0.02); x += w
             if x1 - x0 < 0.2: continue
+            if math.hypot((x0 + x1) / 2 - TX, y + d / 2 - TY) < TR - 0.2: continue   # inside the tower
             sz = (x1 - x0 - 0.03, d - 0.03, 0.08); loc = ((x0 + x1) / 2, y + d / 2, TOP - 0.08 + rnd.uniform(-0.012, 0.006))
             rot = (rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1))
             kw = dict(color=rnd.choice(('tile_a', 'tile_b', 'tile_c', 'tile_d', 'tile_e')), parent=r, bevel=0.015, jitter=0.004, along='top', band=0.1, rough=2.2)
@@ -109,7 +110,7 @@ def floor_slabs(r, rnd, joints):
             if rnd.random() < 0.12: joints.append((x1, y + rnd.uniform(0.1, d - 0.1)))
         y += d; row += 1
 
-TX, TY, TR, TW = -LX / 2 - 2.25, 0.5, 2.45, 0.6                                 # the ruined tower: centre, outer radius, wall
+TX, TY, TR, TW = -LX / 2 - 1.5, 0.5, 2.45, 0.6                                  # the ruined tower (centre, outer radius, wall): it overlaps the end of the pier
 WINDOWS = ((115, TOP + 1.3, TOP + 2.5), (65, TOP + 2.9, TOP + 4.0), (165, TOP + 2.7, TOP + 3.8))   # (angle, sill, head)
 
 def ivy(r, rnd, x, y, z, nx, ny, length):
@@ -403,7 +404,8 @@ def build():
         ivy(r, rnd, x, y, TOP - 0.05, nx_, ny_, ln)                          # a little ivy over the pier's edge
     # v2.2: a tall ruined wall from the tower along the platform, the waiting spot in front of it
     WY, WT, WH = 0.75, 0.7, 3.2
-    ruin_wall(r, rnd, -LX / 2 + 0.15, LX / 2 - 2.6, WY, WT, WH, ((-2.4, TOP + 1.25, TOP + 2.55), (1.4, TOP + 1.25, TOP + 2.55)))
+    ruin_wall(r, rnd, TX + TR - TW - 0.05, LX / 2 - 2.6, WY, WT, WH,       # it starts inside the tower's wall, so they are joined
+              ((-2.4, TOP + 1.25, TOP + 2.55), (1.4, TOP + 1.25, TOP + 2.55)))
     for lx in (-3.9, -0.5, 2.6): lantern(r, lx, WY - WT / 2, TOP + 1.95)
     seat_row(r, -0.5, WY - WT / 2 - 0.45, 4)
     trash_can(r, -0.5 - 4 * 0.62 / 2 - 0.45, WY - WT / 2 - 0.45)

@@ -197,6 +197,7 @@ export function buildTerminal() {
     for (const [x, y] of NORTH()) w.solid(x, -y, 0.9, 0.9);                        // tree trunks
     S(7.94, 13.4, 1.2, 1.0); S(15.93, 11.98, 0.35, 0.35); S(31.6, 10.15, 0.3, 0.3);   // shrine, lantern post, hammock post
     trees = [...(placed.tree_a || []), ...(placed.tree_b || []), ...(placed.tree_c || []), ...(placed.pine || [])].map((o) => ({ o, ph: Math.random() * 6.28 }));
+    makeShafts(trees.map((t) => t.o));
   });
   // The train: "Spirited Away Train" by judpro (CC BY 4.0), prepared by blender/scenes/import_train.py. Its cab is at y = 0,
   // it runs along +y, so turned to run along +x it leads with the cab toward -x, the way it travels here.
@@ -212,6 +213,61 @@ export function buildTerminal() {
   });
   w.ready = Promise.all([w.ready, trainReady]).then(([, glow]) => { w.glowMats.push(...glow); });
   let trees = [], train = null, nextTrain = 1e9;
+
+  // ---------- light shafts: soft beams of sun slanting down through the tree crowns ----------
+  // Each beam is a long quad hung from under a canopy along the sun's direction, turned every frame to face the camera
+  // around that axis. Brightest with a low sun, gone at night and under cloud, flickering as the leaves move.
+  const shafts = [];
+  const shaftTex = (() => {
+    const c = document.createElement('canvas'); c.width = 64; c.height = 256; const g = c.getContext('2d');
+    const img = g.createImageData(64, 256);
+    for (let y = 0; y < 256; y++) for (let x = 0; x < 64; x++) {
+      const v = y / 255, u = (x / 63) * 2 - 1;
+      const along = Math.min(1, v / 0.12) * Math.pow(1 - v, 1.6);             // fades in under the leaves, out toward the ground
+      const across = Math.exp(-u * u * 3.2);
+      const a = along * across;
+      img.data.set([255, 255, 255, Math.round(a * 255)], (y * 64 + x) * 4);
+    }
+    g.putImageData(img, 0, 0);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  })();
+  const shaftMat = new THREE.MeshBasicMaterial({ map: shaftTex, color: 0xfff0c8, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+  const shaftGeo = new THREE.PlaneGeometry(1, 1).translate(0, -0.5, 0);      // top edge at the origin, hanging down
+  function makeShafts(objs) {
+    let seed = 17; const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+    for (const o of objs) {
+      const box = new THREE.Box3().setFromObject(o), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
+      const under = box.min.y + size.y * 0.55;                                 // just under the leaves
+      const n = 3 + Math.floor(rnd() * 3);
+      for (let i = 0; i < n; i++) {
+        const a = rnd() * 6.283, d = Math.sqrt(rnd()) * Math.min(size.x, size.z) * 0.32;
+        const m = new THREE.Mesh(shaftGeo, shaftMat.clone());
+        m.userData = { top: new THREE.Vector3(c.x + Math.cos(a) * d, under + rnd() * size.y * 0.15, c.z + Math.sin(a) * d), width: 0.5 + rnd() * 1.1, ph: rnd() * 6.28, sp: 0.4 + rnd() * 0.6, k: 0.6 + rnd() * 0.4 };
+        m.renderOrder = 3; m.frustumCulled = false; m.userData.noShadow = true; m.matrixAutoUpdate = false;
+        s.add(m); shafts.push(m); hideInMirror.push(m);
+      }
+    }
+  }
+  const camP = new THREE.Vector3(), ax = new THREE.Vector3(), side = new THREE.Vector3(), nrm = new THREE.Vector3(), toCam = new THREE.Vector3();
+  function updateShafts(t, camera) {
+    // strength: the sun has to be up and not behind cloud; a lower sun makes longer, more visible beams
+    const up = THREE.MathUtils.clamp((P.sunI - 0.6) / 1.6, 0, 1), low = 1 - Math.max(0, sd.y) * 0.55;
+    const k = up * (1 - 0.85 * cloudy) * low;
+    for (const m of shafts) m.visible = k > 0.02;
+    if (k <= 0.02) return;
+    ax.copy(sd).negate();                                                      // the way the light travels
+    if (ax.y > -0.25) ax.y = -0.25; ax.normalize();
+    camera.getWorldPosition(camP);
+    for (const m of shafts) {
+      const u = m.userData, L = Math.max(1, (u.top.y + 0.1) / -ax.y);          // reach the ground (or the water)
+      toCam.subVectors(camP, u.top);
+      side.crossVectors(ax, toCam).normalize(); nrm.crossVectors(side, ax).normalize();
+      m.matrix.makeBasis(side.clone().multiplyScalar(u.width), ax.clone().negate().multiplyScalar(L), nrm).setPosition(u.top);
+      m.matrixWorldNeedsUpdate = true;
+      m.material.opacity = k * u.k * 0.5 * (0.7 + 0.3 * Math.sin(t * u.sp + u.ph));
+    }
+  }
+  w.camera = null;                                                            // main.js hands over the camera
   const trainMats = [];
   // Repaint the train in design A's clean livery: flat maroon body, cream window band, slate roof, dark skirt. The
   // texture only says which part is which (rose/red paint vs gold paint, and how high up it is); its grime is dropped.
@@ -507,6 +563,7 @@ export function buildTerminal() {
     U.uStir.value = stir;
     cloudy += (weatherNow() - cloudy) * Math.min(1, dt * 0.2);                     // weather changes ease in over a few seconds
     applySky(hourNow());
+    if (w.camera && shafts.length) updateShafts(t, w.camera);
     for (const c of heavy) {                                                       // the heavy layer gathers one cloud at a time
       const g = THREE.MathUtils.clamp((cloudy - c.userData.k * 0.8) / 0.2, 0, 1);
       c.visible = g > 0.01; c.scale.setScalar(0.35 + 0.65 * g);

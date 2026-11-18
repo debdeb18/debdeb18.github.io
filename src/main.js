@@ -22,6 +22,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
 
 const worlds = { terminal: buildTerminal(), home: buildHome(), office: buildOffice(), market: buildMarket() };
+worlds.terminal.camera = camera;                                  // for things that turn to face the viewer (light shafts)
 let world = worlds.terminal;
 
 const composer = new EffectComposer(renderer);

@@ -17,7 +17,7 @@ Every area follows the same loop: concept render, feedback, split into pieces, b
 - [x] 3D grass on the islets that sways in the wind and bends away as you walk through
 - [x] Walkable islets behind the station: plank ramp from the deck, wading between islets with ripples
 - [x] Camera pulls in instead of passing through the station building and canopy
-- [ ] Next for the painted look: light shafts through the trees
+- [x] Light shafts through the trees (follow the sun, fade with cloud and at night)
 
 ## 1. Terminal: a station above the water
 Design in Blender

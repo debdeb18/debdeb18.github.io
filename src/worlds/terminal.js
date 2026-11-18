@@ -75,7 +75,7 @@ function makeWater(U) {
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = 'varying vec3 vW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime;\nuniform vec3 uShallow, uDeep, uSky, uTrain, uPlayer;\nuniform sampler2D uRefl;\nuniform mat4 uReflMat;\n' + DEPTH_GLSL + '\n' + sh.fragmentShader
+    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime;\nuniform vec3 uShallow, uDeep, uSky, uTrain, uPlayer;\nuniform float uStir;\nuniform sampler2D uRefl;\nuniform mat4 uReflMat;\n' + DEPTH_GLSL + '\n' + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
         vec2 bp = vec2(vW.x, -vW.z);
         float dep = seaDepth(bp);
@@ -96,17 +96,24 @@ function makeWater(U) {
         for (int k = 0; k < 2; k++) { float rr = 0.35 + fract(uTime * 0.7 + float(k) * 0.5) * 1.3; foam += wet * (1.0 - smoothstep(0.0, 0.07, abs(pd - rr))) * (1.0 - (rr - 0.35) / 1.3) * 0.8; }
         foam += wet * (1.0 - smoothstep(0.2, 0.4, pd)) * 0.5;
         foam = clamp(foam, 0.0, 1.0);
+        // how stirred-up the water is here: along the train and its wake (fading out behind it), and around a wader who
+        // is moving (uStir fades back to calm a few seconds after they stop)
+        float trainStir = min(1.0, uTrain.y * 3.0) * clamp(bow * 1.5 + body * (1.0 - smoothstep(1.4, 7.0 + uTrain.y * 6.0, side)) * (1.0 - smoothstep(0.0, uTrain.z + 30.0 * uTrain.y, along) * 0.7), 0.0, 1.0);
+        float walkStir = wet * uStir * (1.0 - smoothstep(0.3, 4.0, pd));
+        float stir = clamp(trainStir + walkStir, 0.0, 1.0);
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0), foam * 0.85);
         diffuseColor.a = max(diffuseColor.a, foam * 0.9);`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         vec2 q = vec2(vW.x, -vW.z) * 0.9;
         float h1 = sin(q.x * 1.7 + uTime * 1.1 + sin(q.y * 1.3 + uTime * 0.4) * 2.0), h2 = sin(q.y * 2.3 - uTime * 0.9 + q.x * 0.5);
         vec3 tilt = vec3(h1 * 0.022 + h2 * 0.012, 0.0, h2 * 0.022 - h1 * 0.01);         // a calm, glassy sea
+        float c1 = sin(q.x * 5.0 - uTime * 6.0 + sin(q.y * 4.0) * 1.5), c2 = sin(q.y * 6.0 + uTime * 5.0 + q.x * 1.3);
+        tilt += vec3(c1 * 0.09 + c2 * 0.05, 0.0, c2 * 0.09 - c1 * 0.04) * stir;         // choppier where something passes
         normal = normalize(normal + (viewMatrix * vec4(tilt, 0.0)).xyz);`)
       .replace('#include <opaque_fragment>', `float fres = pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 3.0);
         // the mirror: the scene rendered upside down, nudged by the ripples. Shallows stay see-through; deep water is a mirror.
         vec4 rp = uReflMat * vec4(vW, 1.0);
-        vec2 ruv = rp.xy / rp.w + tilt.xz * 0.08;                        // only a gentle waver
+        vec2 ruv = rp.xy / rp.w + tilt.xz * (0.08 + 0.3 * stir);                        // only a gentle waver
         vec3 refl = texture2D(uRefl, ruv).rgb * mix(vec3(1.0), uDeep * 2.2 + 0.35, 0.35 * murk);   // the mirror takes on the sea's blue
         float reflK = mix(0.3, 0.9, murk) * mix(0.75, 1.0, fres) * (1.0 - foam);       // deep water: almost a perfect mirror
         outgoingLight = mix(outgoingLight, refl, reflK);
@@ -136,7 +143,7 @@ export function buildTerminal() {
 
   // ---------- water and sea floor ----------
   const U = { uTime: { value: 0 }, uIslets: { value: Array.from({ length: 16 }, () => new THREE.Vector3(1e4, 1e4, 0)) },
-    uShallow: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uSky: { value: new THREE.Color() }, uTrain: { value: new THREE.Vector3(1e4, 0, 25) }, uPlayer, uRefl: { value: null }, uReflMat: { value: new THREE.Matrix4() } };
+    uShallow: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uSky: { value: new THREE.Color() }, uTrain: { value: new THREE.Vector3(1e4, 0, 25) }, uPlayer, uStir: { value: 0 }, uRefl: { value: null }, uReflMat: { value: new THREE.Matrix4() } };
   const water = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), makeWater(U));
   water.position.set(55, 0, 0); water.receiveShadow = true; water.renderOrder = 1; water.userData.noShadow = true;
   s.add(water);
@@ -491,8 +498,13 @@ export function buildTerminal() {
   };
 
   const water0 = new THREE.Vector3();
+  const lastP = new THREE.Vector3(); let stir = 0;
   w.ticks.push((t, dt) => {
     U.uTime.value = t;
+    const v = dt > 0 ? lastP.distanceTo(uPlayer.value) / dt : 0; lastP.copy(uPlayer.value);
+    const want = v > 0.3 && v < 20 ? Math.min(1, v / 3) : 0;                       // walking through water stirs it up...
+    stir += (want - stir) * Math.min(1, dt * (want > stir ? 4 : 0.6));              // ...and it settles over a few seconds
+    U.uStir.value = stir;
     cloudy += (weatherNow() - cloudy) * Math.min(1, dt * 0.2);                     // weather changes ease in over a few seconds
     applySky(hourNow());
     for (const c of heavy) {                                                       // the heavy layer gathers one cloud at a time

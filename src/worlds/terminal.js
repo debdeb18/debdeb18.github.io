@@ -169,11 +169,46 @@ export function buildTerminal() {
   // it runs along +y, so turned to run along +x it leads with the cab toward -x, the way it travels here.
   const trainReady = loadModel('models/terminal/seatrain.glb', { smoothMaps: true }).then(({ scene, glow }) => {
     train = scene; train.rotation.y = -Math.PI / 2; train.position.set(1e4, -0.05, -TRACK);
+    // its textures are dark and weathered: give it a soft light ramp, and brighten it by day (see applySky)
+    const soft = new THREE.DataTexture(new Uint8Array([170, 170, 170, 255, 215, 215, 215, 255, 245, 245, 245, 255, 255, 255, 255, 255]), 4, 1, THREE.RGBAFormat);
+    soft.minFilter = soft.magFilter = THREE.LinearFilter; soft.needsUpdate = true;
+    train.traverse((o) => { if (o.isMesh) for (const m of [].concat(o.material)) if (!trainMats.includes(m)) { m.gradientMap = soft; m.userData.base = m.color.clone(); recolor(m); trainMats.push(m); } });
     s.add(train); nextTrain = 6;
     return glow;
   });
   w.ready = Promise.all([w.ready, trainReady]).then(([, glow]) => { w.glowMats.push(...glow); });
   let trees = [], train = null, nextTrain = 1e9;
+  const trainMats = [];
+  // Repaint the train in a brighter cream-yellow and brown: the texture's rose-red and pink become brown, its gold becomes
+  // cream-yellow, keeping the light and dark of the original paint (wear, panel lines). Grey parts (glass, metal) stay.
+  function recolor(m) {
+    if (!m.map) return;
+    const prev = m.onBeforeCompile;
+    m.onBeforeCompile = (sh, r) => {
+      if (prev) prev(sh, r);
+      sh.vertexShader = 'varying float vTH;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvTH = (modelMatrix * vec4(transformed, 1.0)).y + 0.05;');
+      sh.fragmentShader = 'varying float vTH;\n' + sh.fragmentShader;
+      sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+        {
+          vec3 c = diffuseColor.rgb;
+          float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), d = mx - mn, sat = mx > 0.0 ? d / mx : 0.0;
+          float h = 0.0;
+          if (d > 1e-4) { if (mx == c.r) h = mod((c.g - c.b) / d, 6.0); else if (mx == c.g) h = (c.b - c.r) / d + 2.0; else h = (c.r - c.g) / d + 4.0; h /= 6.0; }
+          float lum = dot(c, vec3(0.3, 0.59, 0.11));
+          float red  = smoothstep(0.12, 0.3, sat) * (1.0 - smoothstep(0.03, 0.07, min(h, 1.0 - h)));          // rose, pink, red
+          float gold = smoothstep(0.1, 0.25, sat) * smoothstep(0.04, 0.07, h) * (1.0 - smoothstep(0.17, 0.22, h)); // gold, bronze
+          float bright = smoothstep(0.85, 1.0, vTH);                                                           // gold above the skirt -> cream; the bronze skirt -> brown
+          vec3 BROWN = vec3(0.66, 0.32, 0.15), CREAM = vec3(1.0, 0.87, 0.5);
+          vec3 brownC = BROWN * clamp(lum / 0.42, 0.6, 1.12), creamC = CREAM * clamp(lum / 0.3, 0.75, 1.12);
+          c = mix(c, brownC, red);
+          c = mix(c, mix(brownC, creamC, bright), gold);
+          diffuseColor.rgb = c;
+        }`);
+    };
+    m.customProgramCacheKey = () => 'train-recolor';
+    m.needsUpdate = true;
+  }
+  const TINT = new THREE.Color();
 
   // ---------- 3D grass on the islets ----------
   function plantGrass(islets) {
@@ -371,6 +406,9 @@ export function buildTerminal() {
     for (const l of lamps) l.intensity = p.lamps * 9;
     for (const m of w.glowMats) m.emissiveIntensity = m.userData.glow * (0.25 + 0.75 * Math.max(p.lamps, 0.2));
     w.bloom = p.bloom;
+    const day = THREE.MathUtils.clamp((p.sunI - 0.45) / 2.55, 0, 1);              // 0 at night .. 1 at noon
+    const kT = 0.9 + 0.35 * day;                                                      // a little brighter in daylight, dimmer at night
+    for (const m of trainMats) m.color.copy(m.userData.base).multiplyScalar(kT);
   }
 
   // ---------- the train ----------

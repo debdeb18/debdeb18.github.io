@@ -1,6 +1,6 @@
 """The porch (halt), after the user's sketch: a stone platform standing in the sea beside the line, paved on top, with a
-white fence along the back and the left end; along the back a vending machine, a lamp post and the waiting spot (an open
-shelter with a tiled roof, two benches, a lamp on each front post and the train schedule board); steps down at the right
+white fence along the back and the left end; along the back an info and timetable board, a lamp post and the waiting spot (an open
+shelter with a tiled roof, a row of four seats and a bin, a lamp on each front post); steps down at the right
 end to a small side jetty with a mooring post; and a railway-crossing signal at the front left.
 Origin: centre of the platform's footprint at water level; the track side faces -Y; the top is at z = TOP."""
 import math, random
@@ -47,39 +47,43 @@ def fence(r, p0, p1):
         t = i / m; x, y = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
         cyl('baluster', 0.028, 0.028, 0.72, (x, y, z + 0.18), color='rail_w', parent=r, bevel=0.005, verts=8)
 
-def vending(r, x, y):
-    """A Japanese vending machine after the poster: warm orange-red body, a big lit window of drinks in four rows,
-    a row of buttons under each row, a coin panel on the right, a dark pickup slot at the bottom."""
-    z = TOP; W, D, H = 1.0, 0.72, 1.9; f = y - D / 2                     # f: its front face (toward the track)
-    box('vend_body', (W, D, H), (x, y, z), color='vend_body', parent=r, bevel=0.035)
-    box('vend_top', (W + 0.04, D + 0.04, 0.08), (x, y, z + H - 0.02), color='vend_dark', parent=r, bevel=0.02)
-    box('vend_plinth', (W - 0.02, D - 0.02, 0.1), (x, y, z), color='vend_dark', parent=r, bevel=0.02)
-    # the lit window: a bright panel, four shelves of bottles and cans, a button under each
-    wx = x - 0.08; ww = 0.66
-    box('vend_window_frame', (ww + 0.08, 0.03, 1.02), (wx, f - 0.005, z + 0.76), color='vend_dark', parent=r, bevel=0.015)
-    box('vend_window', (ww, 0.03, 0.94), (wx, f - 0.015, z + 0.8), color='vend_glow', parent=r, bevel=0.008, emit=2.2)
-    drinks = (0xD9532F, 0x3F8FD1, 0xF2C230, 0x5FA46B, 0xEDE6D6, 0x8B4A2E)
-    for row in range(4):
-        zr = z + 0.84 + row * 0.225
-        box('vend_shelf', (ww, 0.06, 0.02), (wx, f - 0.04, zr - 0.01), color='vend_dark', parent=r, bevel=0.003)
-        for k in range(6):
-            xx = wx - ww / 2 + 0.06 + k * 0.108; c = drinks[(k + row * 2) % 6]
-            if (k + row) % 3 == 0:                                           # a bottle: body and neck
-                cyl('bottle', 0.028, 0.028, 0.11, (xx, f - 0.05, zr), color=c, parent=r, bevel=0.005, verts=10)
-                cyl('bottle_neck', 0.012, 0.02, 0.05, (xx, f - 0.05, zr + 0.11), color=c, parent=r, bevel=0.003, verts=8)
-            else: cyl('can', 0.032, 0.032, 0.12, (xx, f - 0.05, zr), color=c, parent=r, bevel=0.005, verts=10)
-            box('button', (0.05, 0.015, 0.022), (xx, f - 0.03, zr - 0.045), color='button_lit', parent=r, bevel=0.003, emit=1.5)
-    # the coin panel on the right: a small display, a coin slot, a return lever
-    px = x + W / 2 - 0.12
-    box('coin_panel', (0.16, 0.025, 0.62), (px, f - 0.01, z + 0.9), color='vend_dark', parent=r, bevel=0.01)
-    box('coin_display', (0.11, 0.02, 0.06), (px, f - 0.025, z + 1.38), color=0x7FFFB0, parent=r, bevel=0.004, emit=1.8)
-    box('coin_slot', (0.03, 0.02, 0.08), (px, f - 0.025, z + 1.22), color='coping', parent=r, bevel=0.004)
-    box('note_slot', (0.1, 0.02, 0.03), (px, f - 0.025, z + 1.08), color='coping', parent=r, bevel=0.004)
-    cyl('return_lever', 0.025, 0.025, 0.04, (px, f - 0.02, z + 0.97), (90, 0, 0), 'coping', r, bevel=0.005, verts=10)
-    # the pickup slot at the bottom, with its flap
-    box('pickup', (0.62, 0.03, 0.22), (x - 0.06, f - 0.005, z + 0.2), color='vend_dark', parent=r, bevel=0.02)
-    box('pickup_flap', (0.56, 0.02, 0.16), (x - 0.06, f - 0.02, z + 0.23), color=0x3A3A40, parent=r, bevel=0.01)
-    box('vend_label', (0.5, 0.02, 0.06), (wx, f - 0.02, z + 1.8), color='coping', parent=r, bevel=0.005)
+def info_board(r, x, y):
+    """The board along the back fence: train times on the left, station notices and a map of the islands on the
+    right, under a little tiled hood, on two timber legs. Faces the track (-Y)."""
+    z = TOP; W, H, zb = 1.7, 1.05, z + 0.75
+    for sx in (-1, 1): box('board_leg', (0.12, 0.12, zb - z + H + 0.25), (x + sx * (W / 2 - 0.05), y + 0.04, z), color='timber_dark', parent=r, bevel=0.02)
+    box('board_back', (W, 0.07, H), (x, y, zb), color='timber', parent=r, bevel=0.02)
+    box('board_frame_t', (W + 0.08, 0.1, 0.07), (x, y - 0.02, zb + H - 0.035), color='timber_dark', parent=r, bevel=0.015)
+    box('board_frame_b', (W + 0.08, 0.1, 0.07), (x, y - 0.02, zb - 0.035), color='timber_dark', parent=r, bevel=0.015)
+    shingles('board_hood', W + 0.3, 0.45, 1, (x, y - 0.18, zb + H + 0.12), 22, color='roof', dark='roof_dark', parent=r, tile=0.3)
+    yf = y - 0.04
+    # the timetable: a white sheet with a blue head and rows of times
+    tx = x - W / 4 - 0.02
+    box('time_paper', (0.74, 0.02, 0.86), (tx, yf, zb + 0.09), color='board', parent=r, bevel=0.004)
+    box('time_head', (0.74, 0.025, 0.13), (tx, yf - 0.002, zb + 0.82), color=0x2F6F9A, parent=r, bevel=0.003)
+    for i in range(7):
+        for c in (-0.2, 0.12):
+            box('time_line', (0.26 if c < 0 else 0.34, 0.025, 0.028), (tx + c, yf - 0.004, zb + 0.18 + i * 0.085), color='iron_d', parent=r, bevel=0)
+    # the notices: a map of the islands, and two small posters
+    nx = x + W / 4 + 0.02
+    box('map_paper', (0.7, 0.02, 0.5), (nx, yf, zb + 0.47), color=0xE8F1F2, parent=r, bevel=0.004)
+    for (dx, dz, rr) in ((-0.12, 0.2, 0.09), (0.12, 0.27, 0.06), (0.22, 0.15, 0.045)):
+        cyl('map_island', rr, rr, 0.025, (nx + dx, yf - 0.003, zb + 0.47 + dz), (90, 0, 0), 0x7DB85A, r, bevel=0, verts=14)
+    box('map_line', (0.62, 0.025, 0.02), (nx, yf - 0.004, zb + 0.56), color=0xB8403A, parent=r, bevel=0)
+    box('poster_a', (0.32, 0.02, 0.36), (nx - 0.18, yf, zb + 0.06), color=0xF2C46A, parent=r, bevel=0.004)
+    box('poster_b', (0.3, 0.02, 0.32), (nx + 0.19, yf, zb + 0.08), color=0xE8A0A0, parent=r, bevel=0.004)
+    for (px, pz) in ((nx - 0.18, zb + 0.4), (nx + 0.19, zb + 0.38), (nx - 0.3, zb + 0.95), (nx + 0.3, zb + 0.95), (tx - 0.33, zb + 0.93), (tx + 0.33, zb + 0.93)):
+        ball('pin', 0.016, (px, yf - 0.015, pz), (1, 0.6, 1), 0xB8403A, r)
+
+def trash_can(r, x, y):
+    """A station rubbish bin: a dark green drum with a domed lid, a round mouth in front and a label band."""
+    z = TOP
+    cyl('bin', 0.24, 0.22, 0.72, (x, y, z), color=0x3E6B55, parent=r, bevel=0.02, verts=24)
+    cyl('bin_band', 0.245, 0.245, 0.1, (x, y, z + 0.42), color='board', parent=r, bevel=0.01, verts=24)
+    cyl('bin_lid', 0.25, 0.25, 0.05, (x, y, z + 0.72), color=0x2F5444, parent=r, bevel=0.015, verts=24)
+    ball('bin_dome', 0.24, (x, y, z + 0.77), (1, 1, 0.35), 0x2F5444, r)
+    cyl('bin_mouth', 0.09, 0.09, 0.04, (x, y - 0.235, z + 0.6), (90, 0, 0), 'iron_d', r, bevel=0.01, verts=18)
+    cyl('bin_foot', 0.2, 0.2, 0.04, (x, y, z), color=0x2F5444, parent=r, bevel=0.01, verts=24)
 
 def lamp_post(r, x, y):
     z = TOP
@@ -103,21 +107,16 @@ def shelter(r, x0, x1, y0, y1):
     for dx in (-0.6, 0.6):                                                     # wooden brackets under the eave
         box('bracket', (0.08, 0.5, 0.08), (x0 + 0.25 + dx * 0, y0 - 0.15, z + H - 0.35), (45, 0, 0), 'timber_dark', r, bevel=0.01)
         box('bracket', (0.08, 0.5, 0.08), (x1 - 0.25 + dx * 0, y0 - 0.15, z + H - 0.35), (45, 0, 0), 'timber_dark', r, bevel=0.01)
-    # two rows of platform seats after the poster: separate curved wooden seats on one dark metal frame
-    for cx in (x0 + 1.35, x1 - 1.35):
-        seat_row(r, cx, y1 - 0.5, 3)
+    # one row of four platform seats on a dark metal frame, the bin at its left end
+    cx = (x0 + x1) / 2 + 0.45
+    seat_row(r, cx, y1 - 0.5, 4)
+    trash_can(r, cx - 4 * 0.62 / 2 - 0.42, y1 - 0.5)
     # a lantern hanging from each front post
     for x in (x0, x1):
         sx = -1 if x == x0 else 1
         tube('lantern_arm', [(x, y0, z + 1.95), (x + sx * 0.25, y0 - 0.05, z + 2.05), (x + sx * 0.35, y0 - 0.05, z + 1.95)], 0.02, 'iron_d', r)
         cyl('lantern_cap', 0.12, 0.05, 0.08, (x + sx * 0.35, y0 - 0.05, z + 1.88), color='iron_d', parent=r, bevel=0.01, verts=12)
         cyl('lantern', 0.09, 0.09, 0.22, (x + sx * 0.35, y0 - 0.05, z + 1.66), color='lamp_w', parent=r, bevel=0.03, emit=4.0, verts=12)
-    # the train schedule board on the right front post, facing the track
-    bx = x1 + 0.12
-    box('schedule', (0.06, 0.75, 0.95), (bx, y0 + 0.45, z + 0.8), color='timber', parent=r, bevel=0.02)
-    box('schedule_paper', (0.07, 0.62, 0.8), (bx + 0.01, y0 + 0.45, z + 0.87), color='board', parent=r, bevel=0.005)
-    box('schedule_head', (0.08, 0.62, 0.12), (bx + 0.015, y0 + 0.45, z + 1.55), color=0x2F6F9A, parent=r, bevel=0.005)
-    for i in range(6): box('schedule_line', (0.08, 0.5, 0.025), (bx + 0.02, y0 + 0.45, z + 0.97 + i * 0.09), color='iron_d', parent=r, bevel=0)
 
 def seat_row(r, cx, cy, n):
     """A row of n moulded wooden seats on a shared metal beam, facing -Y: each seat a gently dished pan and a curved back."""
@@ -132,10 +131,10 @@ def seat_row(r, cx, cy, n):
         box('seat_mount', (0.06, 0.3, 0.06), (x, cy, z + 0.39), color='seat_frame', parent=r, bevel=0.01)
         for k in range(5):                                                   # the seat pan, dipping a little in the middle
             t = k / 4; yy = cy - 0.2 + t * 0.4; dz = 0.035 * math.sin(math.pi * t)
-            plank('seat_pan', (P - 0.08 + random.uniform(-0.02, 0.01), 0.092, 0.042), (x + random.uniform(-0.012, 0.012), yy, z + 0.45 - dz), (-8 + 16 * t, 0, random.uniform(-1.2, 1.2)), 'seat_wood', r, bevel=0.014)
+            plank('seat_pan', (P - 0.08, 0.092, 0.042), (x, yy, z + 0.45 - dz), (-8 + 16 * t, 0, 0), 'seat_wood', r, bevel=0.014)
         for k in range(5):                                                   # the back, curving up and slightly back
             t = k / 4; yy = cy + 0.22 + t * 0.07; zz = z + 0.5 + t * 0.4
-            plank('seat_back', (P - 0.1 + random.uniform(-0.02, 0.01), 0.092, 0.042), (x + random.uniform(-0.012, 0.012), yy, zz + 0.046), (80 - 8 * t, 0, random.uniform(-1.2, 1.2)), 'seat_wood', r, bevel=0.014)
+            plank('seat_back', (P - 0.1, 0.092, 0.042), (x, yy, zz + 0.046), (80 - 8 * t, 0, 0), 'seat_wood', r, bevel=0.014)
         box('seat_back_post', (0.04, 0.04, 0.32), (x, cy + 0.2, z + 0.4), (-12, 0, 0), 'seat_frame', r, bevel=0.008)
 
 def crossing_signal(r, x, y):
@@ -187,8 +186,8 @@ def build():
     # the fence: along the back and the left end
     fence(r, (-LX / 2 + 0.15, LY / 2 - 0.15), (LX / 2 - 0.15, LY / 2 - 0.15))
     fence(r, (-LX / 2 + 0.15, -LY / 2 + 0.75), (-LX / 2 + 0.15, LY / 2 - 0.15))
-    # along the back, left to right: the vending machine, a lamp post, the waiting spot
-    vending(r, -2.7, LY / 2 - 0.65)
+    # along the back, left to right: the info board, a lamp post, the waiting spot
+    info_board(r, -2.6, LY / 2 - 0.42)
     lamp_post(r, -1.4, LY / 2 - 0.45)
     shelter(r, -0.4, 4.6, 0.35, LY / 2 - 0.45)
     # the railway-crossing signal at the front left

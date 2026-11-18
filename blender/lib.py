@@ -144,7 +144,7 @@ def plank(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, b
     fades = [wave(5) for _ in range(8)]
     chips = [(R(-0.5, 0.5) * L, random.choice((-1, 1)), R(0.012, 0.025), R(0.3, 0.7)) for _ in range(random.randint(0, 2))]
     splits = [(e, R(-0.25, 0.25) * W, R(0.02, 0.05)) for e in (-1, 1) if random.random() < 0.5]
-    bow = R(-1, 1) * 0.006 * wobble; slant = (R(-0.25, 0.25), R(-0.25, 0.25))
+    bow = R(-1, 1) * 0.006 * wobble; slant = (R(-0.04, 0.04), R(-0.04, 0.04))
     def groove(u, v):                                       # how deep the carving is at (u, v) on the top, 0..1
         vv = v + 0.003 * flow(u / L)
         for (ku, kv, kr) in ks:                                 # grain lines bend around each knot
@@ -171,7 +171,7 @@ def plank(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, b
         x, y, z = v.co.x, v.co.y, v.co.z
         c = C['body'] if v in top else C['under']
         u = x * L + (slant[0] if x < 0 else slant[1]) * y * W * (abs(x) * 2) ** 8   # ends cut a little off square
-        Y = y * W + (eL(x) if y > 0 else eR(x)) * 0.0012 * wobble * abs(y) * 2       # edges wander only a little
+        Y = y * W + (eL(x) if y > 0 else eR(x)) * 0.0005 * wobble * abs(y) * 2       # edges barely wander
         Z = z * T * (1 + th(x) * 0.03 * wobble)
         for (cu, side, cw, cd) in chips:                         # chips out of the long top edges
             if y * side > 0.3:

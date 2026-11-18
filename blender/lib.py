@@ -103,40 +103,70 @@ def box(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, bev
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
     return _finish(name, me, color, loc, rot, parent, bevel, **mk)
 
-def plank(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, bevel=0.012, wobble=1.0, grooves=3, **mk):
-    """A hand-cut board along X instead of a clean box: edges that wander, a slight bow and twist, ends rounded
-    unevenly, a few grain grooves along the top and the odd chip. `loc` is the centre of its base, like box()."""
-    L, W, T = size; nx = max(8, int(L / 0.035))
-    bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1)
-    cut = lambda co, no: bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=co, plane_no=no)
-    for i in range(1, nx): cut((-0.5 + i / nx, 0, 0), (1, 0, 0))
-    gy = [-0.5 + (k + 1) / (grooves + 1) + random.uniform(-0.08, 0.08) for k in range(grooves)]
-    for y in gy: cut((0, y, 0), (0, 1, 0))
-    wave = lambda: (lambda a, b, c, d: (lambda t: math.sin(t * a + b) * 0.6 + math.sin(t * c + d) * 0.4))(random.uniform(4, 8), random.uniform(0, 6.3), random.uniform(10, 18), random.uniform(0, 6.3))
-    w1, w2, w3, w4 = wave(), wave(), wave(), wave()
-    bow = random.uniform(-1, 1) * 0.012 * wobble; twist = random.uniform(-1, 1) * 0.06 * wobble
-    rnd = [random.uniform(0.12, 0.25), random.uniform(0.12, 0.25)]                 # how round each end is
-    depth = [random.uniform(0.25, 1.0) for _ in gy]
+def plank(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, bevel=0.014, wobble=1.0, knots=None, **mk):
+    """A stylised carved board along X (the hand-sculpted look): grain grooves cut into the top that flow around a knot
+    or two, rings around each knot, chips out of the long edges, splits running in from the ends, soft chunky bevels,
+    and a slight bow. `loc` is the centre of its base, like box()."""
+    L, W, T = size
+    # a fine grid for the carved top, then plain sides and a flat bottom (the carving only needs detail on top)
+    nx, ny = max(16, int(L / 0.0045)), max(12, int(W / 0.0024))
+    bm = bmesh.new(); bmesh.ops.create_grid(bm, x_segments=nx, y_segments=ny, size=0.5)
+    for v in bm.verts: v.co.z = 1.0                                          # -0.5..0.5 like the cube, top at z=1
+    edges = [e for e in bm.edges if e.is_boundary]
+    ext = bmesh.ops.extrude_edge_only(bm, edges=edges)
+    for v in [g for g in ext['geom'] if isinstance(g, bmesh.types.BMVert)]: v.co.z = 0.0
+    bmesh.ops.contextual_create(bm, geom=[e for e in bm.edges if e.is_boundary])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    R = random.uniform; sm = lambda t: t * t * (3 - 2 * t)
+    wave = lambda f: (lambda a, b, c, d: (lambda t: math.sin(t * a + b) * 0.6 + math.sin(t * c + d) * 0.4))(R(0.6, 1.4) * f, R(0, 6.3), R(1.8, 3) * f, R(0, 6.3))
+    eL, eR, th, flow = wave(9), wave(9), wave(7), wave(11)
+    nk = knots if knots is not None else random.choice((0, 1, 1, 2))
+    ks = [(R(-0.3, 0.3) * L, R(-0.15, 0.15) * W, R(0.015, 0.022)) for _ in range(nk)]
+    spacing = W / R(3.2, 4.2); phase = R(0, 1)
+    fades = [wave(5) for _ in range(8)]
+    chips = [(R(-0.5, 0.5) * L, random.choice((-1, 1)), R(0.012, 0.03), R(0.4, 1)) for _ in range(random.randint(1, 3))]
+    splits = [(e, R(-0.25, 0.25) * W, R(0.03, 0.07)) for e in (-1, 1) if random.random() < 0.7]
+    bow = R(-1, 1) * 0.006 * wobble; slant = (R(-0.25, 0.25), R(-0.25, 0.25))
+    def groove(u, v):                                       # how deep the carving is at (u, v) on the top, 0..1
+        vv = v + 0.003 * flow(u / L)
+        for (ku, kv, kr) in ks:                                 # grain lines bend around each knot
+            fu = math.exp(-((u - ku) / (2.6 * kr)) ** 2); dv = vv - kv
+            vv -= math.copysign(1, dv) * kr * 1.25 * fu * math.exp(-(dv / (2.2 * kr)) ** 2) * 1.6
+        q = vv / spacing + phase; line = math.floor(q + 0.5); f = abs(q - line)
+        d = max(0.0, 1 - f / 0.12); d = sm(d) * (0.55 + 0.45 * fades[int(line) % 8](u / L * 3))
+        d *= max(0.0, min(1.0, (0.5 * L - abs(u)) / 0.01))      # grooves fade out just before the ends
+        for (ku, kv, kr) in ks:                                 # rings around the knot and a dimple in its eye
+            rr = math.hypot((u - ku) / 1.5, v - kv)
+            d *= sm(max(0.0, min(1.0, (rr - 1.35 * kr) / (0.5 * kr))))   # keep the grain lines out of the knot
+            for ring in (0.62, 1.2):                            # two smooth rings, then a dimple in the eye
+                d = max(d, sm(max(0.0, 1 - abs(rr - ring * kr) / 0.0036)) * 0.9)
+            if rr < kr * 0.3: d = max(d, sm(1 - rr / (kr * 0.3)) * 0.8)
+        for (e, sv, sl) in splits:                              # a split running in from the end, deepest at the end
+            de = 0.5 * L - e * u
+            if de < sl: d = max(d, sm(max(0.0, 1 - abs(v - sv) / 0.0035)) * (1 - de / sl) * 1.4)
+        return d
     for v in bm.verts:
-        x, y, z = v.co.x, v.co.y, v.co.z + 0.5                                   # x, y in -0.5..0.5, z in 0..1
-        e = abs(x) * 2                                                         # 0 at the middle, 1 at the ends
-        side = 1 if y > 0 else -1
-        y += (w1(x) if side > 0 else w2(x)) * 0.012 * wobble * (abs(y) * 2)        # each long edge wanders on its own
-        z *= 1 + w3(x) * 0.04 * wobble                                         # thickness varies
-        end = rnd[0 if x < 0 else 1]
-        if e > 1 - end * W / L * 2 and abs(y) > 0.3:                             # round the corners off
-            k = (e - (1 - end * W / L * 2)) / (end * W / L * 2)
-            x -= math.copysign(1, x) * k * k * end * W / L * 0.9 * (abs(y) - 0.3) / 0.2
-        X, Y, Z = x * L, y * W, z * T
-        if Z > T * 0.99:                                                       # grain grooves along the top
-            for gi, g in enumerate(gy):
-                if abs(v.co.y - g) < 1e-4: Z -= T * 0.14 * depth[gi] * wobble * (0.6 + 0.4 * w4(x * 1.7 + gi))
-        Z += bow * (1 - (2 * x) ** 2) + twist * x * y * W                        # bowed and slightly twisted
-        if random.random() < 0.04 * wobble and Z > T * 0.9 and abs(y) > 0.45:  # the odd chip off a top edge
-            Z -= T * 0.25; Y *= 0.94
-        v.co = Vector((X, Y, Z))
+        x, y, z = v.co.x, v.co.y, v.co.z
+        u = x * L + (slant[0] if x < 0 else slant[1]) * y * W * (abs(x) * 2) ** 8   # ends cut a little off square
+        Y = y * W + (eL(x) if y > 0 else eR(x)) * 0.0012 * wobble * abs(y) * 2       # edges wander only a little
+        Z = z * T * (1 + th(x) * 0.03 * wobble)
+        for (cu, side, cw, cd) in chips:                         # chips out of the long top edges
+            if y * side > 0.3:
+                k = max(0.0, 1 - abs(u - cu) / cw) * (y * side - 0.3) / 0.2
+                if k > 0: Y -= side * sm(k) * 0.006 * cd; Z -= sm(k) * T * 0.3 * cd * z
+        for (e, sv, sl) in splits:                               # the end splits notch the end face too
+            if x * e > 0.499 and abs(Y - sv) < 0.004: u -= e * 0.004
+        if z > 0.99: Z -= groove(u, Y) * 0.0055 * wobble
+        Z += bow * (1 - (2 * x) ** 2)
+        v.co = Vector((u, Y, Z))
+    bmesh.ops.dissolve_limit(bm, angle_limit=math.radians(4), verts=bm.verts[:], edges=bm.edges[:])   # thin out the flat parts
+    bmesh.ops.triangulate(bm, faces=bm.faces[:], quad_method='BEAUTY', ngon_method='BEAUTY')         # so the bevel stays clean
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
-    return _finish(name, me, color, loc, rot, parent, bevel, **mk)
+    o = _finish(name, me, color, loc, rot, parent, bevel, segs=2, **mk)
+    o.modifiers['bevel'].angle_limit = math.radians(60)                      # bevel the board's edges, not the carving
+    d = o.modifiers.new('lighter', 'DECIMATE'); d.ratio = 0.22                 # keep the carving, lose most of the triangles
+    o.modifiers.move(len(o.modifiers) - 1, 0)
+    return o
 
 def gable(name, span, height, thick, loc=(0, 0, 0), color='cream', parent=None, **mk):
     """A triangular wall end (under a pitched roof). `span` runs along Y, the point is up."""

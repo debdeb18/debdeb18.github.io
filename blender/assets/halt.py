@@ -132,10 +132,10 @@ def seat_row(r, cx, cy, n):
         box('seat_mount', (0.06, 0.3, 0.06), (x, cy, z + 0.39), color='seat_frame', parent=r, bevel=0.01)
         for k in range(5):                                                   # the seat pan, dipping a little in the middle
             t = k / 4; yy = cy - 0.2 + t * 0.4; dz = 0.035 * math.sin(math.pi * t)
-            plank('seat_pan', (P - 0.08 + random.uniform(-0.02, 0.01), 0.092, 0.042), (x + random.uniform(-0.012, 0.012), yy, z + 0.45 - dz), (-8 + 16 * t, 0, random.uniform(-1.2, 1.2)), 'seat_wood', r, bevel=0.01)
+            plank('seat_pan', (P - 0.08 + random.uniform(-0.02, 0.01), 0.092, 0.042), (x + random.uniform(-0.012, 0.012), yy, z + 0.45 - dz), (-8 + 16 * t, 0, random.uniform(-1.2, 1.2)), 'seat_wood', r, bevel=0.014)
         for k in range(5):                                                   # the back, curving up and slightly back
             t = k / 4; yy = cy + 0.22 + t * 0.07; zz = z + 0.5 + t * 0.4
-            plank('seat_back', (P - 0.1 + random.uniform(-0.02, 0.01), 0.092, 0.042), (x + random.uniform(-0.012, 0.012), yy, zz + 0.046), (80 - 8 * t, 0, random.uniform(-1.2, 1.2)), 'seat_wood', r, bevel=0.01)
+            plank('seat_back', (P - 0.1 + random.uniform(-0.02, 0.01), 0.092, 0.042), (x + random.uniform(-0.012, 0.012), yy, zz + 0.046), (80 - 8 * t, 0, random.uniform(-1.2, 1.2)), 'seat_wood', r, bevel=0.014)
         box('seat_back_post', (0.04, 0.04, 0.32), (x, cy + 0.2, z + 0.4), (-12, 0, 0), 'seat_frame', r, bevel=0.008)
 
 def crossing_signal(r, x, y):

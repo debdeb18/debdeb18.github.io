@@ -223,10 +223,12 @@ def plank(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, b
     return o
 
 def painted_box(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='stone', parent=None, bevel=0.02, jitter=0.0, along='x',
-                band=0.18, paint=None, sculpt=True, face=0, **mk):
+                band=0.18, paint=None, sculpt=True, face=0, rough=1.0, clip=None, moss=0.0, **mk):
     """A box with hand-painted light and shade on its vertices, like a painted stone or tile: a light band along the
     top and the left, a darker, stained band along the bottom and the right. `along` is the face's horizontal axis
-    ('x' or 'y'); a flat tile (along='top') gets a light rim all round its top. The colour multiplies `color`."""
+    ('x' or 'y'); a flat tile (along='top') gets a light rim all round its top. The colour multiplies `color`.
+    `rough` scales the sculpting (swells, soft edges, chips). `clip` = (point, normal) in the unit box keeps only the
+    side behind that plane and closes the cut: two clipped halves make a stone cracked in two. `moss` greens its foot."""
     P = paint or dict(light=0xFFFDF6, mid=0xE8E5DC, low=0xB8B2A0, right=0xD0CABA)
     C = {k: Vector(((h >> 16 & 255) / 255, (h >> 8 & 255) / 255, (h & 255) / 255)) for k, h in P.items()}
     bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1)
@@ -241,10 +243,14 @@ def painted_box(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='stone', parent=
             for i in range(1, n):
                 k = -0.5 + i / n
                 if abs(abs(k) - b) > 0.01: cut(tuple(k if j == ax else 0 for j in range(3)), tuple(1 if j == ax else 0 for j in range(3)))
+    if clip:                                                                  # cut along a crack and close the cut
+        bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=clip[0], plane_no=clip[1], clear_outer=True)
+        bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary], sides=0)
     R = random.uniform
-    bumps = [(R(-0.5, 0.5), R(-0.5, 0.5), R(0.15, 0.4), R(-1, 1)) for _ in range(4)]          # gentle swells in the face
-    chips = [(random.choice((-0.5, 0.5)), R(-0.5, 0.5), R(0.04, 0.09)) for _ in range(random.randint(0, 2))]   # bites out of an edge
-    crack = (R(-0.3, 0.3), R(-0.5, 0.5), R(0.6, 1.4)) if random.random() < 0.3 else None              # a hairline crack
+    bumps = [(R(-0.5, 0.5), R(-0.5, 0.5), R(0.15, 0.4), R(-1, 1)) for _ in range(5)]          # swells and dips in the face
+    chips = [(random.choice((-0.5, 0.5)), R(-0.5, 0.5), R(0.04, 0.1)) for _ in range(random.randint(0, 1 + int(rough * 1.5)))]   # bites out of an edge
+    crack = None
+    mossc = Vector((0.62, 0.74, 0.46))
     jitter *= STYLE['jitter']; ch = STYLE['chunk']
     size = tuple(d * ch if d < 0.16 else d for d in size)
     col = bm.verts.layers.color.new('Col')
@@ -259,17 +265,22 @@ def painted_box(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='stone', parent=
             c = c.lerp(C['low'], sm(cl01((-z - 0.05) / 0.45)))
             c = c.lerp(C['light'], 0.5 * sm(cl01((-h - 0.25) / 0.25)))
             c = c.lerp(C['right'], 0.6 * sm(cl01((h - 0.25) / 0.25)))
+            if moss: c = c.lerp(mossc, moss * sm(cl01((-z - 0.15) / 0.35)))
         v[col] = (c.x, c.y, c.z, 1.0)
         co = [x * size[0] + random.uniform(-jitter, jitter), y * size[1] + random.uniform(-jitter, jitter), (z + 0.5) * size[2] + random.uniform(-jitter, jitter) * 0.5]
         cc = (x, y, z)
         if sculpt and abs(cc[nax]) > 0.499:                                   # on a face: sculpt it
             a1, a2 = [j for j in range(3) if j != nax]; p, q = cc[a1], cc[a2]
-            off = sum(h * math.exp(-((p - bp) ** 2 + (q - bq) ** 2) / (2 * br * br)) for (bp, bq, br, h) in bumps) * 0.0045
+            off = sum(h * math.exp(-((p - bp) ** 2 + (q - bq) ** 2) / (2 * br * br)) for (bp, bq, br, h) in bumps) * 0.0045 * rough
             e = min(0.5 - abs(p), 0.5 - abs(q)) * min(size[a1], size[a2])        # soft, pillowy edges
-            off -= 0.004 * max(0.0, 1 - e / 0.05) ** 2
+            off -= 0.004 * rough * max(0.0, 1 - e / 0.05) ** 2
+            if clip:                                                          # soft edges along the crack too
+                n_m = Vector([clip[1][i] / size[i] for i in range(3)]).normalized()
+                dpl = abs(sum((cc[i] - clip[0][i]) * size[i] * n_m[i] for i in range(3)))
+                off -= 0.005 * rough * max(0.0, 1 - dpl / 0.04) ** 2
             for (cp, cq, cw) in chips:
                 dd = math.hypot((p - cp) * size[a1], (q - cq) * size[a2])
-                if dd < cw: off -= 0.012 * (1 - dd / cw) ** 1.5
+                if dd < cw: off -= 0.012 * rough * (1 - dd / cw) ** 1.5
             if crack:
                 cp, cq, ang = crack
                 dline = abs((p - cp) * size[a1] * math.sin(ang) - (q - cq) * size[a2] * math.cos(ang))

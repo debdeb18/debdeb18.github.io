@@ -8,27 +8,51 @@ from lib import *
 
 VIEW = dict(angle=-28, lift=0.5, res=(1300, 820), samples=24)
 LX, LY, TOP, BASE = 11.0, 4.6, 0.95, -1.2          # length, depth, top height, how far the block reaches down
-COLOURS = dict(stone_a=0xC9B79A, stone_b=0xB7A483, stone_c=0xD6C7AB, joint=0x8E7F68, tile_a=0xD8CBB0, tile_b=0xCDBF9F, tile_c=0xE2D7BE,
+COLOURS = dict(stone_a=0xC9B79A, stone_b=0xB7A483, stone_c=0xD6C7AB, stone_d=0xB9B7A2, moss_a=0x6F9A4C, moss_b=0x8DB463, tile_d=0xC2C1A8, tile_e=0xE9E0C9, joint=0x8E7F68, tile_a=0xD8CBB0, tile_b=0xCDBF9F, tile_c=0xE2D7BE,
                coping=0xEFE6D2, rail_w=0xF4F1EA, timber=0x8A5A3C, timber_dark=0x5C3B28, roof=0xB8573E, roof_dark=0x8E3F2C,
                bench_w=0xA57A4E, seat_wood=0xA0623A, seat_frame=0x2F3036, vend_body=0xE0602F, vend_dark=0x5A2A1E, vend_glow=0xFFE6B0, button_lit=0xFFF4D8, lamp_w=0xFFE2A0, board=0xF3EAD2, iron_d=0x2E2D33,
                stripe_y=0xF2C230, stripe_k=0x26262A, red_l=0xE0453A, plank=0xA07650, plank_d=0x7E5A3A)
 
+def stone(r, rnd, l, h, at, axis, fixed, color, moss=0.0):
+    """One wall stone, laid a little unevenly: it sticks out by its own amount and sits a touch askew; now and then it
+    is cracked in two. `at` is its centre along the face and its base height."""
+    a, z = at; out = 1 if fixed > 0 else -1
+    pos = fixed + out * rnd.uniform(0.0, 0.02)                                  # some stones stand proud of the others
+    tilt, yaw = rnd.uniform(-1.2, 1.2), rnd.uniform(-1.0, 1.0)
+    if axis == 'x': size, loc, rot = (l - 0.03, 0.06, h - 0.03), (a, pos, z), (0, tilt, yaw)
+    else: size, loc, rot = (0.06, l - 0.03, h - 0.03), (pos, a, z), (tilt, 0, yaw)
+    kw = dict(color=color, parent=r, bevel=0.025, jitter=0.008, along=axis, face=out, rough=1.8, moss=moss)
+    if rnd.random() < 0.16 and l > 0.45:                                         # cracked in two, nearly upright
+        k, t = rnd.uniform(-0.25, 0.25), rnd.uniform(-0.5, 0.5)
+        n = (math.cos(t), 0, math.sin(t)) if axis == 'x' else (0, math.cos(t), math.sin(t))
+        g = 0.008 / (l - 0.03)
+        for sgn in (1, -1):
+            nn = tuple(sgn * c for c in n)
+            co = (k - sgn * g, 0, 0) if axis == 'x' else (0, k - sgn * g, 0)
+            painted_box('stone', size, loc, rot, clip=(co, nn), **kw)
+    else:
+        painted_box('stone', size, loc, rot, **kw)
+
 def stone_face(r, rnd, along, fixed, axis):
-    """Courses of cut stone on one side of the block: rows of blocks of varying length."""
+    """Courses of cut stone on one side of the block: rows of uneven height, stones of varying length, laid by hand."""
     z = BASE; row = 0
     while z < TOP - 0.12:
-        h = min(0.34, TOP - 0.12 - z); a = -along / 2 + (0.3 if row % 2 else 0.0)
-        if row % 2:
-            l = 0.3
-            if axis == 'x': painted_box('stone', (l - 0.03, 0.06, h - 0.03), (-along / 2 + l / 2, fixed, z), color='stone_b', parent=r, bevel=0.025, along='x', face=1 if fixed > 0 else -1)
-            else: painted_box('stone', (0.06, l - 0.03, h - 0.03), (fixed, -along / 2 + l / 2, z), color='stone_b', parent=r, bevel=0.025, along='y', face=1 if fixed > 0 else -1)
+        h = min(rnd.uniform(0.24, 0.38), TOP - 0.12 - z)
+        if TOP - 0.12 - (z + h) < 0.16: h = TOP - 0.12 - z                       # no sliver of a course at the top
+        a = -along / 2 + (rnd.uniform(0.2, 0.4) if row % 2 else 0.0)
+        moss = 0.55 if row == 0 else (0.25 if row == 1 else 0.0)                   # green at the foot, by the water
+        if a > -along / 2 + 0.01:
+            stone(r, rnd, a + along / 2, h, ((-along / 2 + a) / 2, z), axis, fixed, 'stone_b', moss)
         while a < along / 2 - 0.01:
-            l = min(rnd.uniform(0.55, 1.05), along / 2 - a)
-            c = rnd.choice(('stone_a', 'stone_b', 'stone_c'))
-            if axis == 'x': painted_box('stone', (l - 0.03, 0.06, h - 0.03), (a + l / 2, fixed, z), color=c, parent=r, bevel=0.025, jitter=0.006, along='x', face=1 if fixed > 0 else -1)
-            else: painted_box('stone', (0.06, l - 0.03, h - 0.03), (fixed, a + l / 2, z), color=c, parent=r, bevel=0.025, jitter=0.006, along='y', face=1 if fixed > 0 else -1)
+            l = min(rnd.uniform(0.45, 1.0), along / 2 - a)
+            if along / 2 - (a + l) < 0.2: l = along / 2 - a
+            stone(r, rnd, l, h, (a + l / 2, z), axis, fixed, rnd.choice(('stone_a', 'stone_b', 'stone_c', 'stone_d')), moss)
             a += l
         z += h; row += 1
+
+def moss_tuft(r, rnd, x, y, z, s=1.0):
+    """A small cushion of moss tucked into a joint."""
+    lump('moss', 0.05 * s, (x, y, z), (rnd.uniform(1.2, 2.2), rnd.uniform(1.0, 1.5), 0.6), rnd.choice(('moss_a', 'moss_b')), r, strength=0.35, grain=0.5)
 
 def fence(r, p0, p1):
     """A white railing from p0 to p1 (on the platform top): posts with caps, top and bottom rails, close balusters."""
@@ -176,12 +200,32 @@ def build():
     stone_face(r, rnd, LY, -LX / 2, 'y'); stone_face(r, rnd, LY, LX / 2, 'y')
     for y in (-LY / 2, LY / 2): box('coping', (LX + 0.14, 0.32, 0.12), (0, y, TOP - 0.12), color='coping', parent=r, bevel=0.03)
     for x in (-LX / 2, LX / 2): box('coping', (0.32, LY + 0.14, 0.12), (x, 0, TOP - 0.12), color='coping', parent=r, bevel=0.03)
-    S = 0.5                                                                    # the paved top
+    S = 0.5                                                                    # the paved top: stone tiles, each laid a
+    joints = []                                                                # little high or low and askew; a few cracked
     for i in range(int(LX / S)):
         for j in range(int(LY / S) + 1):
             yy = -LY / 2 + S / 2 + j * S
             if yy > LY / 2 - 0.1: continue
-            painted_box('tile', (S - 0.03, min(S, LY / 2 - yy + S / 2 - 0.05) - 0.03, 0.04), (-LX / 2 + S / 2 + i * S, yy, TOP - 0.03), color=rnd.choice(('tile_a', 'tile_b', 'tile_c')), parent=r, bevel=0.008, jitter=0.003, along='top', band=0.12)
+            sz = (S - 0.03, min(S, LY / 2 - yy + S / 2 - 0.05) - 0.03, 0.045)
+            xx = -LX / 2 + S / 2 + i * S
+            kw = dict(color=rnd.choice(('tile_a', 'tile_b', 'tile_c', 'tile_d', 'tile_e')), parent=r, bevel=0.01, jitter=0.003, along='top', band=0.12, rough=1.6)
+            lift = lambda: TOP - 0.035 + rnd.uniform(-0.009, 0.009)
+            tilt = lambda: (rnd.uniform(-1.8, 1.8), rnd.uniform(-1.8, 1.8), rnd.uniform(-1.5, 1.5))
+            if rnd.random() < 0.18:                                            # cracked in two, the halves settled apart
+                t = rnd.uniform(0, math.pi); n = (math.cos(t), math.sin(t), 0); k = (rnd.uniform(-0.2, 0.2), rnd.uniform(-0.2, 0.2), 0)
+                for sgn in (1, -1):
+                    co = (k[0] - sgn * n[0] * 0.012, k[1] - sgn * n[1] * 0.012, 0)
+                    painted_box('tile', sz, (xx, yy, lift()), tilt(), clip=(co, tuple(sgn * c for c in n)), **kw)
+            else:
+                painted_box('tile', sz, (xx, yy, lift()), tilt(), **kw)
+            if j > 0 and rnd.random() < 0.06: joints.append((xx + rnd.uniform(-0.2, 0.2), yy - S / 2))
+            if i > 0 and rnd.random() < 0.06: joints.append((xx - S / 2, yy + rnd.uniform(-0.2, 0.2)))
+    for (x, y) in joints:                                                      # a little moss in a few joints
+        moss_tuft(r, rnd, x, y, TOP + 0.004, rnd.uniform(0.7, 1.1))
+    for (x, y, zz) in ((-LX / 2 - 0.04, rnd.uniform(-1.8, 1.8), BASE + 0.3), (rnd.uniform(-5, 5), -LY / 2 - 0.04, BASE + 0.32),
+                       (rnd.uniform(-5, 5), -LY / 2 - 0.04, BASE + 0.62), (rnd.uniform(-5, 5), LY / 2 + 0.04, BASE + 0.3),
+                       (LX / 2 + 0.04, rnd.uniform(-1.8, 1.8), BASE + 0.3), (rnd.uniform(-5, 5), -LY / 2 - 0.04, BASE + 0.3)):
+        moss_tuft(r, rnd, x + (0.03 if x > 0 else -0.03) * (abs(x) > 5), y + (0.03 if y > 0 else -0.03) * (abs(y) > 2), zz, 1.4)   # a few tufts low on the wall
     box('edge_line', (LX - 0.4, 0.12, 0.012), (0, -LY / 2 + 0.45, TOP + 0.01), color=0xE7C14A, parent=r, bevel=0.003)
     # the fence: along the back and the left end
     fence(r, (-LX / 2 + 0.15, LY / 2 - 0.15), (LX / 2 - 0.15, LY / 2 - 0.15))

@@ -30,6 +30,8 @@ COLOURS.update(lower=0x9C5B33, lower_dark=0x7A4326, upper=0xF2D98C, upper_pale=0
                silver=0xC9CCD1, lamp_red=0xE04A3A)
 if os.environ.get('LIVERY') == 'wood': COLOURS.update(WOOD)
 if os.environ.get('LIVERY') == 'film': COLOURS.update(FILM)
+if os.environ.get('LIVERY') == 'rose': COLOURS.update(lower=0xB24A55, lower_dark=0x8E3541, upper=0xD9B56E, upper_pale=0xE8CC8C, roof_t=0xA9454F, roof_box=0x93394A, skirt=0x8C6A3A)
+COLOURS.setdefault('bezel_t', 0xC9A04E)
 
 # The cross-section (half of it, x >= 0), from the skirt up to the roof crown. Rows between points become bands:
 # 0..3 lower body, 3..4 the window band, 4..5 the cream strip above the windows, 5.. the roof.
@@ -111,11 +113,13 @@ def nose(r, yj, f):
         bez = []
         for k in range(49):                                              # a rounded rectangle (superellipse) traced on the surface
             u = k / 48 * 2 * math.pi; cu, su = math.cos(u), math.sin(u)
-            pw = 0.25 if su < 0 else 0.6                                     # square-ish bottom corners, round top corners
+            pw = 0.25 if su < 0 else 0.45                                    # square-ish bottom corners, round top corners
             th = tm + a * math.copysign(abs(cu) ** pw, cu); z = zm + b * math.copysign(abs(su) ** pw, su)
+            z -= 0.14 * max(0.0, su) * abs(math.cos(th)) ** 1.5                 # the tops arch down toward the outer corners
             bez.append(nose_point(xat(z) + 0.03, z, th, yj, f))
-        tube('bezel', bez, 0.055, 'upper_pale', r)
-    tube('centre_post', [nose_point(xat(z) + 0.03, z, math.pi / 2, yj, f) for z in (ZB + 0.02, (ZB + ZW) / 2, ZW - 0.02)], 0.06, 'upper_pale', r)
+        tube('bezel', bez, 0.055, 'bezel_t', r, rough=0.4)
+    for dx in (-0.05, 0.0, 0.05):                                    # a wide brass centre post
+        tube('centre_post', [nose_point(xat(z) + 0.03, z, math.pi / 2 + dx, yj, f) for z in (ZB + 0.02, (ZB + ZW) / 2, ZW + 0.02)], 0.05, 'bezel_t', r, rough=0.4)
     for th in (math.radians(50), math.radians(130)):                   # wipers
         p = nose_point(xat(za + 0.05) + 0.05, za + 0.05, th, yj, f); q = nose_point(xat(za + 0.45) + 0.05, za + 0.45, th + 0.18 * (1 if th < 1.57 else -1), yj, f)
         tube('wiper', [p, q], 0.012, 'iron', r)
@@ -123,6 +127,7 @@ def nose(r, yj, f):
     tube('brow', [nose_point(xat(ZW + 0.1) + 0.07, ZW + 0.1, th, yj, f) for th in ths[4:-4]], 0.06, 'roof_t', r)
     hx, hy, hz = nose_point(xat(ZW + 0.2), ZW + 0.2, math.pi / 2, yj, f)
     cyl('head_body', 0.19, 0.17, 0.26, (hx, hy - f * 0.18, hz + 0.1), (f * -90, 0, 0), 'iron', r, bevel=0.03, verts=24)
+    hood = ball('lamp_hood', 0.24, (hx, hy - f * 0.5, hz + 0.02), (0.85, 2.2, 0.75), 'roof_t', r)                  # a short hood running back over the roof
     cyl('head_rim', 0.17, 0.17, 0.04, (hx, hy + f * 0.07, hz + 0.1), (f * -90, 0, 0), 'brass_t', r, bevel=0.01, verts=24, rough=0.3)
     ball('headlight', 0.14, (hx, hy + f * 0.11, hz + 0.1), (1, 0.4, 1), 'lamp_t', r, emit=6.0 if f < 0 else 0.6)
     # the lower front: a vertical name plate on the centre, a small amber lamp on each side
@@ -136,14 +141,15 @@ def nose(r, yj, f):
         n = Vector((sx * WEDGE, f * xat(1.6), 0)).normalized()
         x, y, z = nose_point(xat(1.6) + 0.03, 1.6, th, yj, f)
         lb = cyl('lamp_body', 0.1, 0.09, 0.08, (x, y, z), (0, 0, 0), 'silver', r, bevel=0.02, verts=16, rough=0.3); lb.rotation_euler = n.to_track_quat('Z', 'Y').to_euler()
-        ball('red_lamp', 0.065, (x + n.x * 0.08, y + n.y * 0.08, z), (1, 1, 1), 'lamp_red', r, emit=2.0)
+        ball('lamp_dome', 0.085, (x + n.x * 0.06, y + n.y * 0.06, z), (1, 1, 1), 'silver', r, rough=0.25)
+        ball('lamp_eye', 0.03, (x + n.x * 0.15, y + n.y * 0.15, z), (1, 1, 1), 'lamp_t', r, emit=2.0)
     # the skirt: big round buffers and a coupler
     bx, by, bz = nose_point(xat(0.6), 0.6, math.pi / 2, yj, f)
     for sx in (-1, 1):
         n = Vector((sx * WEDGE, f * xat(0.6), 0)).normalized()
         x, y, z = nose_point(xat(0.62), 0.62, math.radians(62 if sx > 0 else 118), yj, f)
-        st = cyl('buffer_stem', 0.07, 0.07, 0.2, (x, y, 0.5), (0, 0, 0), 'iron', r, bevel=0.01, verts=12); st.rotation_euler = n.to_track_quat('Z', 'Y').to_euler()
-        ball('buffer', 0.17, (x + n.x * 0.22, y + n.y * 0.22, 0.5), (1, 1, 1), 'iron', r, rough=0.4)
+        st = cyl('buffer_stem', 0.07, 0.07, 0.3, (x, y, 0.5), (0, 0, 0), 'iron', r, bevel=0.01, verts=12); st.rotation_euler = n.to_track_quat('Z', 'Y').to_euler()
+        cyl('buffer', 0.17, 0.17, 0.07, (x + n.x * 0.3, y + n.y * 0.3, 0.5), (f * -90, 0, 0), 'silver', r, bevel=0.03, verts=20, rough=0.3)
     box('coupler', (0.32, 0.45, 0.2), (0, by + f * 0.15, 0.32), color='iron', parent=r, bevel=0.05)
 
 def car(r, y0, flip):
@@ -167,7 +173,12 @@ def car(r, y0, flip):
         x0, x1 = side * HALF[3][0], side * HALF[4][0]
         for i in range(n):                                             # wood frames, a glazing bar and lower-sash glass
             cy = w0 + (i + 0.5) * step
-            for z, x in ((ZB + 0.02, x0), (ZW - 0.02, x1)): box('win_rail', (0.07, ww + 0.02, 0.04), (x * 0.985, cy, z - 0.02), color='trim', parent=r, bevel=0.01)
+            fr = []                                                       # a thin dark frame with rounded corners
+            for k in range(33):
+                u = k / 32 * 2 * math.pi; cu, su = math.cos(u), math.sin(u)
+                yy = cy + (ww / 2 - 0.02) * math.copysign(abs(cu) ** 0.3, cu); zz = (ZB + ZW) / 2 + ((ZW - ZB) / 2 - 0.02) * math.copysign(abs(su) ** 0.3, su)
+                fr.append((side * (xat(zz) + 0.01), yy, zz))
+            tube('win_frame', fr, 0.022, 'trim', r)
             box('glass', (0.015, ww, ZW - ZB - 0.04), ((x0 + x1) / 2 * 0.975, cy, ZB + 0.02), (0, side * 4.5, 0), 'glass_t', r, bevel=0, rough=0.1)
         for dy in doors:                                               # doors: cream panel, window, kick plate, step, grab handles
             xd = side * (HALF[2][0] + 0.015)
@@ -179,7 +190,7 @@ def car(r, y0, flip):
         # vertical slats along the lower body: a corrugated panel, every other strip standing proud
         for a, b in ((ya + 0.05, doors[0] - 0.5), (doors[0] + 0.5, doors[1] - 0.5), (doors[1] + 0.5, yb - 0.05)):
             ys = [a + k * 0.06 for k in range(int((b - a) / 0.06) + 1)]
-            cols = [[(side * (x + 0.012 + (0.03 if (k // 2) % 2 else 0)), y, z) for k, y in enumerate(ys)] for x, z in HALF[1:4]]
+            cols = [[(side * (x + 0.012 + (0.0 if k % 5 == 0 else 0.025)), y, z) for k, y in enumerate(ys)] for x, z in HALF[1:4]]      # wide boards, narrow grooves
             grid('slats', cols, 'lower', r, flat=True)
         tube('drip_rail', [(side * 1.285, ya, 2.9), (side * 1.285, yb, 2.9)], 0.02, 'roof_box', r)
         tube('belt', [(side * (xat(ZB - 0.03) + 0.045), ya, ZB - 0.03), (side * (xat(ZB - 0.03) + 0.045), yb, ZB - 0.03)], 0.03, 'silver', r, rough=0.3)
@@ -187,10 +198,7 @@ def car(r, y0, flip):
     nose(r, yj, f)
     # ---------- roof: ventilators with lids, a horn ----------
     # roof: one long low raised panel in the middle, a round mushroom ventilator toward each end
-    box('roof_panel', (1.0, 5.0, 0.12), (0, yc, 3.27), color='roof_box', parent=r, bevel=0.05)
-    for dy in (-4.6, 4.6):
-        cyl('vent_stem', 0.16, 0.16, 0.12, (0, yc + dy, 3.26), color='roof_box', parent=r, bevel=0.02, verts=20)
-        ball('vent_cap', 0.24, (0, yc + dy, 3.38), (1, 1, 0.4), 'roof_t', r)
+    box('roof_panel', (1.35, 4.6, 0.16), (0, yc + 0.6, 3.24), color='roof_box', parent=r, bevel=0.07, taper=0.88)   # one big raised panel
     cyl('horn', 0.05, 0.1, 0.32, (0.55, yj - f * 0.6, 3.3), (f * -90, 0, 0), 'brass_t', r, bevel=0.01, rough=0.3)
     # ---------- the coupling end: a wall in the shape of the cross-section, with an arched doorway cut through ----------
     def resample(pts, n):
@@ -212,7 +220,8 @@ def car(r, y0, flip):
         box('plank', (2.5, 0.155, 0.04), (0, ya + 0.3 + i * 0.16, zf - 0.04), color='plank' if (i * 7) % 3 else 'plank_dark', parent=r, bevel=0.004)
     for side in (-1, 1):
         xi = side * 1.31
-        box('wainscot', (0.03, yb - ya - 0.3, ZB - zf), (xi, yc, zf), color='wain', parent=r, bevel=0)
+        ps = [ya + 0.15 + k * 0.05 for k in range(int((yb - ya - 0.3) / 0.05))]
+        grid('wainscot', [[(side * (1.31 - (0.0 if k % 3 == 0 else 0.008)), y, z) for k, y in enumerate(ps)] for z in (zf, ZB)], 'wain', r, flat=True)   # vertical planks
         for z in (zf + 0.02, ZB - 0.06): box('wain_rail', (0.05, yb - ya - 0.3, 0.05), (xi - side * 0.01, yc, z), color='wain_dark', parent=r, bevel=0.01)
         box('sill_in', (0.12, yb - ya - 0.3, 0.05), (xi - side * 0.04, yc, ZB - 0.02), color='wain_dark', parent=r, bevel=0.01)
         a, b = doors[0] + 0.6, doors[1] - 0.6                          # a long bench between the doors
@@ -227,10 +236,10 @@ def car(r, y0, flip):
             tube('end_rail', [(side * 0.68, e, 1.65), (side * 1.3, e, 1.65)], 0.018, 'pole', r)
         for i in range(int((yb - ya - 1) / 1.15) + 1):                 # overhead luggage rack: brackets and three rods
             by = ya + 0.6 + i * 1.15
-            tube('rack_bracket', [(side * 1.25, by, 2.74), (side * 1.02, by, 2.82), (side * 0.95, by, 2.84)], 0.016, 'rack', r)
+            tube('rack_bracket', [(side * 1.26, by, 2.62), (side * 1.2, by, 2.76), (side * 1.06, by, 2.84), (side * 0.9, by, 2.86)], 0.018, 'bezel_t', r, rough=0.4)   # swan-neck bracket
             tube('rack_stay', [(side * 1.22, by, 2.95), (side * 1.02, by, 2.83)], 0.012, 'rack', r)
-        for x in (0.95, 1.05, 1.15):
-            tube('rack_rod', [(side * x, ya + 0.5, 2.84 - (x - 0.95) * 0.3), (side * x, yb - 0.5, 2.84 - (x - 0.95) * 0.3)], 0.012, 'rack', r)
+        for x in (0.92, 1.01, 1.1, 1.19):
+            box('rack_slat', (0.07, yb - ya - 1.0, 0.025), (side * x, (ya + yb) / 2, 2.86), color='wain', parent=r, bevel=0.005)      # wooden shelf slats
         tube('strap_rail', [(side * 0.62, ya + 0.6, 3.02), (side * 0.62, yb - 0.6, 3.02)], 0.02, 'pole', r)
         for i in range(14):                                            # ring straps
             sy = ya + 1.0 + i * (yb - ya - 2.0) / 13
@@ -239,6 +248,10 @@ def car(r, y0, flip):
         for a2, b2 in solids[1:-1]: box('pillar_in', (0.03, b2 - a2 + 0.04, ZW - ZB), (side * 1.3, (a2 + b2) / 2, ZB), color='wain', parent=r, bevel=0.005)
         for i in range(n): box('win_in', (0.03, step - 0.12, 0.05), (side * 1.3, w0 + (i + 0.5) * step, ZW - 0.02), color='wain', parent=r, bevel=0.005)
     loft('ceiling', [(x * 0.93, z - 0.1) for x, z in across(5, 10)], ya + 0.1, yb - 0.1, 'ceil', r)      # starts above the windows
+    for k in range(int((yb - ya) / 1.0)):                               # ribs across the arched ceiling
+        y = ya + 0.5 + k * 1.0
+        tube('ceiling_rib', [(x * 0.92, y, z - 0.105) for x, z in across(7, 10)], 0.012, 'ceil', r)      # thin ribs over the crown only
+    for x in (-0.3, 0.3): tube('ceiling_rail', [(x, ya + 0.6, 3.17), (x, yb - 0.6, 3.17)], 0.015, 'pole', r)
     for i in range(4):                                                 # round lamps with brass rims, vent grilles
         cy = ya + 2.0 + i * (yb - ya - 4) / 3
         cyl('lamp_rim', 0.2, 0.2, 0.03, (0, cy, 3.12), color='brass_t', parent=r, bevel=0.01, verts=24, rough=0.3)
@@ -273,5 +286,5 @@ def build():
     box('passage_floor', (1.38, GAP + 0.2, 0.04), (0, L + GAP / 2, 0.81), color='plank', parent=r, bevel=0.005)
     for m in bpy.data.materials:                                       # all glass: clear, so the cabin shows through
         if m.name.startswith('c_31414f') and m.node_tree:
-            b = m.node_tree.nodes['Principled BSDF']; b.inputs['Transmission Weight'].default_value = 0.9; b.inputs['Roughness'].default_value = 0.05
+            b = m.node_tree.nodes['Principled BSDF']; b.inputs['Transmission Weight'].default_value = 1.0; b.inputs['Roughness'].default_value = 0.0; b.inputs['Alpha'].default_value = 0.25   # nearly clear
     return r

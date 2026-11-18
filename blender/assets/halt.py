@@ -8,7 +8,7 @@ from lib import *
 
 VIEW = dict(angle=-28, lift=0.5, res=(1300, 820), samples=24)
 LX, LY, TOP, BASE = 11.0, 4.6, 0.95, -1.2          # length, depth, top height, how far the block reaches down
-COLOURS = dict(stone_a=0xC9B79A, stone_b=0xB7A483, stone_c=0xD6C7AB, stone_d=0xB9B7A2, moss_a=0x6F9A4C, moss_b=0x8DB463, tile_d=0xC2C1A8, tile_e=0xE9E0C9, joint=0x8E7F68, tile_a=0xD8CBB0, tile_b=0xCDBF9F, tile_c=0xE2D7BE,
+COLOURS = dict(stone_a=0xC9B79A, stone_b=0xB7A483, stone_c=0xD6C7AB, stone_d=0xB9B7A2, moss_a=0x6F9A4C, moss_b=0x8DB463, tile_d=0xC2C1A8, tile_e=0xE9E0C9, joint=0x6E6250, tile_a=0xD8CBB0, tile_b=0xCDBF9F, tile_c=0xE2D7BE,
                coping=0xEFE6D2, rail_w=0xF4F1EA, timber=0x8A5A3C, timber_dark=0x5C3B28, roof=0xB8573E, roof_dark=0x8E3F2C,
                bench_w=0xA57A4E, seat_wood=0xA0623A, seat_frame=0x2F3036, vend_body=0xE0602F, vend_dark=0x5A2A1E, vend_glow=0xFFE6B0, button_lit=0xFFF4D8, lamp_w=0xFFE2A0, board=0xF3EAD2, iron_d=0x2E2D33,
                stripe_y=0xF2C230, stripe_k=0x26262A, red_l=0xE0453A, plank=0xA07650, plank_d=0x7E5A3A)
@@ -53,6 +53,70 @@ def stone_face(r, rnd, along, fixed, axis):
 def moss_tuft(r, rnd, x, y, z, s=1.0):
     """A small cushion of moss tucked into a joint."""
     lump('moss', 0.05 * s, (x, y, z), (rnd.uniform(1.2, 2.2), rnd.uniform(1.0, 1.5), 0.6), rnd.choice(('moss_a', 'moss_b')), r, strength=0.35, grain=0.5)
+
+def rock_pile(r, rnd):
+    """Rough stones piled round the block: big boulders at the foot, a jumble of sizes above, greener by the water, and
+    a rim of flatter stones along the top edge. The pile leans in as it rises."""
+    per = 2 * (LX + LY)
+    def place(t, d, z, s_, sc, flat, moss, detail=2):
+        t %= per
+        if t < LX: x, y, nx, ny = -LX / 2 + t, -LY / 2, 0, -1
+        elif t < LX + LY: x, y, nx, ny = LX / 2, -LY / 2 + t - LX, 1, 0
+        elif t < 2 * LX + LY: x, y, nx, ny = LX / 2 - (t - LX - LY), LY / 2, 0, 1
+        else: x, y, nx, ny = -LX / 2, LY / 2 - (t - 2 * LX - LY), -1, 0
+        if LX / 2 - 0.1 < x and -0.6 < y < 1.1 and z > BASE + 0.5: return       # leave room for the steps
+        rock('rock', s_, (x + nx * d, y + ny * d, z), sc, (rnd.uniform(-8, 8), rnd.uniform(-8, 8), math.degrees(math.atan2(ny, nx)) + 90 + rnd.uniform(-25, 25)),
+             rnd.choice(('stone_a', 'stone_b', 'stone_c', 'stone_d')), r, moss=moss, flat=flat, detail=detail)
+    t = 0.0                                                                    # boulders along the foot
+    while t < per:
+        s_ = rnd.uniform(0.3, 0.5); place(t, 0.32 + rnd.uniform(-0.05, 0.1), BASE + s_ * 0.3, s_, (rnd.uniform(1.0, 1.5), rnd.uniform(0.8, 1.1), rnd.uniform(0.7, 1.0)), 0.7, 0.7)
+        t += s_ * rnd.uniform(1.4, 1.9)
+    z = BASE + 0.45; row = 0                                                  # rough courses of mixed stones up the face
+    while z < TOP - 0.22:
+        t = rnd.uniform(0, 0.3)
+        while t < per:
+            s_ = rnd.uniform(0.11, 0.24); zz = z + rnd.uniform(-0.05, 0.05)
+            place(t, (TOP - zz) * 0.14 + rnd.uniform(-0.02, 0.03), zz, s_, (rnd.uniform(1.0, 1.8), rnd.uniform(0.7, 1.0), rnd.uniform(0.6, 0.95)),
+                  rnd.uniform(0.5, 0.8), 0.5 if zz < BASE + 0.7 else (0.2 if zz < BASE + 1.0 else 0.0), detail=1)
+            t += s_ * rnd.uniform(1.5, 2.2)
+        z += rnd.uniform(0.15, 0.2); row += 1
+    for _ in range(int(per * 3)):                                               # odd stones in front, so the courses don't show
+        zz = rnd.uniform(BASE + 0.4, TOP - 0.3); s_ = rnd.uniform(0.1, 0.2)
+        place(rnd.uniform(0, per), (TOP - zz) * 0.14 + 0.05, zz, s_, (rnd.uniform(1.0, 1.6), rnd.uniform(0.7, 1.0), rnd.uniform(0.6, 0.9)),
+              0.7, 0.4 if zz < BASE + 0.7 else 0.0, detail=1)
+    t = 0.0                                                                    # a rim of flatter stones along the top edge
+    while t < per:
+        s_ = rnd.uniform(0.17, 0.26); place(t, 0.02 + rnd.uniform(0, 0.05), TOP - 0.1 - s_ * 0.1, s_, (rnd.uniform(1.3, 1.8), rnd.uniform(0.8, 1.0), 0.6), 0.35, 0.0)
+        t += s_ * rnd.uniform(1.9, 2.4)
+
+def crazy_paving(r, rnd):
+    """The top: irregular flat stones fitted together (cells of a jittered grid), with thin joints and a little moss."""
+    S = 0.46; pts = []
+    x0, x1, y0, y1 = -LX / 2 + 0.02, LX / 2 - 0.02, -LY / 2 + 0.02, LY / 2 - 0.02
+    nx, ny = int((x1 - x0) / S), int((y1 - y0) / S)
+    for i in range(nx + 1):
+        for j in range(ny + 1):
+            pts.append((x0 + (i + rnd.uniform(0.15, 0.85)) * (x1 - x0) / (nx + 1), y0 + (j + rnd.uniform(0.15, 0.85)) * (y1 - y0) / (ny + 1)))
+    def clip(poly, px, py, qx, qy):                                            # keep the side of the bisector nearer p
+        mx, my, dx, dy = (px + qx) / 2, (py + qy) / 2, qx - px, qy - py
+        f = lambda v: (v[0] - mx) * dx + (v[1] - my) * dy
+        out = []
+        for i in range(len(poly)):
+            a, b = poly[i], poly[(i + 1) % len(poly)]; fa, fb = f(a), f(b)
+            if fa <= 0: out.append(a)
+            if (fa <= 0) != (fb <= 0):
+                t = fa / (fa - fb); out.append((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
+        return out
+    for (px, py) in pts:
+        poly = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+        for (qx, qy) in pts:
+            if (qx, qy) != (px, py) and abs(qx - px) < 1.4 and abs(qy - py) < 1.4: poly = clip(poly, px, py, qx, qy)
+        if len(poly) < 3: continue
+        cx = sum(p[0] for p in poly) / len(poly); cy = sum(p[1] for p in poly) / len(poly)
+        poly = [(cx + (x - cx) - 0.014 * ((x - cx) / max(1e-6, math.hypot(x - cx, y - cy))), cy + (y - cy) - 0.014 * ((y - cy) / max(1e-6, math.hypot(x - cx, y - cy)))) for (x, y) in poly]
+        flagstone('flag', poly, 0.05, TOP - 0.05 + rnd.uniform(-0.006, 0.006), rnd.choice(('tile_a', 'tile_b', 'tile_c', 'tile_d', 'tile_e')), r,
+                  tilt=(rnd.uniform(-0.02, 0.02), rnd.uniform(-0.02, 0.02)))
+        if rnd.random() < 0.07: moss_tuft(r, rnd, poly[0][0], poly[0][1], TOP + 0.002, rnd.uniform(0.6, 1.0))
 
 def fence(r, p0, p1):
     """A white railing from p0 to p1 (on the platform top): posts with caps, top and bottom rails, close balusters."""
@@ -112,7 +176,7 @@ def trash_can(r, x, y):
 def lamp_post(r, x, y):
     z = TOP
     cyl('lamp_post', 0.06, 0.05, 2.9, (x, y, z), color='iron_d', parent=r, bevel=0.008, verts=12)
-    box('lamp_foot', (0.3, 0.3, 0.12), (x, y, z), color='coping', parent=r, bevel=0.03)
+    rock('lamp_foot', 0.2, (x, y, z + 0.02), (1.0, 1.0, 0.5), (0, 0, 20), 'stone_b', r, flat=0.5)
     tube('lamp_arm', [(x, y, z + 2.8), (x, y - 0.25, z + 3.0), (x, y - 0.5, z + 2.9)], 0.025, 'iron_d', r)
     cyl('lamp_shade', 0.22, 0.06, 0.16, (x, y - 0.5, z + 2.68), color='iron_d', parent=r, bevel=0.01, verts=16)
     ball('lamp_bulb', 0.09, (x, y - 0.5, z + 2.66), color='lamp_w', parent=r, emit=5.0)
@@ -165,7 +229,7 @@ def crossing_signal(r, x, y):
     """A railway-crossing signal: a yellow-and-black striped mast, a crossbuck, two red lamps on a bar, a small
     direction box and a bell on top."""
     z = TOP; H = 3.4
-    box('signal_foot', (0.42, 0.42, 0.18), (x, y, z), color='coping', parent=r, bevel=0.04)
+    rock('signal_foot', 0.28, (x, y, z + 0.03), (1.0, 0.95, 0.5), (0, 0, 35), 'stone_b', r, flat=0.55)
     n = 12
     for i in range(n):
         cyl('mast', 0.075, 0.075, H / n, (x, y, z + 0.18 + i * (H - 0.18) / n), color='stripe_y' if i % 2 == 0 else 'stripe_k', parent=r, bevel=0.002, verts=14)
@@ -194,39 +258,10 @@ def crossing_signal(r, x, y):
 def build():
     PAL.update(COLOURS)
     rnd = random.Random(9); r = root('halt')
-    # the block: a core, cut-stone faces on all four sides, a coping round the top edge
-    box('core', (LX - 0.12, LY - 0.12, TOP - BASE), (0, 0, BASE), color='joint', parent=r, bevel=0.02)
-    stone_face(r, rnd, LX, -LY / 2, 'x'); stone_face(r, rnd, LX, LY / 2, 'x')
-    stone_face(r, rnd, LY, -LX / 2, 'y'); stone_face(r, rnd, LY, LX / 2, 'y')
-    for y in (-LY / 2, LY / 2): box('coping', (LX + 0.14, 0.32, 0.12), (0, y, TOP - 0.12), color='coping', parent=r, bevel=0.03)
-    for x in (-LX / 2, LX / 2): box('coping', (0.32, LY + 0.14, 0.12), (x, 0, TOP - 0.12), color='coping', parent=r, bevel=0.03)
-    S = 0.5                                                                    # the paved top: stone tiles, each laid a
-    joints = []                                                                # little high or low and askew; a few cracked
-    for i in range(int(LX / S)):
-        for j in range(int(LY / S) + 1):
-            yy = -LY / 2 + S / 2 + j * S
-            if yy > LY / 2 - 0.1: continue
-            sz = (S - 0.03, min(S, LY / 2 - yy + S / 2 - 0.05) - 0.03, 0.045)
-            xx = -LX / 2 + S / 2 + i * S
-            kw = dict(color=rnd.choice(('tile_a', 'tile_b', 'tile_c', 'tile_d', 'tile_e')), parent=r, bevel=0.01, jitter=0.003, along='top', band=0.12, rough=1.6)
-            lift = lambda: TOP - 0.035 + rnd.uniform(-0.009, 0.009)
-            tilt = lambda: (rnd.uniform(-1.8, 1.8), rnd.uniform(-1.8, 1.8), rnd.uniform(-1.5, 1.5))
-            if rnd.random() < 0.18:                                            # cracked in two, the halves settled apart
-                t = rnd.uniform(0, math.pi); n = (math.cos(t), math.sin(t), 0); k = (rnd.uniform(-0.2, 0.2), rnd.uniform(-0.2, 0.2), 0)
-                for sgn in (1, -1):
-                    co = (k[0] - sgn * n[0] * 0.012, k[1] - sgn * n[1] * 0.012, 0)
-                    painted_box('tile', sz, (xx, yy, lift()), tilt(), clip=(co, tuple(sgn * c for c in n)), **kw)
-            else:
-                painted_box('tile', sz, (xx, yy, lift()), tilt(), **kw)
-            if j > 0 and rnd.random() < 0.06: joints.append((xx + rnd.uniform(-0.2, 0.2), yy - S / 2))
-            if i > 0 and rnd.random() < 0.06: joints.append((xx - S / 2, yy + rnd.uniform(-0.2, 0.2)))
-    for (x, y) in joints:                                                      # a little moss in a few joints
-        moss_tuft(r, rnd, x, y, TOP + 0.004, rnd.uniform(0.7, 1.1))
-    for (x, y, zz) in ((-LX / 2 - 0.04, rnd.uniform(-1.8, 1.8), BASE + 0.3), (rnd.uniform(-5, 5), -LY / 2 - 0.04, BASE + 0.32),
-                       (rnd.uniform(-5, 5), -LY / 2 - 0.04, BASE + 0.62), (rnd.uniform(-5, 5), LY / 2 + 0.04, BASE + 0.3),
-                       (LX / 2 + 0.04, rnd.uniform(-1.8, 1.8), BASE + 0.3), (rnd.uniform(-5, 5), -LY / 2 - 0.04, BASE + 0.3)):
-        moss_tuft(r, rnd, x + (0.03 if x > 0 else -0.03) * (abs(x) > 5), y + (0.03 if y > 0 else -0.03) * (abs(y) > 2), zz, 1.4)   # a few tufts low on the wall
-    box('edge_line', (LX - 0.4, 0.12, 0.012), (0, -LY / 2 + 0.45, TOP + 0.01), color=0xE7C14A, parent=r, bevel=0.003)
+    # the block: a pile of rough stones, wider at the foot, round a core; its top paved with fitted flat stones
+    box('core', (LX - 0.3, LY - 0.3, TOP - BASE - 0.04), (0, 0, BASE), color='joint', parent=r, bevel=0.02)
+    rock_pile(r, rnd)
+    crazy_paving(r, rnd)
     # the fence: along the back and the left end
     fence(r, (-LX / 2 + 0.15, LY / 2 - 0.15), (LX / 2 - 0.15, LY / 2 - 0.15))
     fence(r, (-LX / 2 + 0.15, -LY / 2 + 0.75), (-LX / 2 + 0.15, LY / 2 - 0.15))

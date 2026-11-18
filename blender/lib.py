@@ -296,6 +296,62 @@ def painted_box(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='stone', parent=
     o.data.materials[0] = mat_vc(color)
     return o
 
+def _rgb(h): return Vector(((h >> 16 & 255) / 255, (h >> 8 & 255) / 255, (h & 255) / 255))
+
+def rock(name, r, loc=(0, 0, 0), scale=(1, 1, 1), rot=(0, 0, 0), color='stone', parent=None, moss=0.0, flat=0.6, paint=None, detail=2, **mk):
+    """A rough field stone: a rounded lump with a few flat facets knocked off it, lit from above with a darker,
+    stained underside (and greener the lower it sits when `moss` is set). Its top is cut flat above `flat` (0..1)."""
+    P = paint or dict(light=0xFFFDF4, mid=0xE2DED2, low=0xA8A290)
+    C = {k: _rgb(h) for k, h in P.items()}; mossc = Vector((0.62, 0.74, 0.46))
+    bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=detail, radius=1.0)
+    R = random.uniform
+    cuts = [(Vector((R(-1, 1), R(-1, 1), R(-0.6, 1))).normalized(), R(0.62, 0.85)) for _ in range(random.randint(3, 5))]
+    col = bm.verts.layers.color.new('Col')
+    for v in bm.verts:
+        p = v.co * (1 + R(-0.06, 0.06))
+        for (n, d) in cuts:                                                   # knock flat facets off it
+            k = p.dot(n)
+            if k > d: p = p - n * (k - d)
+        if p.z > flat: p.z = flat                                             # a flat top to stand things on
+        t = max(0.0, min(1.0, (p.z + 1) / 2))
+        c = C['low'].lerp(C['mid'], min(1.0, t * 1.6)).lerp(C['light'], max(0.0, (t - 0.6) / 0.4))
+        if moss: c = c.lerp(mossc, moss * max(0.0, 1 - t * 1.8))
+        v[col] = (c.x, c.y, c.z, 1.0)
+        v.co = Vector((p.x * r * scale[0], p.y * r * scale[1], p.z * r * scale[2]))
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    o = _finish(name, me, color, loc, rot, parent, 0, **mk)
+    o.data.materials[0] = mat_vc(color)
+    return o
+
+def flagstone(name, poly, thick, z=0.0, color='stone', parent=None, tilt=(0, 0), paint=None, **mk):
+    """One irregular flat stone of a crazy-paved floor: `poly` is its outline (x, y) seen from above. Its top swells a
+    little in the middle and rolls off at the edges, with a light rim like a painted tile."""
+    P = paint or dict(light=0xFFFDF6, mid=0xE8E5DC, low=0xB8B2A0)
+    C = {k: _rgb(h) for k, h in P.items()}
+    cx = sum(p[0] for p in poly) / len(poly); cy = sum(p[1] for p in poly) / len(poly)
+    R = random.uniform; bump = R(0.004, 0.012)
+    bm = bmesh.new(); col = bm.verts.layers.color.new('Col')
+    def ring(f, h, c):
+        out = []
+        for (x, y) in poly:
+            px, py = cx + (x - cx) * f, cy + (y - cy) * f
+            v = bm.verts.new((px, py, h + tilt[0] * (px - cx) + tilt[1] * (py - cy))); v[col] = (c.x, c.y, c.z, 1.0); out.append(v)
+        return out
+    base = ring(1.0, 0.0, C['low'])
+    edge = ring(1.0, thick - 0.012, C['light'])
+    lip = ring(0.9, thick - 0.002, C['light'].lerp(C['mid'], 0.4))
+    inner = ring(0.55, thick + bump * 0.7, C['mid'])
+    mid = bm.verts.new((cx, cy, thick + bump)); mid[col] = (C['mid'].x, C['mid'].y, C['mid'].z, 1.0)
+    n = len(poly)
+    for a, b in ((base, edge), (edge, lip), (lip, inner)):
+        for i in range(n): bm.faces.new((a[i], a[(i + 1) % n], b[(i + 1) % n], b[i]))
+    for i in range(n): bm.faces.new((inner[i], inner[(i + 1) % n], mid))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    o = _finish(name, me, color, (0, 0, z), (0, 0, 0), parent, 0, **mk)
+    o.data.materials[0] = mat_vc(color)
+    return o
+
 def gable(name, span, height, thick, loc=(0, 0, 0), color='cream', parent=None, **mk):
     """A triangular wall end (under a pitched roof). `span` runs along Y, the point is up."""
     bm = bmesh.new()

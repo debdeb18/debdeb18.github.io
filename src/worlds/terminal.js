@@ -1,7 +1,7 @@
 // The terminal: a little country station on a railway that runs just under the sea.
 // The station itself is built in Blender (models/terminal); this file adds what moves: water, sky, clouds, the train, the cutscene.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { Reflector } from 'three/addons/objects/Reflector.js';
 import { makeWorld, sky, stars, softDot, makeCrack, sign, uPlayer } from '../kit.js';
 import { blob } from '../nature.js';
 import { loadLayout, loadModel, gradient } from '../models.js';
@@ -75,7 +75,7 @@ function makeWater(U) {
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = 'varying vec3 vW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime;\nuniform vec3 uShallow, uDeep, uSky, uTrain, uPlayer;\n' + DEPTH_GLSL + '\n' + sh.fragmentShader
+    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime;\nuniform vec3 uShallow, uDeep, uSky, uTrain, uPlayer;\nuniform sampler2D uRefl;\nuniform mat4 uReflMat;\n' + DEPTH_GLSL + '\n' + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
         vec2 bp = vec2(vW.x, -vW.z);
         float dep = seaDepth(bp);
@@ -101,10 +101,16 @@ function makeWater(U) {
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         vec2 q = vec2(vW.x, -vW.z) * 0.9;
         float h1 = sin(q.x * 1.7 + uTime * 1.1 + sin(q.y * 1.3 + uTime * 0.4) * 2.0), h2 = sin(q.y * 2.3 - uTime * 0.9 + q.x * 0.5);
-        vec3 tilt = vec3(h1 * 0.07 + h2 * 0.04, 0.0, h2 * 0.07 - h1 * 0.03);
+        vec3 tilt = vec3(h1 * 0.022 + h2 * 0.012, 0.0, h2 * 0.022 - h1 * 0.01);         // a calm, glassy sea
         normal = normalize(normal + (viewMatrix * vec4(tilt, 0.0)).xyz);`)
-      .replace('#include <opaque_fragment>', `float fres = pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 4.0);
-        outgoingLight = mix(outgoingLight, uSky, fres * 0.35);
+      .replace('#include <opaque_fragment>', `float fres = pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 3.0);
+        // the mirror: the scene rendered upside down, nudged by the ripples. Shallows stay see-through; deep water is a mirror.
+        vec4 rp = uReflMat * vec4(vW, 1.0);
+        vec2 ruv = rp.xy / rp.w + tilt.xz * 0.35;
+        vec3 refl = texture2D(uRefl, ruv).rgb;
+        float reflK = mix(0.28, 0.82, murk) * mix(0.65, 1.0, fres) * (1.0 - foam);
+        outgoingLight = mix(outgoingLight, refl, reflK);
+        diffuseColor.a = max(diffuseColor.a, reflK);
         #include <opaque_fragment>`);
   };
   return m;
@@ -130,10 +136,30 @@ export function buildTerminal() {
 
   // ---------- water and sea floor ----------
   const U = { uTime: { value: 0 }, uIslets: { value: Array.from({ length: 16 }, () => new THREE.Vector3(1e4, 1e4, 0)) },
-    uShallow: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uSky: { value: new THREE.Color() }, uTrain: { value: new THREE.Vector3(1e4, 0, 25) }, uPlayer };
+    uShallow: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uSky: { value: new THREE.Color() }, uTrain: { value: new THREE.Vector3(1e4, 0, 25) }, uPlayer, uRefl: { value: null }, uReflMat: { value: new THREE.Matrix4() } };
   const water = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), makeWater(U));
   water.position.set(55, 0, 0); water.receiveShadow = true; water.renderOrder = 1; water.userData.noShadow = true;
   s.add(water);
+  // The reflection: three.js's Reflector renders the scene mirrored in the water plane into a texture each frame. It draws
+  // nothing itself; the water samples its texture. Half resolution (a quarter on phones); grass and spray are left out.
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  const rs = (coarse ? 0.35 : 0.5) * Math.min(devicePixelRatio, 2);
+  const mirror = new Reflector(new THREE.PlaneGeometry(900, 900), { textureWidth: Math.round(innerWidth * rs), textureHeight: Math.round(innerHeight * rs), clipBias: 0.003, multisample: 0 });
+  mirror.rotation.x = -Math.PI / 2; mirror.position.set(55, 0.001, 0);
+  mirror.material.colorWrite = false; mirror.material.depthWrite = false; mirror.renderOrder = -1; mirror.userData.noShadow = true;
+  s.add(mirror);
+  const reflMat = mirror.material.uniforms.textureMatrix.value, mirrorInv = new THREE.Matrix4();
+  U.uRefl.value = mirror.getRenderTarget().texture;
+  const hideInMirror = [];                                                          // filled once grass and spray exist
+  const mirrorDraw = mirror.onBeforeRender;
+  mirror.onBeforeRender = (renderer, scene, camera) => {
+    if (camera.isReflectionCamera) return;
+    water.visible = false; for (const o of hideInMirror) o.visible = false;
+    mirrorDraw.call(mirror, renderer, scene, camera);
+    water.visible = true; for (const o of hideInMirror) o.visible = true;
+    mirror.updateMatrixWorld(); mirrorInv.copy(mirror.matrixWorld).invert();
+    U.uReflMat.value.copy(reflMat).multiply(mirrorInv);                            // world position -> reflection texture
+  };
   const floorMat = painted(new THREE.MeshToonMaterial({ color: 0xe6d6a8 }), 'sand');
   const deepFloor = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x14304a }));
   deepFloor.position.set(55, -4.3, 0); deepFloor.userData.noShadow = true; s.add(deepFloor);
@@ -218,7 +244,7 @@ export function buildTerminal() {
   function plantGrass(islets) {
     const perM2 = matchMedia('(pointer: coarse)').matches ? 22 : 55;
     let seed = 3; const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
-    grassField(s, gradient(), (add) => {
+    hideInMirror.push(grassField(s, gradient(), (add) => {
       for (const [x, y, r] of islets) {
         const R = r * 0.86 * 0.96, n = Math.round(Math.PI * R * R * perM2);
         for (let i = 0; i < n; i++) {
@@ -228,7 +254,7 @@ export function buildTerminal() {
           add(bx, 0.08 + 0.2 * r * 0.86 * Math.sqrt(Math.max(0, 1 - (d / (r * 0.86)) ** 2)), -by);
         }
       }
-    }, { max: perM2 > 30 ? 60000 : 24000 });
+    }, { max: perM2 > 30 ? 60000 : 24000 }));
   }
 
   // ---------- a plank ramp from the deck down to the islets ----------
@@ -247,15 +273,6 @@ export function buildTerminal() {
     { size: [0.34, 0.12, 0.11], fg: ['#2f3b52', '#5a6478', '#b0563f'], bg: '#f6eedb', res: 200 });
   name.material = new THREE.MeshToonMaterial({ map: name.material.map });
 
-  // ---------- overhead wires between the utility poles ----------
-  const POLES = [-7, 11, 29, 47, 65, 83], wires = [];
-  for (let i = 0; i < POLES.length - 1; i++) for (const [z, wd] of [[8.66, 2.3], [7.86, 1.8]]) for (const k of [-1, 0, 1]) {
-    const y = -5.9 + k * wd * 0.42, sag = 0.35 + ((i * 7 + k * 3 + z) % 1) * 0.25;
-    wires.push(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(B(POLES[i], y, z), B((POLES[i] + POLES[i + 1]) / 2, y, z - sag * 2), B(POLES[i + 1], y, z)), 24, 0.014, 4));
-  }
-  wires.push(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(B(11, -5.9, 7.2), B(11.5, -1, 5.0), B(12, 3.2, PZ + 3.2)), 24, 0.014, 4));
-  wires.push(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(B(-7, -5.9, 7.2), B(-7.6, -1.5, 5.4), B(-8.2, 2.4, PZ + 4.2)), 24, 0.014, 4));
-  s.add(new THREE.Mesh(mergeGeometries(wires), new THREE.MeshBasicMaterial({ color: 0x3b332d })));
 
   // ---------- far islands with little villages ----------
   for (const [x, y, r, z] of [[190, 100, 80, 0.2], [230, -80, 95, 0.22], [140, 190, 70, 0.18], [150, -180, 70, 0.16]]) {
@@ -301,7 +318,7 @@ export function buildTerminal() {
   const SN = 420, sp = new Float32Array(SN * 3), sv = new Float32Array(SN * 3), life = new Float32Array(SN);
   const sgeo = new THREE.BufferGeometry(); sgeo.setAttribute('position', new THREE.BufferAttribute(sp, 3));
   const spray = new THREE.Points(sgeo, new THREE.PointsMaterial({ size: 0.28, map: softDot(), transparent: true, depthWrite: false, color: 0xffffff, opacity: 0.85 }));
-  spray.frustumCulled = false; spray.renderOrder = 2; s.add(spray);
+  spray.frustumCulled = false; spray.renderOrder = 2; s.add(spray); hideInMirror.push(spray);
   for (let i = 0; i < SN; i++) sp[i * 3 + 1] = -50;
   let emitAcc = 0, spawnI = 0;
 

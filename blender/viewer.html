@@ -1,0 +1,26 @@
+<!doctype html>
+<!-- Look at one Blender model with the website's painted look:  blender/viewer.html?m=../models/halt.glb&cam=x,y,z&at=x,y,z (three.js coordinates) -->
+<html><head><meta charset="utf-8"><title>Asset viewer</title>
+<style>html,body{margin:0;height:100%;background:#cfe3ee}canvas{display:block;width:100%;height:100%}</style>
+<script type="importmap">{ "imports": { "three": "../vendor/three.module.js", "three/addons/": "../vendor/addons/" } }</script>
+</head><body>
+<script type="module">
+import * as THREE from 'three';
+import { loadModel } from '../src/models.js';
+const q = new URLSearchParams(location.search), v = (k, d) => (q.get(k) || d).split(',').map(Number);
+const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xcfe3ee);
+const camera = new THREE.PerspectiveCamera(+(q.get('fov') || 40), innerWidth / innerHeight, 0.05, 500);
+camera.position.set(...v('cam', '6,4,8'));
+scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x9a8a70, 1.1));
+const sun = new THREE.DirectionalLight(0xfff0d8, 2.4); sun.position.set(6, 10, 7); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -10, right: 10, top: 10, bottom: -10 }); sun.shadow.bias = -0.0005; scene.add(sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshToonMaterial({ color: 0xd8cbb0 })); ground.rotation.x = -Math.PI / 2; ground.position.y = -1.3; ground.receiveShadow = true; scene.add(ground);
+const { scene: model } = await loadModel(q.get('m') || '../models/halt.glb'); scene.add(model);
+camera.lookAt(...v('at', '0,1,0'));
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+renderer.setAnimationLoop(() => renderer.render(scene, camera));
+window.ready = true;
+</script></body></html>

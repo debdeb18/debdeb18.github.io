@@ -167,11 +167,44 @@ const PAINTERS = {
     for (let i = 0; i < 1500; i++) { const x = r() * SIZE, y = r() * SIZE, len = 30 + r() * 60; wrap(x, y, len, (X, Y) => stroke(g, X, Y, len, 1.5 + r() * 3, Math.PI / 2 + (r() - 0.5) * 0.06, (r() - 0.5) * 2, r() < 0.5 ? '#cfcfcf' : '#f2f2f2', 0.4)); }
     for (let i = 0; i < 30; i++) { const x = r() * SIZE, y = r() * SIZE; wrap(x, y, 14, (X, Y) => dab(g, X, Y, 3 + r() * 9, 1.5 + r() * 3, r() * 3, '#8c7a66', 0.55)); }
   },
+  // Platform seats, lacquered wood: long strokes along each slat in warm reds and ambers, cool plum in the low tones,
+  // sunlit sheen streaks, paler wood where the varnish has worn through, and the odd dark knot.
+  seatwood(g, r) {
+    const n = fbm(noiseField(r, 2), noiseField(r, 5), noiseField(r, 11));
+    const tones = ['#7a3f30', '#8a4a33', '#9a5637', '#a9633c', '#b77243', '#c4824c'];
+    g.fillStyle = '#a05e39'; g.fillRect(0, 0, SIZE, SIZE);
+    for (let i = 0; i < 90; i++) { const x = r() * SIZE, y = r() * SIZE; wrap(x, y, 110, (X, Y) => dab(g, X, Y, 70 + r() * 60, 18 + r() * 20, (r() - 0.5) * 0.08, pick(tones, n(x, y)), 0.4)); }
+    for (let i = 0; i < 900; i++) {                                             // broad, soft strokes along the grain
+      const x = r() * SIZE, y = r() * SIZE, len = 70 + r() * 160, k = Math.min(0.999, Math.max(0, n(x, y) + (r() - 0.5) * 0.25));
+      wrap(x, y, len, (X, Y) => stroke(g, X, Y, len, 3 + r() * 5, (r() - 0.5) * 0.03, (r() - 0.5) * 6, pick(tones, k), 0.3));
+    }
+    for (let i = 0; i < 70; i++) {                                              // a few calm grain lines, plum rather than black
+      const x = r() * SIZE, y = r() * SIZE, len = 60 + r() * 140;
+      wrap(x, y, len, (X, Y) => stroke(g, X, Y, len, 0.9 + r(), (r() - 0.5) * 0.02, (r() - 0.5) * 6, '#6a3a3a', 0.28));
+    }
+    for (let i = 0; i < 60; i++) {                                              // warm light caught on the varnish
+      const x = r() * SIZE, y = r() * SIZE, len = 40 + r() * 90; if (n(x, y) < 0.5) continue;
+      wrap(x, y, len, (X, Y) => stroke(g, X, Y, len, 2 + r() * 3, (r() - 0.5) * 0.02, (r() - 0.5) * 4, '#dc9c5e', 0.35));
+    }
+    for (let i = 0; i < 12; i++) {                                              // soft worn patches
+      const x = r() * SIZE, y = r() * SIZE; wrap(x, y, 40, (X, Y) => dab(g, X, Y, 18 + r() * 20, 5 + r() * 5, 0, '#cf9a66', 0.25));
+    }
+  },
+  // The seats' iron frame: dark blue-grey paint laid on in short strokes, a cool sheen, chips and a little rust.
+  seatiron(g, r) {
+    const n = fbm(noiseField(r, 2), noiseField(r, 5), noiseField(r, 11));
+    const tones = ['#2a2d37', '#323642', '#3b404d', '#454b59'];
+    g.fillStyle = '#343844'; g.fillRect(0, 0, SIZE, SIZE);
+    for (let i = 0; i < 700; i++) { const x = r() * SIZE, y = r() * SIZE, len = 40 + r() * 90; wrap(x, y, len, (X, Y) => stroke(g, X, Y, len, 4 + r() * 6, (r() < 0.5 ? 0 : Math.PI / 2) + (r() - 0.5) * 0.1, (r() - 0.5) * 6, pick(tones, n(x, y) * 0.85 + r() * 0.15), 0.35)); }
+    for (let i = 0; i < 40; i++) { const x = r() * SIZE, y = r() * SIZE, len = 30 + r() * 60; wrap(x, y, len, (X, Y) => stroke(g, X, Y, len, 2 + r() * 2, (r() - 0.5) * 0.1, 0, '#6a7790', 0.25)); }
+    for (let i = 0; i < 14; i++) { const x = r() * SIZE, y = r() * SIZE; wrap(x, y, 14, (X, Y) => dab(g, X, Y, 4 + r() * 6, 2 + r() * 3, r() * 3, '#8a5236', 0.35)); }
+  },
 };
 // How each kind is applied: `replace` uses the painted colours as they are; `tint` multiplies them with the part's own colour.
 const KINDS = { grass: { scale: 1 / 3.2, mode: 'replace' }, sand: { scale: 1 / 4, mode: 'replace' }, concrete: { scale: 1 / 4, mode: 'replace' },
   gravel: { scale: 1 / 2, mode: 'replace' }, ballast: { scale: 1 / 1.6, mode: 'replace' }, wood: { scale: 1 / 2.2, mode: 'tint' }, stone: { scale: 1 / 2.5, mode: 'tint' },
-  bark: { scale: 1 / 1.6, mode: 'tint' }, plaster: { scale: 1 / 3, mode: 'tint' }, roof: { scale: 1 / 2.4, mode: 'tint' }, paint: { scale: 1 / 1.6, mode: 'tint' } };
+  bark: { scale: 1 / 1.6, mode: 'tint' }, plaster: { scale: 1 / 3, mode: 'tint' }, roof: { scale: 1 / 2.4, mode: 'tint' }, paint: { scale: 1 / 1.6, mode: 'tint' },
+  seatwood: { scale: 1 / 2.0, mode: 'replace' }, seatiron: { scale: 1 / 1.6, mode: 'replace' } };
 
 const textures = {};
 export function paintedTexture(kind) {
@@ -189,6 +222,7 @@ export const SURFACES = {
   '7db85a': 'grass', 'e6d6a8': 'sand', d2cbbc: 'concrete', a39c8f: 'concrete', c9bfa8: 'gravel', '8f877d': 'gravel',
   '9a6a45': 'wood', c9a374: 'wood', '8a5a3c': 'wood', '4a3226': 'wood', '4e3528': 'wood', b9b2a8: 'stone',
   '5a3f30': 'bark', f0e4c8: 'plaster', '41626f': 'roof', '2f4b58': 'roof', '5e8f7a': 'roof', '45725f': 'roof', f1e6cc: 'paint', e8f0f4: 'paint', b8403a: 'paint', f0e2c0: 'paint',
+  a0623a: 'seatwood', '2f3036': 'seatiron',
 };
 export function surfaceOf(material) { const m = /^c_([0-9a-f]{6})/.exec(material.name || ''); return m ? SURFACES[m[1]] : null; }
 

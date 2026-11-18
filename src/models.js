@@ -27,15 +27,16 @@ function rim(m) { m.onBeforeCompile = rimPatch; m.customProgramCacheKey = () => 
 const crisp = (t) => { if (t) { t.minFilter = THREE.NearestFilter; t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true; } return t; };
 
 /** Swap every material for a toon one. Returns the glowing materials (lamps, windows) so they can follow the time of day. */
-export function toon(object) {
+export function toon(object, opts = {}) {      // opts.smoothMaps: keep painted textures smooth (models made outside our pipeline)
   const done = new Map(), glow = [];
   object.traverse((o) => {
     if (!o.isMesh) return;
     const swap = (m) => {
       if (done.has(m)) return done.get(m);
       const t = new THREE.MeshToonMaterial({
-        color: m.color, map: crisp(m.map), gradientMap: gradient(), vertexColors: m.vertexColors,
+        color: m.color, map: m.map && opts.smoothMaps ? m.map : crisp(m.map), gradientMap: gradient(), vertexColors: m.vertexColors,
         emissive: m.emissive, emissiveMap: crisp(m.emissiveMap), emissiveIntensity: m.emissiveIntensity ?? 1, side: m.side,
+        transparent: m.transparent, opacity: m.opacity, depthWrite: !m.transparent,
       });
       t.name = m.name;
       const kind = surfaceOf(m);                                        // grass, sand, concrete, wood... get a hand-painted texture
@@ -51,8 +52,15 @@ export function toon(object) {
 }
 
 /** Load every model a world's layout needs, then place each piece. Blender is z-up, so (x, y, z) becomes (x, z, -y). */
-export async function loadLayout(dir, parent, onProgress = () => {}, prepare = () => {}) {
+/** Load one model outside the layout, with the same painted look. */
+export async function loadModel(url, opts = {}) {
+  const gltf = await loader.loadAsync(url);
+  return { scene: gltf.scene, glow: toon(gltf.scene, opts) };
+}
+
+export async function loadLayout(dir, parent, onProgress = () => {}, prepare = () => {}, skip = []) {
   const layout = await (await fetch(`${dir}/layout.json`)).json();
+  layout.pieces = layout.pieces.filter((p) => !skip.includes(p.name));
   const names = [...new Set(layout.pieces.filter((p) => p.model).map((p) => p.name))];
   const models = {}, glow = [];
   let done = 0;

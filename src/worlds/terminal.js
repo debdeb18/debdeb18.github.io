@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeWorld, sky, stars, softDot, makeCrack, sign, uPlayer } from '../kit.js';
 import { blob } from '../nature.js';
-import { loadLayout, gradient } from '../models.js';
+import { loadLayout, loadModel, gradient } from '../models.js';
 import { leafify } from '../foliage.js';
 import { cumulus, cumulusMaterial } from '../clouds.js';
 import { grassField } from '../grass.js';
@@ -155,7 +155,7 @@ export function buildTerminal() {
   w.ready = loadLayout('models/terminal', s, (n, of) => w.progress(n, of), (name, model) => {
     if (/^tree_|^pine$/.test(name)) leafify(model, name === 'pine' ? 'pine' : 'broad', isCanopy, gradient());
     if (/^islet_|^fences_planters$|^station_props$/.test(name)) leafify(model, 'bush', isBush, gradient(), { clumps: true });
-  }).then((r) => {
+  }, ['train']).then((r) => {
     placed = r.placed; w.glowMats = r.glow; w.loaded = true;
     w.camBlockers = ['station_building', 'canopy', 'roof_extras'].flatMap((n) => placed[n] || []);   // the camera won't pass through these
     buildSeabed(r.layout.islets || []);
@@ -164,9 +164,15 @@ export function buildTerminal() {
     for (const [x, y] of NORTH()) w.solid(x, -y, 0.9, 0.9);                        // tree trunks
     S(7.94, 13.4, 1.2, 1.0); S(15.93, 11.98, 0.35, 0.35); S(31.6, 10.15, 0.3, 0.3);   // shrine, lantern post, hammock post
     trees = [...(placed.tree_a || []), ...(placed.tree_b || []), ...(placed.tree_c || []), ...(placed.pine || [])].map((o) => ({ o, ph: Math.random() * 6.28 }));
-    train = placed.train[0]; train.userData.home = train.position.clone();
-    train.position.x = 1e4; nextTrain = 6;
   });
+  // The train: "Spirited Away Train" by judpro (CC BY 4.0), prepared by blender/scenes/import_train.py. Its cab is at y = 0,
+  // it runs along +y, so turned to run along +x it leads with the cab toward -x, the way it travels here.
+  const trainReady = loadModel('models/terminal/seatrain.glb', { smoothMaps: true }).then(({ scene, glow }) => {
+    train = scene; train.rotation.y = -Math.PI / 2; train.position.set(1e4, -0.05, -TRACK);
+    s.add(train); nextTrain = 6;
+    return glow;
+  });
+  w.ready = Promise.all([w.ready, trainReady]).then(([, glow]) => { w.glowMats.push(...glow); });
   let trees = [], train = null, nextTrain = 1e9;
 
   // ---------- 3D grass on the islets ----------
@@ -368,10 +374,11 @@ export function buildTerminal() {
   }
 
   // ---------- the train ----------
-  const TRAIN_LEN = 25.4;
+  const TRAIN_LEN = 23.64;
   let run = null;                                                                  // { x, v } while a train is on the line
   const startRun = (x, v) => { run = { x, v }; };
   Object.defineProperty(w, 'trainX', { get: () => (run ? run.x : null) });
+  w.holdTrain = (x, v = 0) => startRun(x, v);                                      // debug: put the train at x (moving at v)
   function trainTick(t, dt) {
     if (!train) return;
     if (!run) { U.uTrain.value.set(1e4, 0, TRAIN_LEN); train.position.x = 1e4; return; }

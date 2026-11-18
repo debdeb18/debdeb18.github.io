@@ -58,3 +58,7 @@ Rebuild with `pip install bpy` then `python blender/make.py chair` (or `all`).
 Work happens on the `dev` branch: every push there runs the test but publishes nothing. Merging `dev` into `main` runs the test again and, if it passes, publishes the site to GitHub Pages (`.github/workflows/deploy.yml`).
 
 Models: Blender writes raw pieces to `blender/export/<world>/`; `npm run models` shrinks them into `models/<world>/` for the site.
+
+## Credits
+
+- Train: ["Spirited Away Train"](https://sketchfab.com/3d-models/spirited-away-train-2f7c2bbc09614f1eba8e6ec7d8eb00e0) by judpro, licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Re-oriented, simplified and restyled (`blender/scenes/import_train.py`, `npm run models`). The original file is not stored in this repository.

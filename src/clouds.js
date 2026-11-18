@@ -22,7 +22,8 @@ export function cumulusMaterial() {
         c = mix(c, lit, smoothstep(0.6, 0.63, l));
         float rim = pow(1.0 - max(dot(n, v), 0.0), 3.0);
         c = mix(c, edge, rim * 0.35 * smoothstep(0.35, 0.6, l));          // bright rims where the light wraps round
-        c = mix(c, haze, 0.18 + (1.0 - vH) * 0.12);                        // a little sky in it, more near the base
+        c = mix(c, haze, 0.06 + (1.0 - vH) * 0.06);                        // a little sky in it, more near the base
+        c *= mix(0.86, 1.0, smoothstep(0.0, 0.25, vH));                   // darker undersides give the puffs weight
         gl_FragColor = vec4(c, 1.0);
       }`,
   });

@@ -42,6 +42,14 @@ function sunDir(h, out) {                                        // the sun by d
   return out.set(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).normalize();
 }
 const forced = parseFloat(new URLSearchParams(location.search).get('time'));
+// ---------- weather: mostly fair, with stretches of heavy cloud that come and go over a few hours ----------
+// Everyone visiting at the same time sees the same weather. ?weather=clear | cloudy | 0..1 pins it.
+const wParam = new URLSearchParams(location.search).get('weather');
+const weatherNow = () => {
+  if (wParam === 'clear') return 0; if (wParam === 'cloudy') return 1; if (wParam && !isNaN(+wParam)) return Math.min(1, Math.max(0, +wParam));
+  const h = Date.now() / 3.6e6, n = 0.5 + 0.28 * Math.sin(h * 6.283 / 7.3) + 0.22 * Math.sin(h * 6.283 / 3.1 + 1.7);
+  return THREE.MathUtils.smoothstep(n, 0.58, 0.8);                               // cloudy roughly a third of the time
+};
 const hourNow = () => { if (!isNaN(forced)) return ((forced % 24) + 24) % 24; const d = new Date(); return d.getHours() + d.getMinutes() / 60; };
 
 // ---------- the sea floor: shallow banks under the line, the station and the islets, deep water beyond ----------
@@ -226,6 +234,14 @@ export function buildTerminal() {
     const c = cumulus(s, cm, 55 + Math.cos(a) * r, y, Math.sin(a) * r, wd, i + 1);
     c.userData.bob = Math.random() * 6.28; clouds.push(c);
   });
+  // the heavy layer: big low clouds right overhead, which only gather when the weather turns cloudy
+  const heavy = [];
+  for (let i = 0; i < 14; i++) {                                                  // about as many as the smooth Blender dusk render
+    const a = (i / 14) * 6.283 + Math.random() * 0.35, r = 130 + Math.random() * 130;
+    const c = cumulus(s, cm, 30 + Math.cos(a) * r, -4 + Math.random() * 14, Math.sin(a) * r, 80 + Math.random() * 70, 100 + i);
+    c.userData.bob = Math.random() * 6.28; c.userData.k = Math.random(); c.visible = false; clouds.push(c); heavy.push(c);
+  }
+  let cloudy = weatherNow();
 
   // ---------- gulls ----------
   const gulls = [];
@@ -325,13 +341,21 @@ export function buildTerminal() {
 
   // ---------- applying the time of day (plus the cutscene's push toward dusk) ----------
   const P = {}, Q = {}, sd = new THREE.Vector3();
+  const GREY = { top: new THREE.Color(0x6f7f9c), mid: new THREE.Color(0xc7c9d4), shade: new THREE.Color(0x7d8299), water: new THREE.Color(0x7aa6a8), lit: new THREE.Color(0xf2efe6) };
   let moodK = 0;
   function applySky(h) {
     paletteAt(h, P);
     const k = h > 6 && h < 19.5 ? moodK : 0;                                       // the cutscene drifts into dusk (by day)
     const p = k > 0 ? mixPal(Q, P, DUSK, k) : P;
+    // overcast: the sun dims and the shadows fade, the sky goes greyer, clouds darken underneath
+    const c = cloudy;
+    if (c > 0.001) {
+      p.sunI *= 1 - 0.6 * c; p.hemiI *= 1 + 0.15 * c;
+      p.top.lerp(GREY.top, c * 0.55); p.mid.lerp(GREY.mid, c * 0.45); p.fog.lerp(GREY.mid, c * 0.4);
+      p.cShade.lerp(GREY.shade, c * 0.75); p.cLit.lerp(GREY.lit, c * 0.25); p.shallow.lerp(GREY.water, c * 0.3);
+    }
     SU.a.value.copy(p.top); SU.b.value.copy(p.mid); SU.c.value.copy(p.bot);
-    sunDir(h, sd); SU.sun.value.copy(sd); SU.sc.value.copy(p.sun); SU.sk.value = 1;
+    sunDir(h, sd); SU.sun.value.copy(sd); SU.sc.value.copy(p.sun); SU.sk.value = 1 - 0.85 * cloudy;      // the sun disc hides behind overcast
     w.sun.color.copy(p.sun); w.sun.intensity = p.sunI; w.sun.userData.offset.copy(sd).multiplyScalar(40);
     hemi.color.copy(p.sky); hemi.groundColor.copy(p.ground); hemi.intensity = p.hemiI;
     s.fog.color.copy(p.fog);
@@ -403,9 +427,15 @@ export function buildTerminal() {
   const water0 = new THREE.Vector3();
   w.ticks.push((t, dt) => {
     U.uTime.value = t;
+    cloudy += (weatherNow() - cloudy) * Math.min(1, dt * 0.2);                     // weather changes ease in over a few seconds
     applySky(hourNow());
+    for (const c of heavy) {                                                       // the heavy layer gathers one cloud at a time
+      const g = THREE.MathUtils.clamp((cloudy - c.userData.k * 0.8) / 0.2, 0, 1);
+      c.visible = g > 0.01; c.scale.setScalar(0.35 + 0.65 * g);
+    }
+    const gust = 1 + cloudy * 1.2;                                                 // windier when it is cloudy
     for (const c of clouds) {                                                      // drift; wrap around the far side
-      c.position.addScaledVector(WIND, dt); c.position.y += Math.sin(t * 0.1 + c.userData.bob) * dt * 0.15;
+      c.position.addScaledVector(WIND, dt * gust); c.position.y += Math.sin(t * 0.1 + c.userData.bob) * dt * 0.15;
       water0.set(c.position.x - 55, 0, c.position.z);
       if (water0.length() > 300) c.position.set(55 - WIND.x * 280 / WIND.length() + (Math.random() - 0.5) * 160, c.position.y, -WIND.z * 280 / WIND.length() + (Math.random() - 0.5) * 160);
     }

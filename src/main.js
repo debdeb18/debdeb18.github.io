@@ -189,7 +189,9 @@ canvas.addEventListener('wheel', (e) => { e.preventDefault(); dist = THREE.MathU
 
 // ---------- loop ----------
 const camRay = new THREE.Raycaster(), camDir = new THREE.Vector3();
+let camLock = null;                                              // debug: hold the camera at a fixed viewpoint
 function placeCamera(k) {
+  if (camLock) { camera.position.set(...camLock[0]); camera.lookAt(...camLock[1]); return; }
   if (state === 'walk') {
     tmp.copy(player.position); tmp.y += 1.2;
     look.lerp(tmp, k);
@@ -281,5 +283,5 @@ function frame() {
 resize();
 const start = location.hash.slice(1);
 enter(worlds[start] ? start : 'terminal');
-window.portfolio = { go, worlds, player, get state() { return state; }, debug: { renderer, composer, bloom, paint, camera, joy, get speed() { return speed; }, view(y, p, d) { yaw = y; pitch = p; dist = d; } } };
+window.portfolio = { go, worlds, player, get state() { return state; }, debug: { renderer, composer, bloom, paint, camera, joy, get speed() { return speed; }, view(y, p, d) { yaw = y; pitch = p; dist = d; }, lock(pos, at) { camLock = pos ? [pos, at] : null; } } };
 frame();

@@ -10,7 +10,7 @@ from lib import *
 
 VIEW = dict(angle=-28, lift=0.5, res=(1300, 820), samples=24)
 LX, LY, TOP, BASE = 11.0, 4.6, 0.95, -1.2          # length, depth, top height, how far the block reaches down
-COLOURS = dict(stone_a=0xE6E0CF, stone_b=0xD8D2C0, stone_c=0xEFEBDF, stone_d=0xD2D3C1, ivy_a=0x3F7A3A, ivy_b=0x5C9A45, grass_top=0x7DB85A, moss_a=0x6F9A4C, moss_b=0x8DB463, tile_d=0xC2C1A8, tile_e=0xE9E0C9, joint=0x8D8878, tile_a=0xD8CBB0, tile_b=0xCDBF9F, tile_c=0xE2D7BE,
+COLOURS = dict(stone_a=0xE6E0CF, stone_b=0xD8D2C0, stone_c=0xEFEBDF, stone_d=0xD2D3C1, ivy_a=0x3F7A3A, ivy_b=0x5C9A45, grass_top=0x7DB85A, bush_a=0x4F8A3E, bush_b=0x6BA34A, moss_a=0x6F9A4C, moss_b=0x8DB463, tile_d=0xC2C1A8, tile_e=0xE9E0C9, joint=0x8D8878, tile_a=0xD8CBB0, tile_b=0xCDBF9F, tile_c=0xE2D7BE,
                coping=0xEFE6D2, rail_w=0xF4F1EA, timber=0x8A5A3C, timber_dark=0x5C3B28, roof=0xB8573E, roof_dark=0x8E3F2C,
                bench_w=0xA57A4E, seat_wood=0xA0623A, seat_frame=0x2F3036, vend_body=0xE0602F, vend_dark=0x5A2A1E, vend_glow=0xFFE6B0, button_lit=0xFFF4D8, lamp_w=0xFFE2A0, board=0xF3EAD2, iron_d=0x2E2D33,
                stripe_y=0xF2C230, stripe_k=0x26262A, red_l=0xE0453A, plank=0xA07650, plank_d=0x7E5A3A)
@@ -137,7 +137,7 @@ def ruin_tower(r, rnd):
     tops = [BASE] * n; built = []
     def top(th, k):                                                            # high at the back, ragged, low at the front
         c = max(0.0, math.cos(th - math.radians(115)))
-        return TOP + 0.2 + 5.0 * c ** 0.5 + cols[k] * (0.4 + c)
+        return TOP + 1.8 + 3.6 * c ** 0.5 + cols[k] * (0.4 + c)
     def in_window(th, z0, z1):
         for (wa, ws, wh) in WINDOWS:
             if abs(((th - math.radians(wa)) + math.pi) % (2 * math.pi) - math.pi) < 0.17 and z1 > ws and z0 < wh: return True
@@ -156,20 +156,10 @@ def ruin_tower(r, rnd):
     for (wa, ws, wh) in WINDOWS:                                               # cut each window: a round-arched opening
         th = math.radians(wa); ex, ey = math.cos(th), math.sin(th); tx_, ty_ = -ey, ex
         ww = 0.7; rr = ww / 2; hb = wh - ws - rr
-        prof = [(-rr, 0), (rr, 0), (rr, hb)] + [(rr * math.cos(math.pi * i / 12), hb + rr * math.sin(math.pi * i / 12)) for i in range(1, 12)] + [(-rr, hb)]
-        bm = bmesh.new(); vs = []
-        for d in (TR - TW - 0.3, TR + 0.3):
-            vs.append([bm.verts.new((TX + ex * d + tx_ * a, TY + ey * d + ty_ * a, ws + zz)) for (a, zz) in prof])
-        m = len(prof)
-        bm.faces.new(vs[0][::-1]); bm.faces.new(vs[1])
-        for i in range(m): bm.faces.new((vs[0][i], vs[0][(i + 1) % m], vs[1][(i + 1) % m], vs[1][i]))
-        bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
-        me = bpy.data.meshes.new('_window'); bm.to_mesh(me); bm.free()
-        cutter = bpy.data.objects.new('_window', me); bpy.context.scene.collection.objects.link(cutter); cutter.hide_render = True
+        cutter = arch_cutter(TX + ex * rm, TY + ey * rm, ex, ey, ws, wh, ww, TW + 0.6)
         for (bt, bz, bh, objs) in built:
             if abs(((bt - th) + math.pi) % (2 * math.pi) - math.pi) < 0.45 and bz < wh + 0.05 and bz + bh > ws - 0.05:
-                for o in objs:
-                    bo = o.modifiers.new('window', 'BOOLEAN'); bo.operation = 'DIFFERENCE'; bo.object = cutter; bo.solver = 'EXACT'
+                cut_with(objs, cutter)
         pts = [(TX + ex * (TR + 0.015) + tx_ * rr * 1.08 * math.cos(math.pi * i / 10), TY + ey * (TR + 0.015) + ty_ * rr * 1.08 * math.cos(math.pi * i / 10), ws + hb + rr * 1.08 * math.sin(math.pi * i / 10)) for i in range(11)]
         tube('arch', [(pts[0][0], pts[0][1], ws)] + pts + [(pts[-1][0], pts[-1][1], ws)], 0.045, 'stone_c', r)   # a moulding round the arch
         painted_box('sill', (ww + 0.2, TW + 0.12, 0.09), (TX + rm * ex, TY + rm * ey, ws - 0.09), (0, 0, math.degrees(th) - 90), color='stone_c', parent=r, bevel=0.02, along='x', rough=1.5)
@@ -190,6 +180,76 @@ def ruin_tower(r, rnd):
     for (a, d) in ((200, 0.5), (240, 0.8), (150, 0.3), (300, 0.6)):           # blocks fallen into the water
         ax = TX + (TR + d) * math.cos(math.radians(a)); ay = TY + (TR + d) * math.sin(math.radians(a))
         ruin_block(r, rnd, (rnd.uniform(0.6, 0.9), 0.45, 0.4), (ax, ay, BASE + 0.2), (rnd.uniform(-12, 12), rnd.uniform(-12, 12), rnd.uniform(0, 360)), 'x', 0, moss=0.5, crack=0.3)
+
+def arch_cutter(cx, cy, nx, ny, sill, head, width, depth):
+    """A hidden round-arched shape (named _cut) to cut a window through a wall facing (nx, ny) at (cx, cy)."""
+    tx, ty = -ny, nx; rr = width / 2; hb = head - sill - rr
+    prof = [(-rr, 0), (rr, 0), (rr, hb)] + [(rr * math.cos(math.pi * i / 12), hb + rr * math.sin(math.pi * i / 12)) for i in range(1, 12)] + [(-rr, hb)]
+    bm = bmesh.new(); vs = []; col = bm.verts.layers.color.new('Col')
+    for d in (-depth / 2, depth / 2):
+        vs.append([bm.verts.new((cx + nx * d + tx * a, cy + ny * d + ty * a, sill + zz)) for (a, zz) in prof])
+    m = len(prof); bm.faces.new(vs[0][::-1]); bm.faces.new(vs[1])
+    for i in range(m): bm.faces.new((vs[0][i], vs[0][(i + 1) % m], vs[1][(i + 1) % m], vs[1][i]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    bm.verts.layers.color.remove(col)
+    me = bpy.data.meshes.new('_cut'); bm.to_mesh(me); bm.free()
+    at = me.color_attributes.new('Col', 'BYTE_COLOR', 'POINT')               # the same kind of colour as the blocks', so
+    for d in at.data: d.color = (0.86, 0.85, 0.8, 1.0)                         # the cut carries it onto the window reveals
+    me.materials.append(mat_vc('stone_c'))
+    o = bpy.data.objects.new('_cut', me); bpy.context.scene.collection.objects.link(o); o.hide_render = True
+    return o
+
+def cut_with(objs, cutter):
+    for o in objs:
+        bo = o.modifiers.new('cut', 'BOOLEAN'); bo.operation = 'DIFFERENCE'; bo.object = cutter; bo.solver = 'EXACT'
+
+def ruin_wall(r, rnd, x0, x1, yc, T, H, openings):
+    """A tall ruined wall standing on the pier from x0 to x1 (centred at yc, T thick, H tall above the floor): courses of
+    big pale blocks, its left end broken down in steps, a projecting ledge along the top, round-arched openings
+    (x, sill, head) cut through it, grass on the broken tops and ivy down the front."""
+    z = TOP - 0.04; row = 0; blocks = []; tops = {}
+    def lim(x): return TOP + H if x > x0 + 1.8 else TOP + 0.5 + (x - x0) / 1.8 * (H - 0.5) + rnd.uniform(-0.25, 0.25)
+    while z < TOP + H - 0.1:
+        h = min(rnd.uniform(0.38, 0.48), TOP + H - z)
+        a = x0 - (rnd.uniform(0.2, 0.45) if row % 2 else 0.0)
+        while a < x1 - 0.05:
+            l = rnd.uniform(0.6, 1.15); a0, a1 = max(a, x0), min(a + l, x1); a += l
+            if a1 - a0 < 0.18: continue
+            c = (a0 + a1) / 2
+            if z + h * 0.5 > lim(c): continue
+            objs = ruin_block(r, rnd, (a1 - a0 - 0.03, T, h - 0.03), (c, yc + rnd.uniform(-0.015, 0.015), z), (rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-0.8, 0.8)), 'x', 0,
+                              crack=0.0 if any(abs(c - ox) < 1.0 for (ox, _, _) in openings) else 0.15)
+            blocks.append((c, z, h, objs)); tops[round(c, 2)] = (c, z + h, a1 - a0)
+        z += h; row += 1
+    for (ox, sill, head) in openings:                                          # cut the arched openings, add sills
+        cutter = arch_cutter(ox, yc, 0, -1, sill, head, 0.8, T + 0.6)
+        cut_with([o for (c, bz, bh, objs) in blocks if abs(c - ox) < 1.3 and bz < head and bz + bh > sill for o in objs], cutter)
+        painted_box('sill', (1.0, T + 0.12, 0.09), (ox, yc, sill - 0.09), color='stone_c', parent=r, bevel=0.02, along='x', rough=1.5)
+        pts = [(ox + 0.43 * math.cos(math.pi * i / 10), yc - T / 2 - 0.015, head - 0.4 + 0.43 * math.sin(math.pi * i / 10)) for i in range(11)]
+        tube('arch', [(pts[0][0], pts[0][1], sill)] + pts + [(pts[-1][0], pts[-1][1], sill)], 0.045, 'stone_c', r)
+    xs = x0 + 1.8                                                              # the ledge along the full-height top
+    while xs < x1 - 0.05:
+        l = min(rnd.uniform(0.8, 1.3), x1 - xs)
+        if l > 0.2: painted_box('ledge', (l - 0.03, T + 0.3, 0.2), (xs + l / 2, yc, TOP + H), (0, 0, rnd.uniform(-1, 1)), color='stone_c', parent=r, bevel=0.03, along='top', rough=1.8)
+        xs += l
+    for (c, zt, w) in tops.values():                                           # grass over the broken stepped end, and the top
+        if c < x0 + 1.8 and rnd.random() < 0.8: grass_cap(r, rnd, c, yc, zt - 0.03, w * 1.05, T * 1.2, 0)
+    for _ in range(5): grass_cap(r, rnd, rnd.uniform(x0 + 2, x1 - 0.5), yc, TOP + H + 0.17, rnd.uniform(0.6, 1.2), T + 0.2, 0)
+    for xx in (x0 + 2.4, x0 + 4.3, x1 - 1.0):                                   # ivy down the front
+        ivy(r, rnd, xx, yc - T / 2, TOP + H + 0.1, 0, -1, rnd.uniform(1.5, 2.6))
+    return blocks
+
+def bush(r, rnd, x, y, z, s=1.0):
+    """A round leafy bush."""
+    for _ in range(4):
+        lump('bush', rnd.uniform(0.35, 0.5) * s, (x + rnd.uniform(-0.4, 0.4) * s, y + rnd.uniform(-0.4, 0.4) * s, z + rnd.uniform(0.2, 0.45) * s),
+             (1.1, 1.1, 0.85), rnd.choice(('bush_a', 'bush_b')), r, strength=0.3, grain=0.5, detail=2)
+
+def lantern(r, x, y, z):
+    """A lantern on an iron bracket, fixed to the front of the wall."""
+    tube('lantern_arm', [(x, y, z + 0.35), (x, y - 0.25, z + 0.42), (x, y - 0.35, z + 0.32)], 0.02, 'iron_d', r)
+    cyl('lantern_cap', 0.12, 0.05, 0.08, (x, y - 0.35, z + 0.25), color='iron_d', parent=r, bevel=0.01, verts=12)
+    cyl('lantern', 0.09, 0.09, 0.22, (x, y - 0.35, z + 0.03), color='lamp_w', parent=r, bevel=0.03, emit=4.0, verts=12)
 
 def fence(r, p0, p1):
     """A white railing from p0 to p1 (on the platform top): posts with caps, top and bottom rails, close balusters."""
@@ -341,24 +401,49 @@ def build():
     ruin_tower(r, rnd)
     for (x, y, nx_, ny_, ln) in ((-3.2, -LY / 2 - 0.12, 0, -1, 1.2), (1.6, -LY / 2 - 0.12, 0, -1, 0.8), (3.9, LY / 2 + 0.12, 0, 1, 1.4), (LX / 2 + 0.12, -1.6, 1, 0, 1.0)):
         ivy(r, rnd, x, y, TOP - 0.05, nx_, ny_, ln)                          # a little ivy over the pier's edge
-    # the fence: along the back and the left end
-    fence(r, (-LX / 2 + 0.15, LY / 2 - 0.15), (LX / 2 - 0.15, LY / 2 - 0.15))
-    fence(r, (-LX / 2 + 0.15, -LY / 2 + 0.75), (-LX / 2 + 0.15, LY / 2 - 0.15))
-    # along the back, left to right: the info board, a lamp post, the waiting spot
-    info_board(r, -2.6, LY / 2 - 0.42)
-    lamp_post(r, -1.4, LY / 2 - 0.45)
-    shelter(r, -0.4, 4.6, 0.35, LY / 2 - 0.45)
-    # the railway-crossing signal at the front left
-    crossing_signal(r, -LX / 2 + 0.75, -LY / 2 + 0.75)
-    # steps down at the right end, then a small side jetty with a mooring post
-    for k in range(4): painted_box('step', (0.44, 1.6, 0.22), (LX / 2 + 0.23 + k * 0.42, 0.25, TOP - 0.22 - k * 0.2), (0, 0, rnd.uniform(-2, 2)), color=rnd.choice(('stone_a', 'stone_b')), parent=r, bevel=0.03, along='top', band=0.1, rough=2.0)
+    # v2.2: a tall ruined wall from the tower along the platform, the waiting spot in front of it
+    WY, WT, WH = 0.75, 0.7, 3.2
+    ruin_wall(r, rnd, -LX / 2 + 0.15, LX / 2 - 2.6, WY, WT, WH, ((-2.4, TOP + 1.25, TOP + 2.55), (1.4, TOP + 1.25, TOP + 2.55)))
+    for lx in (-3.9, -0.5, 2.6): lantern(r, lx, WY - WT / 2, TOP + 1.95)
+    seat_row(r, -0.5, WY - WT / 2 - 0.45, 4)
+    trash_can(r, -0.5 - 4 * 0.62 / 2 - 0.45, WY - WT / 2 - 0.45)
+    crossing_signal(r, 1.9, -LY / 2 + 0.7)
+    # the right end: steps up to a landing behind the end of the wall, the info board there among bushes
+    LH = 0.45; lx0, lx1, ly0, ly1 = LX / 2 - 2.55, LX / 2 - 0.05, 0.2, LY / 2 - 0.05
+    for k in range(3):                                                          # steps up from the platform
+        painted_box('step', (0.38, 1.0, LH / 3 * (k + 1)), (lx0 - 0.95 + k * 0.36 + 0.18, ly0 + 0.55, TOP - 0.02), color=rnd.choice(('stone_a', 'stone_b')), parent=r, bevel=0.03, along='top', band=0.1, rough=2.0)
+    xs = lx0
+    while xs < lx1 - 0.05:                                                      # the landing: a block of big slabs
+        l = min(rnd.uniform(0.8, 1.2), lx1 - xs)
+        painted_box('landing', (l - 0.03, ly1 - ly0 - 0.03, LH + 0.08), (xs + l / 2, (ly0 + ly1) / 2, TOP - 0.08), (0, 0, rnd.uniform(-0.8, 0.8)), color=rnd.choice(('tile_a', 'tile_b', 'tile_e')), parent=r, bevel=0.03, along='top', band=0.1, rough=2.0)
+        xs += l
+    info_board(r, (lx0 + lx1) / 2 + 0.2, ly1 - 0.55)                            # facing the steps... the board's own legs stand on the landing
+    for (bx, by) in ((lx0 + 0.35, ly1 - 0.4), (lx1 - 0.35, ly1 - 0.35), (lx1 - 0.3, ly0 + 0.4)):
+        bush(r, rnd, bx, by, TOP + LH - 0.05, 0.7)
+    for (bx, by, bs) in ((TX - 1.2, TY - TR - 0.3, 1.2), (TX + 0.6, TY - TR - 0.5, 1.0), (TX - TR - 0.2, TY + 0.4, 1.1)):
+        bush(r, rnd, bx, by, BASE + 0.4, bs)                                    # bushes at the foot of the tower
+    # stairs down at the right end, in front of the landing, then a small side jetty with a mooring post
+    for k in range(4): painted_box('step', (0.44, 1.6, 0.22), (LX / 2 + 0.23 + k * 0.42, -1.2, TOP - 0.22 - k * 0.2), (0, 0, rnd.uniform(-2, 2)), color=rnd.choice(('stone_a', 'stone_b')), parent=r, bevel=0.03, along='top', band=0.1, rough=2.0)
     JX0, JX1, JZ = LX / 2 + 1.68, LX / 2 + 5.4, 0.12
     for i in range(int((JX1 - JX0) / 0.3)):
-        plank('jetty_plank', (1.6, 0.28, 0.06), (JX0 + 0.15 + i * 0.3, 0.25, JZ), (0, 0, 90 + rnd.uniform(-1.5, 1.5)), 'plank' if i % 3 else 'plank_d', r, bevel=0.012)
+        plank('jetty_plank', (1.6, 0.28, 0.06), (JX0 + 0.15 + i * 0.3, -1.2, JZ), (0, 0, 90 + rnd.uniform(-1.5, 1.5)), 'plank' if i % 3 else 'plank_d', r, bevel=0.012)
     for jx in (JX0 + 0.3, JX0 + 1.9, JX1 - 0.2):
-        for sy in (-0.65, 1.15): cyl('jetty_pile', 0.08, 0.07, 1.6, (jx, sy, -1.4), color='timber_dark', parent=r, bevel=0.01, verts=10)
-    for sy in (-0.55, 1.05): box('jetty_beam', (JX1 - JX0, 0.12, 0.14), ((JX0 + JX1) / 2, sy, JZ - 0.14), color='timber_dark', parent=r, bevel=0.02)
-    cyl('bollard', 0.12, 0.1, 0.5, (JX1 - 0.3, 0.95, JZ + 0.06), color='timber_dark', parent=r, bevel=0.03, verts=12)
-    ball('bollard_cap', 0.13, (JX1 - 0.3, 0.95, JZ + 0.58), (1, 1, 0.5), 'timber_dark', r)
-    tube('rope', [(JX1 - 0.3, 0.95, JZ + 0.4), (JX1 - 0.2, 1.6, JZ + 0.05), (JX1 - 0.4, 2.3, JZ + 0.25)], 0.02, 0xD9C08E, r)
+        for sy in (-2.1, -0.3): cyl('jetty_pile', 0.08, 0.07, 1.6, (jx, sy, -1.4), color='timber_dark', parent=r, bevel=0.01, verts=10)
+    for sy in (-2.0, -0.4): box('jetty_beam', (JX1 - JX0, 0.12, 0.14), ((JX0 + JX1) / 2, sy, JZ - 0.14), color='timber_dark', parent=r, bevel=0.02)
+    cyl('bollard', 0.12, 0.1, 0.5, (JX1 - 0.3, -0.5, JZ + 0.06), color='timber_dark', parent=r, bevel=0.03, verts=12)
+    ball('bollard_cap', 0.13, (JX1 - 0.3, -0.5, JZ + 0.58), (1, 1, 0.5), 'timber_dark', r)
+    tube('rope', [(JX1 - 0.3, -0.5, JZ + 0.4), (JX1 - 0.2, 0.15, JZ + 0.05), (JX1 - 0.4, 0.85, JZ + 0.25)], 0.02, 0xD9C08E, r)
+    bake_cuts()
     return r
+
+def bake_cuts():
+    """Apply the window cuts now and paint the new faces (the window reveals): a cut leaves them unpainted, black."""
+    dg = bpy.context.evaluated_depsgraph_get()
+    for o in [o for o in bpy.data.objects if o.type == 'MESH' and any(m.type == 'BOOLEAN' for m in o.modifiers)]:
+        me = bpy.data.meshes.new_from_object(o.evaluated_get(dg), depsgraph=dg)
+        at = me.color_attributes.get('Col')
+        if at:
+            for d in at.data:
+                c = d.color
+                if c[0] + c[1] + c[2] < 0.06: d.color = (0.82, 0.8, 0.74, 1.0)
+        o.modifiers.clear(); o.data = me

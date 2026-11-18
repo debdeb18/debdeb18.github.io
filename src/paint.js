@@ -167,28 +167,39 @@ const PAINTERS = {
     for (let i = 0; i < 1500; i++) { const x = r() * SIZE, y = r() * SIZE, len = 30 + r() * 60; wrap(x, y, len, (X, Y) => stroke(g, X, Y, len, 1.5 + r() * 3, Math.PI / 2 + (r() - 0.5) * 0.06, (r() - 0.5) * 2, r() < 0.5 ? '#cfcfcf' : '#f2f2f2', 0.4)); }
     for (let i = 0; i < 30; i++) { const x = r() * SIZE, y = r() * SIZE; wrap(x, y, 14, (X, Y) => dab(g, X, Y, 3 + r() * 9, 1.5 + r() * 3, r() * 3, '#8c7a66', 0.55)); }
   },
-  // Platform seats, lacquered wood: long strokes along each slat in warm reds and ambers, cool plum in the low tones,
-  // sunlit sheen streaks, paler wood where the varnish has worn through, and the odd dark knot.
+  // Platform seats: stylised painted wood. Soft brown bands, long flowing grain lines in light tan with a thin dark line
+  // beside each, a few "cathedral" arches where the grain bends, little dark pores. The vertices multiply this: light
+  // worn edges, a touch darker in the shallow grooves (the body is a little under white, so the colours here are a little brighter).
   seatwood(g, r) {
-    const n = fbm(noiseField(r, 2), noiseField(r, 5), noiseField(r, 11));
-    const tones = ['#7a3f30', '#8a4a33', '#9a5637', '#a9633c', '#b77243', '#c4824c'];
-    g.fillStyle = '#a05e39'; g.fillRect(0, 0, SIZE, SIZE);
-    for (let i = 0; i < 90; i++) { const x = r() * SIZE, y = r() * SIZE; wrap(x, y, 110, (X, Y) => dab(g, X, Y, 70 + r() * 60, 18 + r() * 20, (r() - 0.5) * 0.08, pick(tones, n(x, y)), 0.4)); }
-    for (let i = 0; i < 900; i++) {                                             // broad, soft strokes along the grain
-      const x = r() * SIZE, y = r() * SIZE, len = 70 + r() * 160, k = Math.min(0.999, Math.max(0, n(x, y) + (r() - 0.5) * 0.25));
-      wrap(x, y, len, (X, Y) => stroke(g, X, Y, len, 3 + r() * 5, (r() - 0.5) * 0.03, (r() - 0.5) * 6, pick(tones, k), 0.3));
+    const up = (h) => { const n = parseInt(h.slice(1), 16), f = (v) => Math.min(255, Math.round(v * 1.12)); return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`; };
+    const tones = ['#6f4430', '#7a4a34', '#845238', '#8d593d'].map(up);
+    g.fillStyle = up('#7d4c34'); g.fillRect(0, 0, SIZE, SIZE);
+    for (let y = 0; y < SIZE;) { const h = 14 + r() * 40; g.globalAlpha = 0.45; g.fillStyle = pick(tones, r()); g.fillRect(0, y, SIZE, h); y += h; }
+    for (let i = 0; i < 60; i++) { const x = r() * SIZE, y = r() * SIZE; wrap(x, y, 120, (X, Y) => dab(g, X, Y, 60 + r() * 80, 6 + r() * 10, 0, pick(tones, r()), 0.35)); }
+    for (let i = 0; i < 22; i++) {                                               // the grain: long tapered light streaks that
+      const x = r() * SIZE, y = r() * SIZE, len = 140 + r() * 260, bend = (r() - 0.5) * 14, a = (r() - 0.5) * 0.05;   // flow gently,
+      wrap(x, y, len, (X, Y) => {                                                // each with a thin dark line just below it
+        stroke(g, X, Y + 2.2, len * 0.9, 0.8, a, bend, up('#4f2a1e'), 0.5);
+        stroke(g, X, Y, len, 1.4 + r() * 2.2, a, bend, up('#c99468'), 0.7);
+      });
     }
-    for (let i = 0; i < 70; i++) {                                              // a few calm grain lines, plum rather than black
-      const x = r() * SIZE, y = r() * SIZE, len = 60 + r() * 140;
-      wrap(x, y, len, (X, Y) => stroke(g, X, Y, len, 0.9 + r(), (r() - 0.5) * 0.02, (r() - 0.5) * 6, '#6a3a3a', 0.28));
+    for (let i = 0; i < 25; i++) {                                               // broad soft highlights along the grain
+      const x = r() * SIZE, y = r() * SIZE, len = 120 + r() * 200;
+      wrap(x, y, len, (X, Y) => stroke(g, X, Y, len, 5 + r() * 6, (r() - 0.5) * 0.04, (r() - 0.5) * 10, up('#a06c4a'), 0.35));
     }
-    for (let i = 0; i < 60; i++) {                                              // warm light caught on the varnish
-      const x = r() * SIZE, y = r() * SIZE, len = 40 + r() * 90; if (n(x, y) < 0.5) continue;
-      wrap(x, y, len, (X, Y) => stroke(g, X, Y, len, 2 + r() * 3, (r() - 0.5) * 0.02, (r() - 0.5) * 4, '#dc9c5e', 0.35));
+    for (let i = 0; i < 2; i++) {                                                // a soft arch where the grain bends
+      const x0 = r() * SIZE, yc = r() * SIZE, len = 150 + r() * 120;
+      for (let j = 1; j <= 2; j++) {
+        const w = j * (7 + r() * 3);
+        wrap(x0 + len / 2, yc, len, (X, Y) => {
+          const xs = X - len / 2; g.globalAlpha = 0.5; g.strokeStyle = up('#d39c66'); g.lineWidth = 1.4; g.beginPath();
+          for (let t = 0; t <= 1.0001; t += 0.05) { const x = xs + t * len, y = Y - w * Math.sqrt(t); t ? g.lineTo(x, y) : g.moveTo(x, y); }
+          for (let t = 1; t >= -0.0001; t -= 0.05) g.lineTo(xs + t * len, Y + w * Math.sqrt(t));
+          g.stroke();
+        });
+      }
     }
-    for (let i = 0; i < 12; i++) {                                              // soft worn patches
-      const x = r() * SIZE, y = r() * SIZE; wrap(x, y, 40, (X, Y) => dab(g, X, Y, 18 + r() * 20, 5 + r() * 5, 0, '#cf9a66', 0.25));
-    }
+    for (let i = 0; i < 140; i++) { const x = r() * SIZE, y = r() * SIZE; wrap(x, y, 8, (X, Y) => stroke(g, X, Y, 4 + r() * 6, 0.6, 0, 0, up('#5a3022'), 0.35)); }
   },
   // The seats' iron frame: dark blue-grey paint laid on in short strokes, a cool sheen, chips and a little rust.
   seatiron(g, r) {
@@ -204,7 +215,7 @@ const PAINTERS = {
 const KINDS = { grass: { scale: 1 / 3.2, mode: 'replace' }, sand: { scale: 1 / 4, mode: 'replace' }, concrete: { scale: 1 / 4, mode: 'replace' },
   gravel: { scale: 1 / 2, mode: 'replace' }, ballast: { scale: 1 / 1.6, mode: 'replace' }, wood: { scale: 1 / 2.2, mode: 'tint' }, stone: { scale: 1 / 2.5, mode: 'tint' },
   bark: { scale: 1 / 1.6, mode: 'tint' }, plaster: { scale: 1 / 3, mode: 'tint' }, roof: { scale: 1 / 2.4, mode: 'tint' }, paint: { scale: 1 / 1.6, mode: 'tint' },
-  seatwood: { scale: 1 / 2.0, mode: 'replace' }, seatiron: { scale: 1 / 1.6, mode: 'replace' } };
+  seatwood: { scale: 1 / 0.7, mode: 'replace' }, seatiron: { scale: 1 / 1.6, mode: 'replace' } };
 
 const textures = {};
 export function paintedTexture(kind) {

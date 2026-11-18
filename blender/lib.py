@@ -78,6 +78,21 @@ def mat(color, rough=0.75, emit=0.0):
     _mats[key] = m
     return m
 
+def mat_vc(color, rough=0.75):
+    """A material whose colour is painted on the vertices (the 'Col' attribute). Named after `color` so the website
+    still knows what surface it is."""
+    hexv = PAL[color] if isinstance(color, str) else color
+    key = ('vc', hexv)
+    if key in _mats: return _mats[key]
+    m = bpy.data.materials.new('c_%06x_vc' % hexv); m.use_nodes = True
+    nt = m.node_tree; b = nt.nodes['Principled BSDF']; ca = nt.nodes.new('ShaderNodeVertexColor'); ca.layer_name = 'Col'
+    mx = nt.nodes.new('ShaderNodeMix'); mx.data_type = 'RGBA'; mx.blend_type = 'MULTIPLY'; mx.inputs['Factor'].default_value = 1.0
+    mx.inputs['B'].default_value = (_lin(hexv >> 16 & 255) * 1.25, _lin(hexv >> 8 & 255) * 1.25, _lin(hexv & 255) * 1.25, 1)
+    nt.links.new(ca.outputs['Color'], mx.inputs['A']); nt.links.new(mx.outputs['Result'], b.inputs['Base Color'])
+    b.inputs['Roughness'].default_value = rough
+    _mats[key] = m
+    return m
+
 def root(name):
     e = bpy.data.objects.new(name, None); bpy.context.scene.collection.objects.link(e); return e
 
@@ -103,15 +118,18 @@ def box(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, bev
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
     return _finish(name, me, color, loc, rot, parent, bevel, **mk)
 
-def plank(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, bevel=0.014, wobble=1.0, knots=None, **mk):
+def plank(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, bevel=0.014, wobble=1.0, knots=0, depth=0.0018, paint=None, **mk):
     """A stylised carved board along X (the hand-sculpted look): grain grooves cut into the top that flow around a knot
     or two, rings around each knot, chips out of the long edges, splits running in from the ends, soft chunky bevels,
     and a slight bow. `loc` is the centre of its base, like box()."""
     L, W, T = size
     # a fine grid for the carved top, then plain sides and a flat bottom (the carving only needs detail on top)
-    nx, ny = max(16, int(L / 0.0045)), max(12, int(W / 0.0024))
+    nx, ny = max(16, int(L / 0.009)), max(12, int(W / 0.0036))
     bm = bmesh.new(); bmesh.ops.create_grid(bm, x_segments=nx, y_segments=ny, size=0.5)
     for v in bm.verts: v.co.z = 1.0                                          # -0.5..0.5 like the cube, top at z=1
+    ix, iy = 0.5 - 1.0 / nx, 0.5 - 1.0 / ny                                   # the row just inside each edge stays, so the
+    keep = {v for v in bm.verts if abs(abs(v.co.x) - ix) < 1e-5 or abs(abs(v.co.y) - iy) < 1e-5}   # light edge paint stays thin
+    top = set(bm.verts)
     edges = [e for e in bm.edges if e.is_boundary]
     ext = bmesh.ops.extrude_edge_only(bm, edges=edges)
     for v in [g for g in ext['geom'] if isinstance(g, bmesh.types.BMVert)]: v.co.z = 0.0
@@ -122,10 +140,10 @@ def plank(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, b
     eL, eR, th, flow = wave(9), wave(9), wave(7), wave(11)
     nk = knots if knots is not None else random.choice((0, 1, 1, 2))
     ks = [(R(-0.3, 0.3) * L, R(-0.15, 0.15) * W, R(0.015, 0.022)) for _ in range(nk)]
-    spacing = W / R(3.2, 4.2); phase = R(0, 1)
+    spacing = W / R(1.8, 2.6); phase = R(0, 1)
     fades = [wave(5) for _ in range(8)]
-    chips = [(R(-0.5, 0.5) * L, random.choice((-1, 1)), R(0.012, 0.03), R(0.4, 1)) for _ in range(random.randint(1, 3))]
-    splits = [(e, R(-0.25, 0.25) * W, R(0.03, 0.07)) for e in (-1, 1) if random.random() < 0.7]
+    chips = [(R(-0.5, 0.5) * L, random.choice((-1, 1)), R(0.012, 0.025), R(0.3, 0.7)) for _ in range(random.randint(0, 2))]
+    splits = [(e, R(-0.25, 0.25) * W, R(0.02, 0.05)) for e in (-1, 1) if random.random() < 0.5]
     bow = R(-1, 1) * 0.006 * wobble; slant = (R(-0.25, 0.25), R(-0.25, 0.25))
     def groove(u, v):                                       # how deep the carving is at (u, v) on the top, 0..1
         vv = v + 0.003 * flow(u / L)
@@ -145,8 +163,13 @@ def plank(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, b
             de = 0.5 * L - e * u
             if de < sl: d = max(d, sm(max(0.0, 1 - abs(v - sv) / 0.0035)) * (1 - de / sl) * 1.4)
         return d
+    P = paint or dict(body=0xE6E6E6, edge=0xFFF0D8, under=0xC8C8C8)          # multiplies the painted grain
+    lin = lambda h: Vector(((h >> 16 & 255) / 255, (h >> 8 & 255) / 255, (h & 255) / 255))   # the exporter converts these itself
+    C = {k: lin(h) for k, h in P.items()}
+    col = bm.verts.layers.color.new('Col')
     for v in bm.verts:
         x, y, z = v.co.x, v.co.y, v.co.z
+        c = C['body'] if v in top else C['under']
         u = x * L + (slant[0] if x < 0 else slant[1]) * y * W * (abs(x) * 2) ** 8   # ends cut a little off square
         Y = y * W + (eL(x) if y > 0 else eR(x)) * 0.0012 * wobble * abs(y) * 2       # edges wander only a little
         Z = z * T * (1 + th(x) * 0.03 * wobble)
@@ -156,16 +179,20 @@ def plank(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, b
                 if k > 0: Y -= side * sm(k) * 0.006 * cd; Z -= sm(k) * T * 0.3 * cd * z
         for (e, sv, sl) in splits:                               # the end splits notch the end face too
             if x * e > 0.499 and abs(Y - sv) < 0.004: u -= e * 0.004
-        if z > 0.99: Z -= groove(u, Y) * 0.0055 * wobble
+        if z > 0.99:
+            g = groove(u, Y); Z -= g * depth * wobble
+            if abs(x) > 0.4999 or abs(y) > 0.4999: c = C['edge']                 # light, worn edges all round
+            for (cu, side, cw, cd) in chips:
+                if y * side > 0.42 and abs(u - cu) < cw: c = c.lerp(C['edge'], 0.7)
+        v[col] = (c.x, c.y, c.z, 1.0)
         Z += bow * (1 - (2 * x) ** 2)
         v.co = Vector((u, Y, Z))
-    bmesh.ops.dissolve_limit(bm, angle_limit=math.radians(4), verts=bm.verts[:], edges=bm.edges[:])   # thin out the flat parts
+    bmesh.ops.dissolve_limit(bm, angle_limit=math.radians(4), verts=[v for v in bm.verts if v not in keep], edges=[e for e in bm.edges if not (set(e.verts) & keep)])   # thin out the flat parts
     bmesh.ops.triangulate(bm, faces=bm.faces[:], quad_method='BEAUTY', ngon_method='BEAUTY')         # so the bevel stays clean
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
     o = _finish(name, me, color, loc, rot, parent, bevel, segs=2, **mk)
+    o.data.materials[0] = mat_vc(color)                                      # the colour comes from the painted vertices
     o.modifiers['bevel'].angle_limit = math.radians(60)                      # bevel the board's edges, not the carving
-    d = o.modifiers.new('lighter', 'DECIMATE'); d.ratio = 0.22                 # keep the carving, lose most of the triangles
-    o.modifiers.move(len(o.modifiers) - 1, 0)
     return o
 
 def gable(name, span, height, thick, loc=(0, 0, 0), color='cream', parent=None, **mk):

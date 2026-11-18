@@ -169,7 +169,6 @@ export function buildTerminal() {
   // it runs along +y, so turned to run along +x it leads with the cab toward -x, the way it travels here.
   const trainReady = loadModel('models/terminal/seatrain.glb', { smoothMaps: true }).then(({ scene, glow }) => {
     train = scene;
-    addPlates(train);
     train.rotation.y = -Math.PI / 2; train.position.set(1e4, -0.05, -TRACK);
     // its textures are dark and weathered: give it a soft light ramp, and brighten it by day (see applySky)
     const soft = new THREE.DataTexture(new Uint8Array([170, 170, 170, 255, 215, 215, 215, 255, 245, 245, 245, 255, 255, 255, 255, 255]), 4, 1, THREE.RGBAFormat);
@@ -181,29 +180,6 @@ export function buildTerminal() {
   w.ready = Promise.all([w.ready, trainReady]).then(([, glow]) => { w.glowMats.push(...glow); });
   let trees = [], train = null, nextTrain = 1e9;
   const trainMats = [];
-  // The 中道 destination plate on each cab: drawn here so the characters stay crisp. Its spot on the nose is found by
-  // casting a ray at the model (the train is still unrotated at this point, so model space = world space).
-  function addPlates(model) {
-    const c = document.createElement('canvas'); c.width = 128; c.height = 192;
-    const g = c.getContext('2d');
-    g.fillStyle = '#f4ead2'; g.fillRect(0, 0, 128, 192);
-    g.strokeStyle = '#2a2224'; g.lineWidth = 10; g.strokeRect(5, 5, 118, 182);
-    g.fillStyle = '#2a2224'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.font = '700 74px "Noto Serif CJK JP", "Hiragino Mincho ProN", "Yu Mincho", "MS Mincho", "Noto Sans CJK KR", serif';
-    g.fillText('中', 64, 54); g.fillText('道', 64, 136);
-    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-    const mat = new THREE.MeshToonMaterial({ map: tex, gradientMap: gradient() });
-    model.updateMatrixWorld(true);
-    const ray = new THREE.Raycaster(), H = 1.16;                      // inside the model's own (empty) plate frame
-    for (const [from, dir, turn] of [[5, -1, 0], [-30, 1, Math.PI]]) {
-      ray.set(new THREE.Vector3(0, H, from), new THREE.Vector3(0, 0, dir));
-      const hit = ray.intersectObject(model, true)[0];
-      if (!hit) continue;
-      const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.5), mat);
-      plate.position.set(0, H, hit.point.z - dir * 0.03); plate.rotation.y = turn;
-      model.add(plate);
-    }
-  }
   // Repaint the train in design A's clean livery: flat maroon body, cream window band, slate roof, dark skirt. The
   // texture only says which part is which (rose/red paint vs gold paint, and how high up it is); its grime is dropped.
   // Grey parts (glass, metal, frames) keep their texture.

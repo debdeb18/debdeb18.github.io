@@ -10,7 +10,7 @@ VIEW = dict(angle=-28, lift=0.5, res=(1300, 820), samples=24)
 LX, LY, TOP, BASE = 11.0, 4.6, 0.95, -1.2          # length, depth, top height, how far the block reaches down
 COLOURS = dict(stone_a=0xC9B79A, stone_b=0xB7A483, stone_c=0xD6C7AB, joint=0x8E7F68, tile_a=0xD8CBB0, tile_b=0xCDBF9F, tile_c=0xE2D7BE,
                coping=0xEFE6D2, rail_w=0xF4F1EA, timber=0x8A5A3C, timber_dark=0x5C3B28, roof=0xB8573E, roof_dark=0x8E3F2C,
-               bench_w=0xA57A4E, vend=0xE8EEF0, vend_glow=0xBFE6FF, lamp_w=0xFFE2A0, board=0xF3EAD2, iron_d=0x2E2D33,
+               bench_w=0xA57A4E, seat_wood=0xA0623A, seat_frame=0x2E2D33, vend_body=0xE0602F, vend_dark=0x5A2A1E, vend_glow=0xFFE6B0, button_lit=0xFFF4D8, lamp_w=0xFFE2A0, board=0xF3EAD2, iron_d=0x2E2D33,
                stripe_y=0xF2C230, stripe_k=0x26262A, red_l=0xE0453A, plank=0xA07650, plank_d=0x7E5A3A)
 
 def stone_face(r, rnd, along, fixed, axis):
@@ -48,13 +48,38 @@ def fence(r, p0, p1):
         cyl('baluster', 0.028, 0.028, 0.72, (x, y, z + 0.18), color='rail_w', parent=r, bevel=0.005, verts=8)
 
 def vending(r, x, y):
-    z = TOP
-    box('vend_body', (0.95, 0.65, 1.85), (x, y, z), color='vend', parent=r, bevel=0.04)
-    box('vend_window', (0.8, 0.03, 0.9), (x, y - 0.33, z + 0.82), color='vend_glow', parent=r, bevel=0.005, emit=1.6)
-    for i in range(8):
-        cyl('can', 0.035, 0.035, 0.12, (x - 0.3 + (i % 4) * 0.2, y - 0.36, z + 1.1 + (i // 4) * 0.28), color=(0xD9532F, 0x3F8FD1, 0xF2C230, 0x5FA46B)[i % 4], parent=r, bevel=0.005, verts=10)
-    box('vend_slot', (0.75, 0.04, 0.2), (x, y - 0.33, z + 0.3), color='iron_d', parent=r, bevel=0.01)
-    box('vend_top', (1.0, 0.7, 0.1), (x, y, z + 1.85), color=0xD9483B, parent=r, bevel=0.03)
+    """A Japanese vending machine after the poster: warm orange-red body, a big lit window of drinks in four rows,
+    a row of buttons under each row, a coin panel on the right, a dark pickup slot at the bottom."""
+    z = TOP; W, D, H = 1.0, 0.72, 1.9; f = y - D / 2                     # f: its front face (toward the track)
+    box('vend_body', (W, D, H), (x, y, z), color='vend_body', parent=r, bevel=0.035)
+    box('vend_top', (W + 0.04, D + 0.04, 0.08), (x, y, z + H - 0.02), color='vend_dark', parent=r, bevel=0.02)
+    box('vend_plinth', (W - 0.02, D - 0.02, 0.1), (x, y, z), color='vend_dark', parent=r, bevel=0.02)
+    # the lit window: a bright panel, four shelves of bottles and cans, a button under each
+    wx = x - 0.08; ww = 0.66
+    box('vend_window_frame', (ww + 0.08, 0.03, 1.02), (wx, f - 0.005, z + 0.76), color='vend_dark', parent=r, bevel=0.015)
+    box('vend_window', (ww, 0.03, 0.94), (wx, f - 0.015, z + 0.8), color='vend_glow', parent=r, bevel=0.008, emit=2.2)
+    drinks = (0xD9532F, 0x3F8FD1, 0xF2C230, 0x5FA46B, 0xEDE6D6, 0x8B4A2E)
+    for row in range(4):
+        zr = z + 0.84 + row * 0.225
+        box('vend_shelf', (ww, 0.06, 0.02), (wx, f - 0.04, zr - 0.01), color='vend_dark', parent=r, bevel=0.003)
+        for k in range(6):
+            xx = wx - ww / 2 + 0.06 + k * 0.108; c = drinks[(k + row * 2) % 6]
+            if (k + row) % 3 == 0:                                           # a bottle: body and neck
+                cyl('bottle', 0.028, 0.028, 0.11, (xx, f - 0.05, zr), color=c, parent=r, bevel=0.005, verts=10)
+                cyl('bottle_neck', 0.012, 0.02, 0.05, (xx, f - 0.05, zr + 0.11), color=c, parent=r, bevel=0.003, verts=8)
+            else: cyl('can', 0.032, 0.032, 0.12, (xx, f - 0.05, zr), color=c, parent=r, bevel=0.005, verts=10)
+            box('button', (0.05, 0.015, 0.022), (xx, f - 0.03, zr - 0.045), color='button_lit', parent=r, bevel=0.003, emit=1.5)
+    # the coin panel on the right: a small display, a coin slot, a return lever
+    px = x + W / 2 - 0.12
+    box('coin_panel', (0.16, 0.025, 0.62), (px, f - 0.01, z + 0.9), color='vend_dark', parent=r, bevel=0.01)
+    box('coin_display', (0.11, 0.02, 0.06), (px, f - 0.025, z + 1.38), color=0x7FFFB0, parent=r, bevel=0.004, emit=1.8)
+    box('coin_slot', (0.03, 0.02, 0.08), (px, f - 0.025, z + 1.22), color='coping', parent=r, bevel=0.004)
+    box('note_slot', (0.1, 0.02, 0.03), (px, f - 0.025, z + 1.08), color='coping', parent=r, bevel=0.004)
+    cyl('return_lever', 0.025, 0.025, 0.04, (px, f - 0.02, z + 0.97), (90, 0, 0), 'coping', r, bevel=0.005, verts=10)
+    # the pickup slot at the bottom, with its flap
+    box('pickup', (0.62, 0.03, 0.22), (x - 0.06, f - 0.005, z + 0.2), color='vend_dark', parent=r, bevel=0.02)
+    box('pickup_flap', (0.56, 0.02, 0.16), (x - 0.06, f - 0.02, z + 0.23), color=0x3A3A40, parent=r, bevel=0.01)
+    box('vend_label', (0.5, 0.02, 0.06), (wx, f - 0.02, z + 1.8), color='coping', parent=r, bevel=0.005)
 
 def lamp_post(r, x, y):
     z = TOP
@@ -78,16 +103,9 @@ def shelter(r, x0, x1, y0, y1):
     for dx in (-0.6, 0.6):                                                     # wooden brackets under the eave
         box('bracket', (0.08, 0.5, 0.08), (x0 + 0.25 + dx * 0, y0 - 0.15, z + H - 0.35), (45, 0, 0), 'timber_dark', r, bevel=0.01)
         box('bracket', (0.08, 0.5, 0.08), (x1 - 0.25 + dx * 0, y0 - 0.15, z + H - 0.35), (45, 0, 0), 'timber_dark', r, bevel=0.01)
-    # two benches facing the track
-    L = (x1 - x0 - 0.9) / 2
-    for bx in (x0 + 0.3 + L / 2, x1 - 0.3 - L / 2):
-        by = y1 - 0.45
-        for k, dz in enumerate((0.45,)):
-            for j in range(3): box('bench_slat', (L, 0.14, 0.04), (bx, by - 0.16 + j * 0.16, z + dz), color='bench_w', parent=r, bevel=0.01, jitter=0.004)
-        for j in range(2): box('bench_back', (L, 0.03, 0.12), (bx, by + 0.3, z + 0.72 + j * 0.18), color='bench_w', parent=r, bevel=0.01)
-        for sx in (-1, 1):
-            box('bench_leg', (0.07, 0.5, 0.45), (bx + sx * (L / 2 - 0.15), by, z), color='timber_dark', parent=r, bevel=0.01)
-            box('bench_upright', (0.06, 0.06, 0.55), (bx + sx * (L / 2 - 0.15), by + 0.3, z + 0.45), color='timber_dark', parent=r, bevel=0.01)
+    # two rows of platform seats after the poster: separate curved wooden seats on one dark metal frame
+    for cx in (x0 + 1.35, x1 - 1.35):
+        seat_row(r, cx, y1 - 0.5, 3)
     # a lantern hanging from each front post
     for x in (x0, x1):
         sx = -1 if x == x0 else 1
@@ -100,6 +118,25 @@ def shelter(r, x0, x1, y0, y1):
     box('schedule_paper', (0.07, 0.62, 0.8), (bx + 0.01, y0 + 0.45, z + 0.87), color='board', parent=r, bevel=0.005)
     box('schedule_head', (0.08, 0.62, 0.12), (bx + 0.015, y0 + 0.45, z + 1.55), color=0x2F6F9A, parent=r, bevel=0.005)
     for i in range(6): box('schedule_line', (0.08, 0.5, 0.025), (bx + 0.02, y0 + 0.45, z + 0.97 + i * 0.09), color='iron_d', parent=r, bevel=0)
+
+def seat_row(r, cx, cy, n):
+    """A row of n moulded wooden seats on a shared metal beam, facing -Y: each seat a gently dished pan and a curved back."""
+    z = TOP; P = 0.62; x0 = cx - (n - 1) * P / 2
+    box('seat_beam', (n * P, 0.08, 0.07), (cx, cy, z + 0.34), color='seat_frame', parent=r, bevel=0.02)
+    for sx in (-1, 1):                                                        # two T-legs with feet
+        lx = cx + sx * (n * P / 2 - 0.25)
+        box('seat_leg', (0.07, 0.07, 0.34), (lx, cy, z), color='seat_frame', parent=r, bevel=0.015)
+        box('seat_foot', (0.1, 0.5, 0.04), (lx, cy, z), color='seat_frame', parent=r, bevel=0.015)
+    for i in range(n):
+        x = x0 + i * P
+        box('seat_mount', (0.06, 0.3, 0.06), (x, cy, z + 0.39), color='seat_frame', parent=r, bevel=0.01)
+        for k in range(5):                                                   # the seat pan, dipping a little in the middle
+            t = k / 4; yy = cy - 0.2 + t * 0.4; dz = 0.035 * math.sin(math.pi * t)
+            box('seat_pan', (P - 0.08, 0.1, 0.04), (x, yy, z + 0.45 - dz), (-8 + 16 * t, 0, 0), 'seat_wood', r, bevel=0.012)
+        for k in range(5):                                                   # the back, curving up and slightly back
+            t = k / 4; yy = cy + 0.22 + t * 0.07; zz = z + 0.5 + t * 0.4
+            box('seat_back', (P - 0.1, 0.04, 0.1), (x, yy, zz), (-10 - 8 * t, 0, 0), 'seat_wood', r, bevel=0.012)
+        box('seat_back_post', (0.04, 0.04, 0.32), (x, cy + 0.2, z + 0.4), (-12, 0, 0), 'seat_frame', r, bevel=0.008)
 
 def crossing_signal(r, x, y):
     """A railway-crossing signal: a yellow-and-black striped mast, a crossbuck, two red lamps on a bar, a small

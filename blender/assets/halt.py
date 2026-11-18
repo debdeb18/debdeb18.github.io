@@ -20,13 +20,13 @@ def stone_face(r, rnd, along, fixed, axis):
         h = min(0.34, TOP - 0.12 - z); a = -along / 2 + (0.3 if row % 2 else 0.0)
         if row % 2:
             l = 0.3
-            if axis == 'x': painted_box('stone', (l - 0.03, 0.06, h - 0.03), (-along / 2 + l / 2, fixed, z), color='stone_b', parent=r, bevel=0.025, along='x')
-            else: painted_box('stone', (0.06, l - 0.03, h - 0.03), (fixed, -along / 2 + l / 2, z), color='stone_b', parent=r, bevel=0.025, along='y')
+            if axis == 'x': painted_box('stone', (l - 0.03, 0.06, h - 0.03), (-along / 2 + l / 2, fixed, z), color='stone_b', parent=r, bevel=0.025, along='x', face=1 if fixed > 0 else -1)
+            else: painted_box('stone', (0.06, l - 0.03, h - 0.03), (fixed, -along / 2 + l / 2, z), color='stone_b', parent=r, bevel=0.025, along='y', face=1 if fixed > 0 else -1)
         while a < along / 2 - 0.01:
             l = min(rnd.uniform(0.55, 1.05), along / 2 - a)
             c = rnd.choice(('stone_a', 'stone_b', 'stone_c'))
-            if axis == 'x': painted_box('stone', (l - 0.03, 0.06, h - 0.03), (a + l / 2, fixed, z), color=c, parent=r, bevel=0.025, jitter=0.006, along='x')
-            else: painted_box('stone', (0.06, l - 0.03, h - 0.03), (fixed, a + l / 2, z), color=c, parent=r, bevel=0.025, jitter=0.006, along='y')
+            if axis == 'x': painted_box('stone', (l - 0.03, 0.06, h - 0.03), (a + l / 2, fixed, z), color=c, parent=r, bevel=0.025, jitter=0.006, along='x', face=1 if fixed > 0 else -1)
+            else: painted_box('stone', (0.06, l - 0.03, h - 0.03), (fixed, a + l / 2, z), color=c, parent=r, bevel=0.025, jitter=0.006, along='y', face=1 if fixed > 0 else -1)
             a += l
         z += h; row += 1
 
@@ -196,7 +196,7 @@ def build():
     for k in range(4): painted_box('step', (0.42, 1.6, 0.22), (LX / 2 + 0.21 + k * 0.42, 0.25, TOP - 0.22 - k * 0.2), color='stone_b', parent=r, bevel=0.03, along='y')
     JX0, JX1, JZ = LX / 2 + 1.68, LX / 2 + 5.4, 0.12
     for i in range(int((JX1 - JX0) / 0.3)):
-        box('jetty_plank', (0.28, 1.6, 0.06), (JX0 + 0.15 + i * 0.3, 0.25, JZ), color='plank' if i % 3 else 'plank_d', parent=r, bevel=0.01, jitter=0.006)
+        plank('jetty_plank', (1.6, 0.28, 0.06), (JX0 + 0.15 + i * 0.3, 0.25, JZ), (0, 0, 90 + rnd.uniform(-1.5, 1.5)), 'plank' if i % 3 else 'plank_d', r, bevel=0.012)
     for jx in (JX0 + 0.3, JX0 + 1.9, JX1 - 0.2):
         for sy in (-0.65, 1.15): cyl('jetty_pile', 0.08, 0.07, 1.6, (jx, sy, -1.4), color='timber_dark', parent=r, bevel=0.01, verts=10)
     for sy in (-0.55, 1.05): box('jetty_beam', (JX1 - JX0, 0.12, 0.14), ((JX0 + JX1) / 2, sy, JZ - 0.14), color='timber_dark', parent=r, bevel=0.02)

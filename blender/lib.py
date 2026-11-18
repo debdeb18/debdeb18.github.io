@@ -118,13 +118,16 @@ def box(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, bev
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
     return _finish(name, me, color, loc, rot, parent, bevel, **mk)
 
-def plank(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, bevel=0.014, wobble=1.0, knots=0, depth=0.0018, paint=None, **mk):
+def plank(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, bevel=0.014, wobble=1.0, knots=0, depth=0.0018, paint=None,
+          cuts=True, nails=True, corner=0.22, **mk):
     """A stylised carved board along X (the hand-sculpted look): grain grooves cut into the top that flow around a knot
     or two, rings around each knot, chips out of the long edges, splits running in from the ends, soft chunky bevels,
-    and a slight bow. `loc` is the centre of its base, like box()."""
+    and a slight bow. With `cuts` (the default) the grain is sculpted as thin, sharp cuts that taper in and out, like
+    a hand-sculpted board, instead of grooves; `nails` adds a nail hole near each end; `corner` rounds the corners of
+    the board seen from above (a share of its width). `loc` is the centre of its base, like box()."""
     L, W, T = size
     # a fine grid for the carved top, then plain sides and a flat bottom (the carving only needs detail on top)
-    nx, ny = max(16, int(L / 0.009)), max(12, int(W / 0.0036))
+    nx, ny = (max(16, min(160, int(L / 0.004))), max(12, min(60, int(W / 0.0018)))) if cuts else (max(16, int(L / 0.009)), max(12, int(W / 0.0036)))
     bm = bmesh.new(); bmesh.ops.create_grid(bm, x_segments=nx, y_segments=ny, size=0.5)
     for v in bm.verts: v.co.z = 1.0                                          # -0.5..0.5 like the cube, top at z=1
     ix, iy = 0.5 - 1.0 / nx, 0.5 - 1.0 / ny                                   # the row just inside each edge stays, so the
@@ -145,7 +148,27 @@ def plank(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, b
     chips = [(R(-0.5, 0.5) * L, random.choice((-1, 1)), R(0.012, 0.025), R(0.3, 0.7)) for _ in range(random.randint(0, 2))]
     splits = [(e, R(-0.25, 0.25) * W, R(0.02, 0.05)) for e in (-1, 1) if random.random() < 0.5]
     bow = R(-1, 1) * 0.006 * wobble; slant = (R(-0.04, 0.04), R(-0.04, 0.04))
-    def groove(u, v):                                       # how deep the carving is at (u, v) on the top, 0..1
+    cl = []                                                 # thin grain cuts: (v at start, slope, u0, u1, half-width)
+    for _ in range(random.randint(int(W / 0.016), int(W / 0.011)) if cuts else 0):
+        ln = R(0.12, 0.45) * L; u0 = R(-0.5 * L + 0.02, 0.5 * L - 0.02 - ln)
+        cl.append((R(-0.42, 0.42) * W, R(-0.012, 0.012), u0, u0 + ln, R(0.0016, 0.0024)))
+    nl = [(e * (0.5 * L - R(0.03, 0.045)), R(-0.2, 0.2) * W) for e in (-1, 1)] if nails else []
+    rc = corner * W
+    def groove(u, v):
+        if not cuts: return groove_lines(u, v)
+        d = 0.0
+        for (v0, sl, u0, u1, hw) in cl:                     # a V-shaped cut, tapering to nothing at both ends
+            if u0 < u < u1:
+                t = (u - u0) / (u1 - u0); tp = math.sin(math.pi * t) ** 0.6
+                d = max(d, max(0.0, 1 - abs(v - (v0 + sl * (u - u0))) / (hw * (0.4 + 0.6 * tp))) * tp)
+        for (nu, nv) in nl:                                  # nail holes
+            rr = math.hypot(u - nu, v - nv)
+            if rr < 0.005: d = max(d, 1.4 * sm(1 - rr / 0.005))
+        for (e, sv, sl2) in splits:
+            de = 0.5 * L - e * u
+            if de < sl2: d = max(d, max(0.0, 1 - abs(v - sv) / 0.0018) * (1 - de / sl2) * 1.3)
+        return d
+    def groove_lines(u, v):                                 # how deep the carving is at (u, v) on the top, 0..1
         vv = v + 0.003 * flow(u / L)
         for (ku, kv, kr) in ks:                                 # grain lines bend around each knot
             fu = math.exp(-((u - ku) / (2.6 * kr)) ** 2); dv = vv - kv
@@ -172,6 +195,10 @@ def plank(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, b
         c = C['body'] if v in top else C['under']
         u = x * L + (slant[0] if x < 0 else slant[1]) * y * W * (abs(x) * 2) ** 8   # ends cut a little off square
         Y = y * W + (eL(x) if y > 0 else eR(x)) * 0.0005 * wobble * abs(y) * 2       # edges barely wander
+        cx_, cy_ = abs(u) - (0.5 * L - rc), abs(Y) - (0.5 * W - rc)              # corners rounded off, seen from above
+        if rc > 0 and cx_ > 0 and cy_ > 0:
+            k = math.hypot(cx_, cy_)
+            if k > rc: u = math.copysign(0.5 * L - rc + cx_ * rc / k, u); Y = math.copysign(0.5 * W - rc + cy_ * rc / k, Y)
         Z = z * T * (1 + th(x) * 0.03 * wobble)
         for (cu, side, cw, cd) in chips:                         # chips out of the long top edges
             if y * side > 0.3:
@@ -180,7 +207,7 @@ def plank(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, b
         for (e, sv, sl) in splits:                               # the end splits notch the end face too
             if x * e > 0.499 and abs(Y - sv) < 0.004: u -= e * 0.004
         if z > 0.99:
-            g = groove(u, Y); Z -= g * depth * wobble
+            g = groove(u, Y); Z -= g * (0.003 if cuts else depth) * wobble
             if abs(x) > 0.4999 or abs(y) > 0.4999: c = C['edge']                 # light, worn edges all round
             for (cu, side, cw, cd) in chips:
                 if y * side > 0.42 and abs(u - cu) < cw: c = c.lerp(C['edge'], 0.7)
@@ -196,7 +223,7 @@ def plank(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, b
     return o
 
 def painted_box(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='stone', parent=None, bevel=0.02, jitter=0.0, along='x',
-                band=0.18, paint=None, **mk):
+                band=0.18, paint=None, sculpt=True, face=0, **mk):
     """A box with hand-painted light and shade on its vertices, like a painted stone or tile: a light band along the
     top and the left, a darker, stained band along the bottom and the right. `along` is the face's horizontal axis
     ('x' or 'y'); a flat tile (along='top') gets a light rim all round its top. The colour multiplies `color`."""
@@ -206,24 +233,55 @@ def painted_box(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='stone', parent=
     cut = lambda co, no: bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=co, plane_no=no)
     b = 0.5 - band
     for k in (-b, b): cut((k, 0, 0), (1, 0, 0)); cut((0, k, 0), (0, 1, 0)); cut((0, 0, k), (0, 0, 1))
+    nax = {'x': 1, 'y': 0, 'top': 2}[along]                                   # the axis the visible face looks along
+    if sculpt:                                                                # a finer grid on the face, for the sculpting
+        for ax in range(3):
+            if ax == nax: continue
+            n = max(2, int(size[ax] / 0.06))
+            for i in range(1, n):
+                k = -0.5 + i / n
+                if abs(abs(k) - b) > 0.01: cut(tuple(k if j == ax else 0 for j in range(3)), tuple(1 if j == ax else 0 for j in range(3)))
+    R = random.uniform
+    bumps = [(R(-0.5, 0.5), R(-0.5, 0.5), R(0.15, 0.4), R(-1, 1)) for _ in range(4)]          # gentle swells in the face
+    chips = [(random.choice((-0.5, 0.5)), R(-0.5, 0.5), R(0.04, 0.09)) for _ in range(random.randint(0, 2))]   # bites out of an edge
+    crack = (R(-0.3, 0.3), R(-0.5, 0.5), R(0.6, 1.4)) if random.random() < 0.3 else None              # a hairline crack
     jitter *= STYLE['jitter']; ch = STYLE['chunk']
     size = tuple(d * ch if d < 0.16 else d for d in size)
     col = bm.verts.layers.color.new('Col')
     for v in bm.verts:
         x, y, z = v.co.x, v.co.y, v.co.z
-        if along == 'top':
-            c = C['light'] if (z > 0.49 and max(abs(x), abs(y)) > b + 0.01) else (C['mid'] if z > 0.49 else C['low'])
-        else:
+        cl01 = lambda t: max(0.0, min(1.0, t)); sm = lambda t: t * t * (3 - 2 * t)
+        if along == 'top':                                                    # a soft light rim round the top, darker below
+            c = C['mid'].lerp(C['light'], sm(cl01((max(abs(x), abs(y)) - 0.28) / 0.22))) if z > 0.49 else C['low']
+        else:                                                                 # light from the top left, stains at the foot
             h = x if along == 'x' else -y
-            c = C['mid']
-            if z > b + 0.01: c = C['light']
-            elif z < -b - 0.01: c = C['low']
-            if h < -b - 0.01: c = c.lerp(C['light'], 0.6)
-            elif h > b + 0.01: c = c.lerp(C['right'], 0.7)
+            c = C['mid'].lerp(C['light'], sm(cl01((z - 0.1) / 0.4)))
+            c = c.lerp(C['low'], sm(cl01((-z - 0.05) / 0.45)))
+            c = c.lerp(C['light'], 0.5 * sm(cl01((-h - 0.25) / 0.25)))
+            c = c.lerp(C['right'], 0.6 * sm(cl01((h - 0.25) / 0.25)))
         v[col] = (c.x, c.y, c.z, 1.0)
-        v.co = Vector((x * size[0] + random.uniform(-jitter, jitter), y * size[1] + random.uniform(-jitter, jitter), (z + 0.5) * size[2] + random.uniform(-jitter, jitter) * 0.5))
+        co = [x * size[0] + random.uniform(-jitter, jitter), y * size[1] + random.uniform(-jitter, jitter), (z + 0.5) * size[2] + random.uniform(-jitter, jitter) * 0.5]
+        cc = (x, y, z)
+        if sculpt and abs(cc[nax]) > 0.499:                                   # on a face: sculpt it
+            a1, a2 = [j for j in range(3) if j != nax]; p, q = cc[a1], cc[a2]
+            off = sum(h * math.exp(-((p - bp) ** 2 + (q - bq) ** 2) / (2 * br * br)) for (bp, bq, br, h) in bumps) * 0.0045
+            e = min(0.5 - abs(p), 0.5 - abs(q)) * min(size[a1], size[a2])        # soft, pillowy edges
+            off -= 0.004 * max(0.0, 1 - e / 0.05) ** 2
+            for (cp, cq, cw) in chips:
+                dd = math.hypot((p - cp) * size[a1], (q - cq) * size[a2])
+                if dd < cw: off -= 0.012 * (1 - dd / cw) ** 1.5
+            if crack:
+                cp, cq, ang = crack
+                dline = abs((p - cp) * size[a1] * math.sin(ang) - (q - cq) * size[a2] * math.cos(ang))
+                if dline < 0.004 and abs(p - cp) < 0.35: off -= 0.004 * (1 - dline / 0.004)
+            co[nax] += math.copysign(off, cc[nax])
+        v.co = Vector(co)
+    hide = -1 if along == 'top' else -face                                    # the face nobody sees (against the core, or
+    if hide:                                                                  # underneath): drop it, it only costs triangles
+        k = nax; lim = 0.49 * size[k] if k != 2 else 0.01 * size[2]
+        bmesh.ops.delete(bm, geom=[f for f in bm.faces if all((v.co[k] * hide > lim) if k != 2 else (v.co[2] < lim) for v in f.verts)], context='FACES')
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
-    o = _finish(name, me, color, loc, rot, parent, bevel, **mk)
+    o = _finish(name, me, color, loc, rot, parent, bevel, segs=2, **mk)
     o.data.materials[0] = mat_vc(color)
     return o
 

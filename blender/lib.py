@@ -103,6 +103,41 @@ def box(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, bev
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
     return _finish(name, me, color, loc, rot, parent, bevel, **mk)
 
+def plank(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, bevel=0.012, wobble=1.0, grooves=3, **mk):
+    """A hand-cut board along X instead of a clean box: edges that wander, a slight bow and twist, ends rounded
+    unevenly, a few grain grooves along the top and the odd chip. `loc` is the centre of its base, like box()."""
+    L, W, T = size; nx = max(8, int(L / 0.035))
+    bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1)
+    cut = lambda co, no: bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=co, plane_no=no)
+    for i in range(1, nx): cut((-0.5 + i / nx, 0, 0), (1, 0, 0))
+    gy = [-0.5 + (k + 1) / (grooves + 1) + random.uniform(-0.08, 0.08) for k in range(grooves)]
+    for y in gy: cut((0, y, 0), (0, 1, 0))
+    wave = lambda: (lambda a, b, c, d: (lambda t: math.sin(t * a + b) * 0.6 + math.sin(t * c + d) * 0.4))(random.uniform(4, 8), random.uniform(0, 6.3), random.uniform(10, 18), random.uniform(0, 6.3))
+    w1, w2, w3, w4 = wave(), wave(), wave(), wave()
+    bow = random.uniform(-1, 1) * 0.012 * wobble; twist = random.uniform(-1, 1) * 0.06 * wobble
+    rnd = [random.uniform(0.12, 0.25), random.uniform(0.12, 0.25)]                 # how round each end is
+    depth = [random.uniform(0.25, 1.0) for _ in gy]
+    for v in bm.verts:
+        x, y, z = v.co.x, v.co.y, v.co.z + 0.5                                   # x, y in -0.5..0.5, z in 0..1
+        e = abs(x) * 2                                                         # 0 at the middle, 1 at the ends
+        side = 1 if y > 0 else -1
+        y += (w1(x) if side > 0 else w2(x)) * 0.035 * wobble * (abs(y) * 2)        # each long edge wanders on its own
+        z *= 1 + w3(x) * 0.08 * wobble                                         # thickness varies
+        end = rnd[0 if x < 0 else 1]
+        if e > 1 - end * W / L * 2 and abs(y) > 0.3:                             # round the corners off
+            k = (e - (1 - end * W / L * 2)) / (end * W / L * 2)
+            x -= math.copysign(1, x) * k * k * end * W / L * 0.9 * (abs(y) - 0.3) / 0.2
+        X, Y, Z = x * L, y * W, z * T
+        if Z > T * 0.99:                                                       # grain grooves along the top
+            for gi, g in enumerate(gy):
+                if abs(v.co.y - g) < 1e-4: Z -= T * 0.14 * depth[gi] * wobble * (0.6 + 0.4 * w4(x * 1.7 + gi))
+        Z += bow * (1 - (2 * x) ** 2) + twist * x * y * W                        # bowed and slightly twisted
+        if random.random() < 0.04 * wobble and Z > T * 0.9 and abs(y) > 0.45:  # the odd chip off a top edge
+            Z -= T * 0.25; Y *= 0.94
+        v.co = Vector((X, Y, Z))
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    return _finish(name, me, color, loc, rot, parent, bevel, **mk)
+
 def gable(name, span, height, thick, loc=(0, 0, 0), color='cream', parent=None, **mk):
     """A triangular wall end (under a pitched roof). `span` runs along Y, the point is up."""
     bm = bmesh.new()

@@ -5,7 +5,7 @@ import bpy
 from mathutils import Vector
 import lib
 VIEWS = {   # asset: {view: (camera position, look at, lens)}
-    'halt': {'vending': ((-2.2, -2.6, 1.9), (-2.7, 1.4, 1.75), 45), 'seats': ((2.6, -2.0, 2.0), (2.1, 1.7, 1.25), 32), 'signal': ((-3.4, -4.8, 2.6), (-4.75, -1.55, 3.0), 38)},
+    'halt': {'vending': ((-2.2, -2.6, 1.9), (-2.7, 1.4, 1.75), 45), 'seats': ((2.6, -2.0, 2.0), (2.1, 1.7, 1.25), 32), 'signal': ((-2.6, -6.4, 3.0), (-4.75, -1.55, 3.3), 34)},
 }
 name = sys.argv[1]
 lib.reset(); random.seed(7)

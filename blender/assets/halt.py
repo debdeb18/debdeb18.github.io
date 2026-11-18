@@ -132,10 +132,10 @@ def seat_row(r, cx, cy, n):
         box('seat_mount', (0.06, 0.3, 0.06), (x, cy, z + 0.39), color='seat_frame', parent=r, bevel=0.01)
         for k in range(5):                                                   # the seat pan, dipping a little in the middle
             t = k / 4; yy = cy - 0.2 + t * 0.4; dz = 0.035 * math.sin(math.pi * t)
-            box('seat_pan', (P - 0.08, 0.1, 0.04), (x, yy, z + 0.45 - dz), (-8 + 16 * t, 0, 0), 'seat_wood', r, bevel=0.012)
+            plank('seat_pan', (P - 0.08 + random.uniform(-0.02, 0.01), 0.092, 0.042), (x + random.uniform(-0.012, 0.012), yy, z + 0.45 - dz), (-8 + 16 * t, 0, random.uniform(-1.2, 1.2)), 'seat_wood', r, bevel=0.01)
         for k in range(5):                                                   # the back, curving up and slightly back
             t = k / 4; yy = cy + 0.22 + t * 0.07; zz = z + 0.5 + t * 0.4
-            box('seat_back', (P - 0.1, 0.04, 0.1), (x, yy, zz), (-10 - 8 * t, 0, 0), 'seat_wood', r, bevel=0.012)
+            plank('seat_back', (P - 0.1 + random.uniform(-0.02, 0.01), 0.092, 0.042), (x + random.uniform(-0.012, 0.012), yy, zz + 0.046), (80 - 8 * t, 0, random.uniform(-1.2, 1.2)), 'seat_wood', r, bevel=0.01)
         box('seat_back_post', (0.04, 0.04, 0.32), (x, cy + 0.2, z + 0.4), (-12, 0, 0), 'seat_frame', r, bevel=0.008)
 
 def crossing_signal(r, x, y):
@@ -150,8 +150,8 @@ def crossing_signal(r, x, y):
     zc = z + H - 0.2
     for ang in (35, -35):
         bd = root('crossbuck_arm'); bd.location = (x, y - 0.1, zc); bd.rotation_euler = (0, math.radians(ang), 0); bd.parent = r
-        for k in range(6):
-            box('crossbuck', (0.2, 0.04, 0.16), (-0.5 + k * 0.2 + 0.1, 0, -0.08), color='stripe_y' if k % 2 == 0 else 'stripe_k', parent=bd, bevel=0.01)
+        for k in range(7):                                                    # centred on the mast, yellow at both ends
+            box('crossbuck', (0.17, 0.04, 0.16), (-0.51 + k * 0.17, 0, -0.08), color='stripe_y' if k % 2 == 0 else 'stripe_k', parent=bd, bevel=0.01)
     # the lamp bar with two red lamps facing the track (and the other way)
     zl = z + H - 1.05
     box('lamp_bar', (1.1, 0.1, 0.1), (x, y, zl), color='stripe_k', parent=r, bevel=0.02)

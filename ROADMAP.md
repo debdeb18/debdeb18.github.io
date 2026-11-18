@@ -27,6 +27,8 @@ Design in Blender
 - [x] Water that is clear in the shallows and darker with depth; rails just under the surface; train wake
 - [x] Islet details: footbridge, shrine, jetty, swing, hammock, picnic, lantern posts, reeds, rocks, flowers
 - [x] Split into pieces: 47 models and a layout file in `models/terminal/`
+- [x] Train: judpro's Sketchfab model in maroon and golden cream
+- [x] Mirror water that stirs where things pass; ballast-bank railway; poles and wires removed; trees reshaped
 - [ ] Review, then fixes (the rowing boat needs a proper hull)
 
 Build in the website
@@ -76,4 +78,4 @@ Build in the website
 - [ ] Speed on phones and older laptops
 - [ ] Test on real devices
 - [x] Automatic test and publish on every push to `main` (GitHub Actions)
-- [ ] Switch GitHub Pages to the `main` workflow so the new site goes live
+- [x] Switch GitHub Pages to the `main` workflow so the new site goes live

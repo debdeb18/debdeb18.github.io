@@ -1,4 +1,5 @@
-"""The porch (halt), after the user's sketch: a stone platform standing in the sea beside the line, paved on top, with a
+"""The porch (halt), after the user's sketch: built on the old stone pier of a ruin standing in the sea beside the
+line, beside the broken stump of a round tower; on its worn floor slabs, a
 white fence along the back and the left end; along the back an info and timetable board, a lamp post and the waiting spot (an open
 shelter with a tiled roof, a row of four seats and a bin, a lamp on each front post); steps down at the right
 end to a small side jetty with a mooring post; and a railway-crossing signal at the front left.
@@ -54,69 +55,91 @@ def moss_tuft(r, rnd, x, y, z, s=1.0):
     """A small cushion of moss tucked into a joint."""
     lump('moss', 0.05 * s, (x, y, z), (rnd.uniform(1.2, 2.2), rnd.uniform(1.0, 1.5), 0.6), rnd.choice(('moss_a', 'moss_b')), r, strength=0.35, grain=0.5)
 
-def rock_pile(r, rnd):
-    """Rough stones piled round the block: big boulders at the foot, a jumble of sizes above, greener by the water, and
-    a rim of flatter stones along the top edge. The pile leans in as it rises."""
-    per = 2 * (LX + LY)
-    def place(t, d, z, s_, sc, flat, moss, detail=2):
-        t %= per
-        if t < LX: x, y, nx, ny = -LX / 2 + t, -LY / 2, 0, -1
-        elif t < LX + LY: x, y, nx, ny = LX / 2, -LY / 2 + t - LX, 1, 0
-        elif t < 2 * LX + LY: x, y, nx, ny = LX / 2 - (t - LX - LY), LY / 2, 0, 1
-        else: x, y, nx, ny = -LX / 2, LY / 2 - (t - 2 * LX - LY), -1, 0
-        if LX / 2 - 0.1 < x and -0.6 < y < 1.1 and z > BASE + 0.5: return       # leave room for the steps
-        rock('rock', s_, (x + nx * d, y + ny * d, z), sc, (rnd.uniform(-8, 8), rnd.uniform(-8, 8), math.degrees(math.atan2(ny, nx)) + 90 + rnd.uniform(-25, 25)),
-             rnd.choice(('stone_a', 'stone_b', 'stone_c', 'stone_d')), r, moss=moss, flat=flat, detail=detail)
-    t = 0.0                                                                    # boulders along the foot
-    while t < per:
-        s_ = rnd.uniform(0.3, 0.5); place(t, 0.32 + rnd.uniform(-0.05, 0.1), BASE + s_ * 0.3, s_, (rnd.uniform(1.0, 1.5), rnd.uniform(0.8, 1.1), rnd.uniform(0.7, 1.0)), 0.7, 0.7)
-        t += s_ * rnd.uniform(1.4, 1.9)
-    z = BASE + 0.45; row = 0                                                  # rough courses of mixed stones up the face
-    while z < TOP - 0.22:
-        t = rnd.uniform(0, 0.3)
-        while t < per:
-            s_ = rnd.uniform(0.11, 0.24); zz = z + rnd.uniform(-0.05, 0.05)
-            place(t, (TOP - zz) * 0.14 + rnd.uniform(-0.02, 0.03), zz, s_, (rnd.uniform(1.0, 1.8), rnd.uniform(0.7, 1.0), rnd.uniform(0.6, 0.95)),
-                  rnd.uniform(0.5, 0.8), 0.5 if zz < BASE + 0.7 else (0.2 if zz < BASE + 1.0 else 0.0), detail=1)
-            t += s_ * rnd.uniform(1.5, 2.2)
-        z += rnd.uniform(0.15, 0.2); row += 1
-    for _ in range(int(per * 3)):                                               # odd stones in front, so the courses don't show
-        zz = rnd.uniform(BASE + 0.4, TOP - 0.3); s_ = rnd.uniform(0.1, 0.2)
-        place(rnd.uniform(0, per), (TOP - zz) * 0.14 + 0.05, zz, s_, (rnd.uniform(1.0, 1.6), rnd.uniform(0.7, 1.0), rnd.uniform(0.6, 0.9)),
-              0.7, 0.4 if zz < BASE + 0.7 else 0.0, detail=1)
-    t = 0.0                                                                    # a rim of flatter stones along the top edge
-    while t < per:
-        s_ = rnd.uniform(0.17, 0.26); place(t, 0.02 + rnd.uniform(0, 0.05), TOP - 0.1 - s_ * 0.1, s_, (rnd.uniform(1.3, 1.8), rnd.uniform(0.8, 1.0), 0.6), 0.35, 0.0)
-        t += s_ * rnd.uniform(1.9, 2.4)
+def ruin_block(r, rnd, size, loc, rot, along, face, color=None, moss=0.0, crack=0.2):
+    """One big old block of the ruin: weathered round its edges, chipped, sometimes cracked in two."""
+    kw = dict(color=color or rnd.choice(('stone_a', 'stone_b', 'stone_c', 'stone_d')), parent=r, bevel=0.03, jitter=0.01,
+              along=along, face=face, rough=2.6, moss=moss)
+    if rnd.random() < crack:
+        k, t = rnd.uniform(-0.25, 0.25), rnd.uniform(-0.6, 0.6)
+        n = (math.cos(t), 0, math.sin(t)) if along == 'x' else (0, math.cos(t), math.sin(t))
+        ax = 0 if along == 'x' else 1; g = 0.012 / size[ax]
+        for sgn in (1, -1):
+            co = tuple((k - sgn * g) if i == ax else 0 for i in range(3))
+            painted_box('ruin', size, loc, rot, clip=(co, tuple(sgn * c for c in n)), **kw)
+    else:
+        painted_box('ruin', size, loc, rot, **kw)
 
-def crazy_paving(r, rnd):
-    """The top: irregular flat stones fitted together (cells of a jittered grid), with thin joints and a little moss."""
-    S = 0.46; pts = []
-    x0, x1, y0, y1 = -LX / 2 + 0.02, LX / 2 - 0.02, -LY / 2 + 0.02, LY / 2 - 0.02
-    nx, ny = int((x1 - x0) / S), int((y1 - y0) / S)
-    for i in range(nx + 1):
-        for j in range(ny + 1):
-            pts.append((x0 + (i + rnd.uniform(0.15, 0.85)) * (x1 - x0) / (nx + 1), y0 + (j + rnd.uniform(0.15, 0.85)) * (y1 - y0) / (ny + 1)))
-    def clip(poly, px, py, qx, qy):                                            # keep the side of the bisector nearer p
-        mx, my, dx, dy = (px + qx) / 2, (py + qy) / 2, qx - px, qy - py
-        f = lambda v: (v[0] - mx) * dx + (v[1] - my) * dy
-        out = []
-        for i in range(len(poly)):
-            a, b = poly[i], poly[(i + 1) % len(poly)]; fa, fb = f(a), f(b)
-            if fa <= 0: out.append(a)
-            if (fa <= 0) != (fb <= 0):
-                t = fa / (fa - fb); out.append((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
-        return out
-    for (px, py) in pts:
-        poly = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
-        for (qx, qy) in pts:
-            if (qx, qy) != (px, py) and abs(qx - px) < 1.4 and abs(qy - py) < 1.4: poly = clip(poly, px, py, qx, qy)
-        if len(poly) < 3: continue
-        cx = sum(p[0] for p in poly) / len(poly); cy = sum(p[1] for p in poly) / len(poly)
-        poly = [(cx + (x - cx) - 0.014 * ((x - cx) / max(1e-6, math.hypot(x - cx, y - cy))), cy + (y - cy) - 0.014 * ((y - cy) / max(1e-6, math.hypot(x - cx, y - cy)))) for (x, y) in poly]
-        flagstone('flag', poly, 0.05, TOP - 0.05 + rnd.uniform(-0.006, 0.006), rnd.choice(('tile_a', 'tile_b', 'tile_c', 'tile_d', 'tile_e')), r,
-                  tilt=(rnd.uniform(-0.02, 0.02), rnd.uniform(-0.02, 0.02)))
-        if rnd.random() < 0.07: moss_tuft(r, rnd, poly[0][0], poly[0][1], TOP + 0.002, rnd.uniform(0.6, 1.0))
+def ruin_face(r, rnd, along, fixed, axis):
+    """One side of the old pier: courses of big weathered blocks, laid unevenly, a few fallen out."""
+    z = BASE; row = 0; out = 1 if fixed > 0 else -1
+    while z < TOP - 0.15:
+        h = min(rnd.uniform(0.42, 0.58), TOP - 0.1 - z)
+        if TOP - 0.1 - (z + h) < 0.25: h = TOP - 0.1 - z
+        a = -along / 2 - (rnd.uniform(0.2, 0.6) if row % 2 else 0.0)
+        moss = 0.6 if row == 0 else (0.3 if row == 1 else 0.0)
+        while a < along / 2 - 0.05:
+            l = rnd.uniform(0.7, 1.4)
+            a0, a1 = max(a, -along / 2), min(a + l, along / 2); a += l
+            if a1 - a0 < 0.15: continue
+            if row > 0 and z + h < TOP - 0.2 and rnd.random() < 0.06: continue  # a block fallen out
+            ll = a1 - a0 - 0.035; c = (a0 + a1) / 2; pos = fixed + out * rnd.uniform(-0.01, 0.04)
+            tilt, yaw = rnd.uniform(-2, 2), rnd.uniform(-1.5, 1.5)
+            if axis == 'x': ruin_block(r, rnd, (ll, 0.3, h - 0.035), (c, pos - out * 0.12, z), (0, tilt, yaw), 'x', out, moss=moss)
+            else: ruin_block(r, rnd, (0.3, ll, h - 0.035), (pos - out * 0.12, c, z), (tilt, 0, yaw), 'y', out, moss=moss)
+        z += h; row += 1
+
+def floor_slabs(r, rnd, joints):
+    """The top: big worn floor slabs of the old ruin in staggered rows, a few cracked or sunk a little."""
+    y = -LY / 2 + 0.02; row = 0
+    while y < LY / 2 - 0.1:
+        d = min(rnd.uniform(0.75, 1.0), LY / 2 - 0.02 - y)
+        if LY / 2 - 0.02 - (y + d) < 0.3: d = LY / 2 - 0.02 - y
+        x = -LX / 2 + 0.02 - (rnd.uniform(0.2, 0.5) if row % 2 else 0)
+        while x < LX / 2 - 0.05:
+            w = rnd.uniform(0.8, 1.3); x0, x1 = max(x, -LX / 2 + 0.02), min(x + w, LX / 2 - 0.02); x += w
+            if x1 - x0 < 0.2: continue
+            sz = (x1 - x0 - 0.03, d - 0.03, 0.08); loc = ((x0 + x1) / 2, y + d / 2, TOP - 0.08 + rnd.uniform(-0.012, 0.006))
+            rot = (rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1))
+            kw = dict(color=rnd.choice(('tile_a', 'tile_b', 'tile_c', 'tile_d', 'tile_e')), parent=r, bevel=0.015, jitter=0.004, along='top', band=0.1, rough=2.2)
+            if rnd.random() < 0.22:
+                t = rnd.uniform(0, math.pi); n = (math.cos(t), math.sin(t), 0); k = (rnd.uniform(-0.2, 0.2), rnd.uniform(-0.2, 0.2), 0)
+                for sgn in (1, -1):
+                    co = (k[0] - sgn * n[0] * 0.01, k[1] - sgn * n[1] * 0.01, 0)
+                    painted_box('slab', sz, loc, rot, clip=(co, tuple(sgn * c for c in n)), **kw)
+            else:
+                painted_box('slab', sz, loc, rot, **kw)
+            if rnd.random() < 0.12: joints.append((x1, y + rnd.uniform(0.1, d - 0.1)))
+        y += d; row += 1
+
+TX, TY, TR, TW = -LX / 2 - 2.25, 0.5, 2.45, 0.6                                 # the ruined tower: centre, outer radius, wall
+
+def ruin_tower(r, rnd):
+    """The stump of an old round tower at the left end: courses of big curved-wall blocks, broken off high at the back
+    and crumbling down towards the front, a gap where a window was, rubble inside and fallen blocks at its foot."""
+    n = 18; z = BASE; row = 0
+    cols = [rnd.uniform(-0.5, 0.3) for _ in range(n)]                          # each column of blocks breaks off at its own height
+    def top(th, k):                                                            # a broad stretch of wall stands high at the back,
+        c = max(0.0, math.cos(th - math.radians(115)))                         # the rest is broken down low, ragged
+        return TOP + 0.2 + 3.0 * c ** 0.55 + cols[k % n] * (0.4 + c)
+    while z < TOP + 3.4:
+        h = rnd.uniform(0.42, 0.55); off = (0.5 if row % 2 else 0.0) + rnd.uniform(-0.1, 0.1)
+        for k in range(n):
+            th = (k + off) / n * 2 * math.pi
+            lim = top(th, k) + rnd.uniform(-0.15, 0.1)
+            if z + h * 0.5 > lim: continue
+            if abs(((th - math.radians(105)) + math.pi) % (2 * math.pi) - math.pi) < 0.2 and TOP + 1.0 < z < TOP + 2.1: continue   # the window
+            if row > 0 and rnd.random() < 0.04: continue
+            rm = TR - TW / 2; arc = 2 * math.pi * TR / n - 0.04
+            ruin_block(r, rnd, (arc, TW, h - 0.035), (TX + rm * math.cos(th), TY + rm * math.sin(th), z),
+                       (rnd.uniform(-2, 2), rnd.uniform(-2, 2), math.degrees(th) - 90 + rnd.uniform(-2, 2)), 'x', 0,
+                       moss=0.6 if row == 0 else (0.3 if row == 1 else 0.0), crack=0.12)
+        z += h; row += 1
+    for _ in range(9):                                                         # rubble inside the stump
+        a, d = rnd.uniform(0, 6.28), rnd.uniform(0, TR - TW - 0.3)
+        rock('rubble', rnd.uniform(0.2, 0.4), (TX + d * math.cos(a), TY + d * math.sin(a), TOP - 0.2), (1.3, 1.0, 0.7), (0, 0, rnd.uniform(0, 360)), rnd.choice(('stone_a', 'stone_b', 'stone_c')), r, moss=0.3)
+    for (a, d) in ((200, 0.5), (240, 0.8), (150, 0.3), (300, 0.6)):           # blocks fallen into the water
+        ax = TX + (TR + d) * math.cos(math.radians(a)); ay = TY + (TR + d) * math.sin(math.radians(a))
+        ruin_block(r, rnd, (rnd.uniform(0.6, 0.9), 0.45, 0.4), (ax, ay, BASE + 0.2), (rnd.uniform(-12, 12), rnd.uniform(-12, 12), rnd.uniform(0, 360)), 'x', 0, moss=0.5, crack=0.3)
 
 def fence(r, p0, p1):
     """A white railing from p0 to p1 (on the platform top): posts with caps, top and bottom rails, close balusters."""
@@ -258,10 +281,14 @@ def crossing_signal(r, x, y):
 def build():
     PAL.update(COLOURS)
     rnd = random.Random(9); r = root('halt')
-    # the block: a pile of rough stones, wider at the foot, round a core; its top paved with fitted flat stones
-    box('core', (LX - 0.3, LY - 0.3, TOP - BASE - 0.04), (0, 0, BASE), color='joint', parent=r, bevel=0.02)
-    rock_pile(r, rnd)
-    crazy_paving(r, rnd)
+    # the old pier of the ruin: big weathered blocks round a core, the top paved with its old floor slabs
+    box('core', (LX - 0.5, LY - 0.5, TOP - BASE - 0.06), (0, 0, BASE), color='joint', parent=r, bevel=0.02)
+    ruin_face(r, rnd, LX, -LY / 2, 'x'); ruin_face(r, rnd, LX, LY / 2, 'x')
+    ruin_face(r, rnd, LY, -LX / 2, 'y'); ruin_face(r, rnd, LY, LX / 2, 'y')
+    joints = []
+    floor_slabs(r, rnd, joints)
+    for (x, y) in joints: moss_tuft(r, rnd, x, y, TOP + 0.004, rnd.uniform(0.7, 1.1))
+    ruin_tower(r, rnd)
     # the fence: along the back and the left end
     fence(r, (-LX / 2 + 0.15, LY / 2 - 0.15), (LX / 2 - 0.15, LY / 2 - 0.15))
     fence(r, (-LX / 2 + 0.15, -LY / 2 + 0.75), (-LX / 2 + 0.15, LY / 2 - 0.15))
@@ -272,7 +299,7 @@ def build():
     # the railway-crossing signal at the front left
     crossing_signal(r, -LX / 2 + 0.75, -LY / 2 + 0.75)
     # steps down at the right end, then a small side jetty with a mooring post
-    for k in range(4): painted_box('step', (0.42, 1.6, 0.22), (LX / 2 + 0.21 + k * 0.42, 0.25, TOP - 0.22 - k * 0.2), color='stone_b', parent=r, bevel=0.03, along='y')
+    for k in range(4): painted_box('step', (0.44, 1.6, 0.22), (LX / 2 + 0.23 + k * 0.42, 0.25, TOP - 0.22 - k * 0.2), (0, 0, rnd.uniform(-2, 2)), color=rnd.choice(('stone_a', 'stone_b')), parent=r, bevel=0.03, along='top', band=0.1, rough=2.0)
     JX0, JX1, JZ = LX / 2 + 1.68, LX / 2 + 5.4, 0.12
     for i in range(int((JX1 - JX0) / 0.3)):
         plank('jetty_plank', (1.6, 0.28, 0.06), (JX0 + 0.15 + i * 0.3, 0.25, JZ), (0, 0, 90 + rnd.uniform(-1.5, 1.5)), 'plank' if i % 3 else 'plank_d', r, bevel=0.012)

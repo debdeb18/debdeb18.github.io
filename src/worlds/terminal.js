@@ -168,19 +168,46 @@ export function buildTerminal() {
   // The train: "Spirited Away Train" by judpro (CC BY 4.0), prepared by blender/scenes/import_train.py. Its cab is at y = 0,
   // it runs along +y, so turned to run along +x it leads with the cab toward -x, the way it travels here.
   const trainReady = loadModel('models/terminal/seatrain.glb', { smoothMaps: true }).then(({ scene, glow }) => {
-    train = scene; train.rotation.y = -Math.PI / 2; train.position.set(1e4, -0.05, -TRACK);
+    train = scene;
+    addPlates(train);
+    train.rotation.y = -Math.PI / 2; train.position.set(1e4, -0.05, -TRACK);
     // its textures are dark and weathered: give it a soft light ramp, and brighten it by day (see applySky)
     const soft = new THREE.DataTexture(new Uint8Array([170, 170, 170, 255, 215, 215, 215, 255, 245, 245, 245, 255, 255, 255, 255, 255]), 4, 1, THREE.RGBAFormat);
     soft.minFilter = soft.magFilter = THREE.LinearFilter; soft.needsUpdate = true;
-    train.traverse((o) => { if (o.isMesh) for (const m of [].concat(o.material)) if (!trainMats.includes(m)) { m.gradientMap = soft; m.userData.base = m.color.clone(); recolor(m); trainMats.push(m); } });
+    train.traverse((o) => { if (o.isMesh) for (const m of [].concat(o.material)) if (!trainMats.includes(m)) { m.userData.base = m.color.clone(); recolor(m); trainMats.push(m); } });   // the usual crisp toon ramp
     s.add(train); nextTrain = 6;
     return glow;
   });
   w.ready = Promise.all([w.ready, trainReady]).then(([, glow]) => { w.glowMats.push(...glow); });
   let trees = [], train = null, nextTrain = 1e9;
   const trainMats = [];
-  // Repaint the train in a brighter cream-yellow and brown: the texture's rose-red and pink become brown, its gold becomes
-  // cream-yellow, keeping the light and dark of the original paint (wear, panel lines). Grey parts (glass, metal) stay.
+  // The 中道 destination plate on each cab: drawn here so the characters stay crisp. Its spot on the nose is found by
+  // casting a ray at the model (the train is still unrotated at this point, so model space = world space).
+  function addPlates(model) {
+    const c = document.createElement('canvas'); c.width = 128; c.height = 192;
+    const g = c.getContext('2d');
+    g.fillStyle = '#f4ead2'; g.fillRect(0, 0, 128, 192);
+    g.strokeStyle = '#2a2224'; g.lineWidth = 10; g.strokeRect(5, 5, 118, 182);
+    g.fillStyle = '#2a2224'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = '700 74px "Noto Serif CJK JP", "Hiragino Mincho ProN", "Yu Mincho", "MS Mincho", "Noto Sans CJK KR", serif';
+    g.fillText('中', 64, 54); g.fillText('道', 64, 136);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+    const mat = new THREE.MeshToonMaterial({ map: tex, gradientMap: gradient() });
+    model.updateMatrixWorld(true);
+    const ray = new THREE.Raycaster(), H = 1.16;                      // inside the model's own (empty) plate frame
+    for (const [from, dir, turn] of [[5, -1, 0], [-30, 1, Math.PI]]) {
+      ray.set(new THREE.Vector3(0, H, from), new THREE.Vector3(0, 0, dir));
+      const hit = ray.intersectObject(model, true)[0];
+      if (!hit) continue;
+      const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.5), mat);
+      plate.position.set(0, H, hit.point.z - dir * 0.03); plate.rotation.y = turn;
+      model.add(plate);
+    }
+  }
+  // Repaint the train in design A's clean livery: flat maroon body, cream window band, slate roof, dark skirt. The
+  // texture only says which part is which (rose/red paint vs gold paint, and how high up it is); its grime is dropped.
+  // Grey parts (glass, metal, frames) keep their texture.
+  const L = (hex) => { const c = new THREE.Color(hex); return `vec3(${c.r.toFixed(4)}, ${c.g.toFixed(4)}, ${c.b.toFixed(4)})`; };
   function recolor(m) {
     if (!m.map) return;
     const prev = m.onBeforeCompile;
@@ -195,13 +222,14 @@ export function buildTerminal() {
           float h = 0.0;
           if (d > 1e-4) { if (mx == c.r) h = mod((c.g - c.b) / d, 6.0); else if (mx == c.g) h = (c.b - c.r) / d + 2.0; else h = (c.r - c.g) / d + 4.0; h /= 6.0; }
           float lum = dot(c, vec3(0.3, 0.59, 0.11));
-          float red  = smoothstep(0.12, 0.3, sat) * (1.0 - smoothstep(0.03, 0.07, min(h, 1.0 - h)));          // rose, pink, red
-          float gold = smoothstep(0.1, 0.25, sat) * smoothstep(0.04, 0.07, h) * (1.0 - smoothstep(0.17, 0.22, h)); // gold, bronze
-          float bright = smoothstep(0.85, 1.0, vTH);                                                           // gold above the skirt -> cream; the bronze skirt -> brown
-          vec3 BROWN = vec3(0.66, 0.32, 0.15), CREAM = vec3(1.0, 0.87, 0.5);
-          vec3 brownC = BROWN * clamp(lum / 0.42, 0.6, 1.12), creamC = CREAM * clamp(lum / 0.3, 0.75, 1.12);
-          c = mix(c, brownC, red);
-          c = mix(c, mix(brownC, creamC, bright), gold);
+          float red  = smoothstep(0.12, 0.3, sat) * (1.0 - smoothstep(0.03, 0.07, min(h, 1.0 - h)));
+          float gold = smoothstep(0.1, 0.25, sat) * smoothstep(0.04, 0.07, h) * (1.0 - smoothstep(0.17, 0.22, h));
+          float roof = smoothstep(2.72, 2.8, vTH), skirt = 1.0 - smoothstep(0.85, 1.0, vTH);
+          float tex = 0.9 + 0.1 * clamp(lum / 0.35, 0.0, 1.6);                   // only a whisper of the old texture: clean paint
+          vec3 MAROON = ${L(0x8A2A36)}, CREAM = ${L(0xE6C47C)}, SLATE = ${L(0x4D5655)}, IRON = ${L(0x2E2D33)};
+          vec3 body = mix(MAROON, SLATE, roof), band = mix(CREAM, IRON, skirt);
+          c = mix(c, body * tex, red);
+          c = mix(c, mix(band, SLATE, roof) * tex, gold);
           diffuseColor.rgb = c;
         }`);
     };
@@ -407,7 +435,7 @@ export function buildTerminal() {
     for (const m of w.glowMats) m.emissiveIntensity = m.userData.glow * (0.25 + 0.75 * Math.max(p.lamps, 0.2));
     w.bloom = p.bloom;
     const day = THREE.MathUtils.clamp((p.sunI - 0.45) / 2.55, 0, 1);              // 0 at night .. 1 at noon
-    const kT = 0.9 + 0.35 * day;                                                      // a little brighter in daylight, dimmer at night
+    const kT = 0.95 + 0.15 * day;
     for (const m of trainMats) m.color.copy(m.userData.base).multiplyScalar(kT);
   }
 

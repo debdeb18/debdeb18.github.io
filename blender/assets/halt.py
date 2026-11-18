@@ -5,11 +5,12 @@ shelter with a tiled roof, a row of four seats and a bin, a lamp on each front p
 end to a small side jetty with a mooring post; and a railway-crossing signal at the front left.
 Origin: centre of the platform's footprint at water level; the track side faces -Y; the top is at z = TOP."""
 import math, random
+import bpy, bmesh
 from lib import *
 
 VIEW = dict(angle=-28, lift=0.5, res=(1300, 820), samples=24)
 LX, LY, TOP, BASE = 11.0, 4.6, 0.95, -1.2          # length, depth, top height, how far the block reaches down
-COLOURS = dict(stone_a=0xC9B79A, stone_b=0xB7A483, stone_c=0xD6C7AB, stone_d=0xB9B7A2, moss_a=0x6F9A4C, moss_b=0x8DB463, tile_d=0xC2C1A8, tile_e=0xE9E0C9, joint=0x6E6250, tile_a=0xD8CBB0, tile_b=0xCDBF9F, tile_c=0xE2D7BE,
+COLOURS = dict(stone_a=0xE6E0CF, stone_b=0xD8D2C0, stone_c=0xEFEBDF, stone_d=0xD2D3C1, ivy_a=0x3F7A3A, ivy_b=0x5C9A45, grass_top=0x7DB85A, moss_a=0x6F9A4C, moss_b=0x8DB463, tile_d=0xC2C1A8, tile_e=0xE9E0C9, joint=0x8D8878, tile_a=0xD8CBB0, tile_b=0xCDBF9F, tile_c=0xE2D7BE,
                coping=0xEFE6D2, rail_w=0xF4F1EA, timber=0x8A5A3C, timber_dark=0x5C3B28, roof=0xB8573E, roof_dark=0x8E3F2C,
                bench_w=0xA57A4E, seat_wood=0xA0623A, seat_frame=0x2F3036, vend_body=0xE0602F, vend_dark=0x5A2A1E, vend_glow=0xFFE6B0, button_lit=0xFFF4D8, lamp_w=0xFFE2A0, board=0xF3EAD2, iron_d=0x2E2D33,
                stripe_y=0xF2C230, stripe_k=0x26262A, red_l=0xE0453A, plank=0xA07650, plank_d=0x7E5A3A)
@@ -63,11 +64,8 @@ def ruin_block(r, rnd, size, loc, rot, along, face, color=None, moss=0.0, crack=
         k, t = rnd.uniform(-0.25, 0.25), rnd.uniform(-0.6, 0.6)
         n = (math.cos(t), 0, math.sin(t)) if along == 'x' else (0, math.cos(t), math.sin(t))
         ax = 0 if along == 'x' else 1; g = 0.012 / size[ax]
-        for sgn in (1, -1):
-            co = tuple((k - sgn * g) if i == ax else 0 for i in range(3))
-            painted_box('ruin', size, loc, rot, clip=(co, tuple(sgn * c for c in n)), **kw)
-    else:
-        painted_box('ruin', size, loc, rot, **kw)
+        return [painted_box('ruin', size, loc, rot, clip=(tuple((k - sgn * g) if i == ax else 0 for i in range(3)), tuple(sgn * c for c in n)), **kw) for sgn in (1, -1)]
+    return [painted_box('ruin', size, loc, rot, **kw)]
 
 def ruin_face(r, rnd, along, fixed, axis):
     """One side of the old pier: courses of big weathered blocks, laid unevenly, a few fallen out."""
@@ -112,31 +110,83 @@ def floor_slabs(r, rnd, joints):
         y += d; row += 1
 
 TX, TY, TR, TW = -LX / 2 - 2.25, 0.5, 2.45, 0.6                                 # the ruined tower: centre, outer radius, wall
+WINDOWS = ((115, TOP + 1.3, TOP + 2.5), (65, TOP + 2.9, TOP + 4.0), (165, TOP + 2.7, TOP + 3.8))   # (angle, sill, head)
+
+def ivy(r, rnd, x, y, z, nx, ny, length):
+    """Ivy hanging down a wall from (x, y, z): a few strands of leafy clusters pressed flat to the wall, fuller at the
+    top and thinning out as they fall."""
+    tx, ty = -ny, nx
+    for sidx in range(rnd.randint(2, 3)):
+        o = rnd.uniform(-0.25, 0.25); ln = length * rnd.uniform(0.55, 1.0); n = int(ln / 0.075)
+        for i in range(n):
+            f = 1 - i / n * 0.55; w = math.sin(i * 0.45 + sidx) * 0.06
+            lump('ivy', rnd.uniform(0.09, 0.14) * f, (x + tx * (o + w) + nx * 0.03, y + ty * (o + w) + ny * 0.03, z - i * 0.075),
+                 (1.4 if nx == 0 else 0.45, 1.4 if ny == 0 else 0.45, 1.0) if abs(nx) + abs(ny) > 0 and (abs(nx) < 0.3 or abs(ny) < 0.3) else (1.0, 1.0, 1.0),
+                 rnd.choice(('ivy_a', 'ivy_b')), r, strength=0.45, grain=0.35, detail=1)
+
+def grass_cap(r, rnd, x, y, z, w, d, yaw):
+    """Grass grown over the broken top of a wall."""
+    lump('grass_cap', 0.3, (x, y, z), (w / 0.55, d / 0.55, 0.3), 'grass_top', r, strength=0.3, grain=0.6, detail=2).rotation_euler = (0, 0, math.radians(yaw))
 
 def ruin_tower(r, rnd):
-    """The stump of an old round tower at the left end: courses of big curved-wall blocks, broken off high at the back
-    and crumbling down towards the front, a gap where a window was, rubble inside and fallen blocks at its foot."""
-    n = 18; z = BASE; row = 0
-    cols = [rnd.uniform(-0.5, 0.3) for _ in range(n)]                          # each column of blocks breaks off at its own height
-    def top(th, k):                                                            # a broad stretch of wall stands high at the back,
-        c = max(0.0, math.cos(th - math.radians(115)))                         # the rest is broken down low, ragged
-        return TOP + 0.2 + 3.0 * c ** 0.55 + cols[k % n] * (0.4 + c)
-    while z < TOP + 3.4:
-        h = rnd.uniform(0.42, 0.55); off = (0.5 if row % 2 else 0.0) + rnd.uniform(-0.1, 0.1)
+    """The ruin of an old round tower at the left end, pale stone after the references: it stands high at the back, with
+    a few battlements left, and is broken down low at the front; round-arched windows; grass over the broken tops and
+    ivy hanging down; rubble inside and fallen blocks at its foot."""
+    n = 18; z = BASE; row = 0; rm = TR - TW / 2; arc = 2 * math.pi * TR / n - 0.035
+    cols = [rnd.uniform(-0.5, 0.3) for _ in range(n)]
+    tops = [BASE] * n; built = []
+    def top(th, k):                                                            # high at the back, ragged, low at the front
+        c = max(0.0, math.cos(th - math.radians(115)))
+        return TOP + 0.2 + 5.0 * c ** 0.5 + cols[k] * (0.4 + c)
+    def in_window(th, z0, z1):
+        for (wa, ws, wh) in WINDOWS:
+            if abs(((th - math.radians(wa)) + math.pi) % (2 * math.pi) - math.pi) < 0.17 and z1 > ws and z0 < wh: return True
+        return False
+    while z < TOP + 5.6:
+        h = rnd.uniform(0.4, 0.5); off = (0.5 if row % 2 else 0.0)
         for k in range(n):
             th = (k + off) / n * 2 * math.pi
-            lim = top(th, k) + rnd.uniform(-0.15, 0.1)
-            if z + h * 0.5 > lim: continue
-            if abs(((th - math.radians(105)) + math.pi) % (2 * math.pi) - math.pi) < 0.2 and TOP + 1.0 < z < TOP + 2.1: continue   # the window
-            if row > 0 and rnd.random() < 0.04: continue
-            rm = TR - TW / 2; arc = 2 * math.pi * TR / n - 0.04
-            ruin_block(r, rnd, (arc, TW, h - 0.035), (TX + rm * math.cos(th), TY + rm * math.sin(th), z),
-                       (rnd.uniform(-2, 2), rnd.uniform(-2, 2), math.degrees(th) - 90 + rnd.uniform(-2, 2)), 'x', 0,
-                       moss=0.6 if row == 0 else (0.3 if row == 1 else 0.0), crack=0.12)
+            if z + h * 0.5 > top(th, k): continue
+            if row > 1 and rnd.random() < 0.03 and not in_window(th, z - 0.6, z + h + 0.6): continue
+            built.append((th, z, h, ruin_block(r, rnd, (arc, TW, h - 0.03), (TX + rm * math.cos(th), TY + rm * math.sin(th), z),
+                       (rnd.uniform(-1.5, 1.5), rnd.uniform(-1.5, 1.5), math.degrees(th) - 90 + rnd.uniform(-1.5, 1.5)), 'x', 0,
+                       moss=0.6 if row == 0 else (0.3 if row == 1 else 0.0), crack=0.0 if in_window(th, z - 0.6, z + h + 0.6) else 0.1)))
+            tops[k] = max(tops[k], z + h)
         z += h; row += 1
-    for _ in range(9):                                                         # rubble inside the stump
+    for (wa, ws, wh) in WINDOWS:                                               # cut each window: a round-arched opening
+        th = math.radians(wa); ex, ey = math.cos(th), math.sin(th); tx_, ty_ = -ey, ex
+        ww = 0.7; rr = ww / 2; hb = wh - ws - rr
+        prof = [(-rr, 0), (rr, 0), (rr, hb)] + [(rr * math.cos(math.pi * i / 12), hb + rr * math.sin(math.pi * i / 12)) for i in range(1, 12)] + [(-rr, hb)]
+        bm = bmesh.new(); vs = []
+        for d in (TR - TW - 0.3, TR + 0.3):
+            vs.append([bm.verts.new((TX + ex * d + tx_ * a, TY + ey * d + ty_ * a, ws + zz)) for (a, zz) in prof])
+        m = len(prof)
+        bm.faces.new(vs[0][::-1]); bm.faces.new(vs[1])
+        for i in range(m): bm.faces.new((vs[0][i], vs[0][(i + 1) % m], vs[1][(i + 1) % m], vs[1][i]))
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+        me = bpy.data.meshes.new('_window'); bm.to_mesh(me); bm.free()
+        cutter = bpy.data.objects.new('_window', me); bpy.context.scene.collection.objects.link(cutter); cutter.hide_render = True
+        for (bt, bz, bh, objs) in built:
+            if abs(((bt - th) + math.pi) % (2 * math.pi) - math.pi) < 0.45 and bz < wh + 0.05 and bz + bh > ws - 0.05:
+                for o in objs:
+                    bo = o.modifiers.new('window', 'BOOLEAN'); bo.operation = 'DIFFERENCE'; bo.object = cutter; bo.solver = 'EXACT'
+        pts = [(TX + ex * (TR + 0.015) + tx_ * rr * 1.08 * math.cos(math.pi * i / 10), TY + ey * (TR + 0.015) + ty_ * rr * 1.08 * math.cos(math.pi * i / 10), ws + hb + rr * 1.08 * math.sin(math.pi * i / 10)) for i in range(11)]
+        tube('arch', [(pts[0][0], pts[0][1], ws)] + pts + [(pts[-1][0], pts[-1][1], ws)], 0.045, 'stone_c', r)   # a moulding round the arch
+        painted_box('sill', (ww + 0.2, TW + 0.12, 0.09), (TX + rm * ex, TY + rm * ey, ws - 0.09), (0, 0, math.degrees(th) - 90), color='stone_c', parent=r, bevel=0.02, along='x', rough=1.5)
+    for k in range(n):                                                         # battlements, grass over the broken tops
+        th = (k + 0.25) / n * 2 * math.pi; px, py = TX + rm * math.cos(th), TY + rm * math.sin(th)
+        if tops[k] > TOP + 4.0 and k % 2 == 0:
+            ruin_block(r, rnd, (arc * 0.8, TW * 0.9, 0.42), (px, py, tops[k]), (0, 0, math.degrees(th) - 90), 'x', 0, crack=0.0)
+        elif tops[k] > BASE and rnd.random() < 0.75:
+            grass_cap(r, rnd, px, py, tops[k] - 0.03, arc * 1.1, TW * 1.15, math.degrees(th) - 90)
+    for (deg, ln) in ((135, 2.6), (95, 1.8), (150, 2.2), (60, 1.4)):            # ivy down the outside of the high wall
+        th = math.radians(deg); k = int(round(deg / 360 * n - 0.25)) % n
+        if tops[k] - TOP > 1.0:
+            ivy(r, rnd, TX + TR * math.cos(th), TY + TR * math.sin(th), tops[k] - 0.05, math.cos(th), math.sin(th), min(ln, tops[k] - BASE - 0.5))
+    for _ in range(9):                                                         # rubble and grass inside the stump
         a, d = rnd.uniform(0, 6.28), rnd.uniform(0, TR - TW - 0.3)
         rock('rubble', rnd.uniform(0.2, 0.4), (TX + d * math.cos(a), TY + d * math.sin(a), TOP - 0.2), (1.3, 1.0, 0.7), (0, 0, rnd.uniform(0, 360)), rnd.choice(('stone_a', 'stone_b', 'stone_c')), r, moss=0.3)
+    grass_cap(r, rnd, TX, TY, TOP - 0.25, (TR - TW) * 1.9, (TR - TW) * 1.9, 0)
     for (a, d) in ((200, 0.5), (240, 0.8), (150, 0.3), (300, 0.6)):           # blocks fallen into the water
         ax = TX + (TR + d) * math.cos(math.radians(a)); ay = TY + (TR + d) * math.sin(math.radians(a))
         ruin_block(r, rnd, (rnd.uniform(0.6, 0.9), 0.45, 0.4), (ax, ay, BASE + 0.2), (rnd.uniform(-12, 12), rnd.uniform(-12, 12), rnd.uniform(0, 360)), 'x', 0, moss=0.5, crack=0.3)
@@ -289,6 +339,8 @@ def build():
     floor_slabs(r, rnd, joints)
     for (x, y) in joints: moss_tuft(r, rnd, x, y, TOP + 0.004, rnd.uniform(0.7, 1.1))
     ruin_tower(r, rnd)
+    for (x, y, nx_, ny_, ln) in ((-3.2, -LY / 2 - 0.12, 0, -1, 1.2), (1.6, -LY / 2 - 0.12, 0, -1, 0.8), (3.9, LY / 2 + 0.12, 0, 1, 1.4), (LX / 2 + 0.12, -1.6, 1, 0, 1.0)):
+        ivy(r, rnd, x, y, TOP - 0.05, nx_, ny_, ln)                          # a little ivy over the pier's edge
     # the fence: along the back and the left end
     fence(r, (-LX / 2 + 0.15, LY / 2 - 0.15), (LX / 2 - 0.15, LY / 2 - 0.15))
     fence(r, (-LX / 2 + 0.15, -LY / 2 + 0.75), (-LX / 2 + 0.15, LY / 2 - 0.15))

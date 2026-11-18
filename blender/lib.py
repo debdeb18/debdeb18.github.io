@@ -373,9 +373,9 @@ def ball(name, r, loc=(0, 0, 0), scale=(1, 1, 1), color='wood', parent=None, **m
     o = _finish(name, me, color, loc, (0, 0, 0), parent, 0, **mk); o.scale = scale
     return o
 
-def lump(name, r, loc=(0, 0, 0), scale=(1, 1, 1), color='leaf', parent=None, strength=0.3, grain=0.55, **mk):
+def lump(name, r, loc=(0, 0, 0), scale=(1, 1, 1), color='leaf', parent=None, strength=0.3, grain=0.55, detail=3, **mk):
     """A lumpy, cauliflower-like blob: the building block for leafy canopies, bushes and clouds."""
-    bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=3, radius=r)
+    bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=detail, radius=r)
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
     for p in me.polygons: p.use_smooth = True
     o = bpy.data.objects.new(name, me); bpy.context.scene.collection.objects.link(o)
@@ -434,7 +434,7 @@ def output(name, out_dir, angle=35, lift=0.42, res=(1000, 800), samples=72, expo
     sc = bpy.context.scene
     assets = list(sc.collection.all_objects)
     bpy.ops.object.select_all(action='DESELECT')
-    for o in assets: o.select_set(True)
+    for o in assets: o.select_set(not o.name.startswith('_'))         # helpers named _... (cutters) stay out of the model
     if export: bpy.ops.export_scene.gltf(filepath='%s/../models/%s.glb' % (out_dir, name), use_selection=True, export_apply=True)
     lo, hi = _bounds(assets); c = (lo + hi) / 2; rad = (hi - lo).length / 2
     # studio: soft ground, warm key light, cool fill

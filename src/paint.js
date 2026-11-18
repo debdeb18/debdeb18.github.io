@@ -257,7 +257,7 @@ export const SURFACES = {
   '7db85a': 'grass', 'e6d6a8': 'sand', d2cbbc: 'concrete', a39c8f: 'concrete', c9bfa8: 'gravel', '8f877d': 'gravel',
   '9a6a45': 'wood', c9a374: 'wood', '8a5a3c': 'wood', '4a3226': 'wood', '4e3528': 'wood', b9b2a8: 'stone',
   '5a3f30': 'bark', f0e4c8: 'plaster', '41626f': 'roof', '2f4b58': 'roof', '5e8f7a': 'roof', '45725f': 'roof', f1e6cc: 'paint', e8f0f4: 'paint', b8403a: 'paint', f0e2c0: 'paint',
-  a0623a: 'seatwood', c9b79a: 'brick', b7a483: 'brick', d6c7ab: 'brick', b9b7a2: 'brick', d8cbb0: 'paving', cdbf9f: 'paving', e2d7be: 'paving', c2c1a8: 'paving', e9e0c9: 'paving', '2f3036': 'seatiron',
+  a0623a: 'seatwood', e6e0cf: 'brick', d8d2c0: 'brick', efebdf: 'brick', d2d3c1: 'brick', d8cbb0: 'paving', cdbf9f: 'paving', e2d7be: 'paving', c2c1a8: 'paving', e9e0c9: 'paving', '2f3036': 'seatiron',
 };
 export function surfaceOf(material) { const m = /^c_([0-9a-f]{6})/.exec(material.name || ''); return m ? SURFACES[m[1]] : null; }
 

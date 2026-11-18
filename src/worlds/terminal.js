@@ -179,7 +179,7 @@ export function buildTerminal() {
   const BUSH = /^c_(3a8547|6fb04f|2a6643)/;                                       // bushes, planter shrubs, potted plants
   const isBush = (m) => BUSH.test(m.name || '');
   w.ready = loadLayout('models/terminal', s, (n, of) => w.progress(n, of), (name, model) => {
-    if (/^tree_|^pine$/.test(name)) leafify(model, name === 'pine' ? 'pine' : 'broad', isCanopy, gradient());
+    if (/^tree_|^pine$/.test(name)) leafify(model, name === 'pine' ? 'pine' : 'broad', isCanopy, gradient(), { clumps: true });   // each puff gets its own round light
     if (/^islet_|^fences_planters$|^station_props$/.test(name)) leafify(model, 'bush', isBush, gradient(), { clumps: true });
   }, ['train', 'utility_pole', 'utility_pole_lamp', 'utility_pole_transformer']).then((r) => {
     placed = r.placed; w.glowMats = r.glow; w.loaded = true;

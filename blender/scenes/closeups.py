@@ -6,7 +6,6 @@ from mathutils import Vector
 import lib
 VIEWS = {   # asset: {view: (camera position, look at, lens)}
     'halt': {'vending': ((-2.2, -2.6, 1.9), (-2.7, 1.4, 1.75), 45), 'seats': ((2.6, -2.0, 2.0), (2.1, 1.7, 1.25), 32), 'signal': ((-3.4, -4.8, 2.6), (-4.75, -1.55, 3.0), 38)},
-    'chair': {'front': ((0.9, -1.6, 1.0), (0, 0, 0.55), 50), 'back': ((-1.1, 1.3, 1.1), (0, 0.1, 0.6), 50)},
 }
 name = sys.argv[1]
 lib.reset(); random.seed(7)

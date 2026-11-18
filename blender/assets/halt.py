@@ -157,9 +157,12 @@ def crossing_signal(r, x, y):
     box('lamp_bar', (1.1, 0.1, 0.1), (x, y, zl), color='stripe_k', parent=r, bevel=0.02)
     for sx in (-1, 1):
         for face in (-1, 1):
-            cyl('lamp_hood', 0.17, 0.17, 0.08, (x + sx * 0.45, y + face * 0.06, zl - 0.12), (face * -90, 0, 0), 'stripe_k', r, bevel=0.01, verts=18)
-            ball('red_lamp', 0.12, (x + sx * 0.45, y + face * 0.12, zl - 0.12), (1, 0.45, 1), 'red_l', r, emit=2.0)
-            cyl('lamp_visor', 0.18, 0.18, 0.12, (x + sx * 0.45, y + face * 0.12, zl - 0.02), (face * -90, 0, 0), 'stripe_k', r, bevel=0.005, verts=18)
+            yf = y + face * 0.05                                              # a round black backplate, the red lens on it
+            cyl('lamp_plate', 0.19, 0.19, 0.04, (x + sx * 0.45, yf, zl - 0.12), (face * -90, 0, 0), 'stripe_k', r, bevel=0.01, verts=24)
+            ball('red_lamp', 0.13, (x + sx * 0.45, yf + face * 0.04, zl - 0.12), (1, 0.32, 1), 'red_l', r, emit=2.0)
+            for k in range(9):                                               # a curved hood over the top half of the lens
+                ang = -80 + k * 20; R = 0.19
+                box('lamp_visor', (0.075, 0.12, 0.022), (x + sx * 0.45 + R * math.sin(math.radians(ang)), yf + face * 0.08, zl - 0.12 + R * math.cos(math.radians(ang)) - 0.011), (0, ang, 0), 'stripe_k', r, bevel=0.006)
     box('arrow_box', (0.42, 0.14, 0.22), (x, y - 0.06, zl - 0.48), color='stripe_k', parent=r, bevel=0.02)
     box('arrow', (0.28, 0.02, 0.06), (x, y - 0.14, zl - 0.4), color='lamp_w', parent=r, bevel=0.005, emit=1.5)
     ball('bell', 0.15, (x, y, z + H + 0.02), (1, 1, 0.7), 'stripe_k', r)

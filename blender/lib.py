@@ -121,8 +121,8 @@ def plank(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, b
         x, y, z = v.co.x, v.co.y, v.co.z + 0.5                                   # x, y in -0.5..0.5, z in 0..1
         e = abs(x) * 2                                                         # 0 at the middle, 1 at the ends
         side = 1 if y > 0 else -1
-        y += (w1(x) if side > 0 else w2(x)) * 0.035 * wobble * (abs(y) * 2)        # each long edge wanders on its own
-        z *= 1 + w3(x) * 0.08 * wobble                                         # thickness varies
+        y += (w1(x) if side > 0 else w2(x)) * 0.012 * wobble * (abs(y) * 2)        # each long edge wanders on its own
+        z *= 1 + w3(x) * 0.04 * wobble                                         # thickness varies
         end = rnd[0 if x < 0 else 1]
         if e > 1 - end * W / L * 2 and abs(y) > 0.3:                             # round the corners off
             k = (e - (1 - end * W / L * 2)) / (end * W / L * 2)

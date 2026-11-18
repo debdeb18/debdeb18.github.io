@@ -106,7 +106,7 @@ function makeWater(U) {
       .replace('#include <opaque_fragment>', `float fres = pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 3.0);
         // the mirror: the scene rendered upside down, nudged by the ripples. Shallows stay see-through; deep water is a mirror.
         vec4 rp = uReflMat * vec4(vW, 1.0);
-        vec2 ruv = rp.xy / rp.w + tilt.xz * 0.35;
+        vec2 ruv = rp.xy / rp.w + tilt.xz * 0.08;                        // only a gentle waver
         vec3 refl = texture2D(uRefl, ruv).rgb * mix(vec3(1.0), uDeep * 2.2 + 0.35, 0.35 * murk);   // the mirror takes on the sea's blue
         float reflK = mix(0.3, 0.9, murk) * mix(0.75, 1.0, fres) * (1.0 - foam);       // deep water: almost a perfect mirror
         outgoingLight = mix(outgoingLight, refl, reflK);
@@ -181,7 +181,7 @@ export function buildTerminal() {
   w.ready = loadLayout('models/terminal', s, (n, of) => w.progress(n, of), (name, model) => {
     if (/^tree_|^pine$/.test(name)) leafify(model, name === 'pine' ? 'pine' : 'broad', isCanopy, gradient());
     if (/^islet_|^fences_planters$|^station_props$/.test(name)) leafify(model, 'bush', isBush, gradient(), { clumps: true });
-  }, ['train']).then((r) => {
+  }, ['train', 'utility_pole', 'utility_pole_lamp', 'utility_pole_transformer']).then((r) => {
     placed = r.placed; w.glowMats = r.glow; w.loaded = true;
     w.camBlockers = ['station_building', 'canopy', 'roof_extras'].flatMap((n) => placed[n] || []);   // the camera won't pass through these
     buildSeabed(r.layout.islets || []);

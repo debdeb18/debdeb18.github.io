@@ -32,13 +32,27 @@ nt.links.new(va.outputs[0], nt.nodes['Material Output'].inputs['Volume'])
 box('deep_floor', (900, 900, 0.1), (150, 0, -4.2), color=0x2A5F78, bevel=0)
 ISLETS = []
 lib.piece('causeway')
-box('causeway', (190, 3.0, 0.3), (55, -3.2, -0.52), color=0xC9BFA8, bevel=0.1)
+# a raised bank of blue-grey ballast with sloping sides (painted with pebbles in the browser), big rocks along its edges
+import bmesh as _bm
+_r = random.Random(41)                                                     # its own dice, so the rest of the scene stays put
+_prof = [(-3.3, -0.8), (-2.55, -0.5), (-1.75, -0.27), (-1.2, -0.24), (1.2, -0.24), (1.75, -0.27), (2.55, -0.5), (3.3, -0.8)]
+_bmesh = _bm.new(); _rows = []
+for i in range(166):
+    x = -25 + i
+    _rows.append([_bmesh.verts.new((x, -3.2 + yy + (_r.uniform(-0.06, 0.06) if 0 < k < 7 else 0), zz + (_r.uniform(-0.03, 0.03) if 0 < k < 7 else 0))) for k, (yy, zz) in enumerate(_prof)])
+for a, b in zip(_rows, _rows[1:]):
+    for k in range(len(_prof) - 1): _bmesh.faces.new((a[k], b[k], b[k + 1], a[k + 1]))
+_me = bpy.data.meshes.new('ballast'); _bmesh.to_mesh(_me); _bmesh.free()
+_o = bpy.data.objects.new('ballast', _me); bpy.context.scene.collection.objects.link(_o); _o.data.materials.append(mat(0x8C97A3, 1.0)); lib._attach(_o, None)
+for i in range(520):                                                       # rocks tumbled along both edges of the bank
+    x = _r.uniform(-24, 140); sy = _r.choice((-1, 1)); y = -3.2 + sy * _r.uniform(1.9, 3.0); r = _r.uniform(0.14, 0.34)
+    ball('edge_rock', r, (x, y, -0.62 + (3.0 - abs(y + 3.2)) * 0.35 + r * 0.2), (_r.uniform(1.0, 1.6), _r.uniform(0.8, 1.2), _r.uniform(0.55, 0.8)), _r.choice((0x7A8490, 0x6A7380, 0x96A0AA)), rough=1)
 for dy in (-0.72, 0.72): box('rail', (190, 0.07, 0.14), (55, -3.2 + dy, -0.19), color='rail', bevel=0.012, rough=0.3)
 x = -22.0
 while x < 110: box('sleeper', (0.24, 2.4, 0.14), (x, -3.2, -0.3), color='timber_dark', bevel=0.02, jitter=0.012); x += 0.7
 x = -20.0
 while x < 110:
-    for sy in (-1, 1): cyl('pile', 0.11, 0.1, 0.9, (x, -3.2 + sy * 1.62, -0.6), (random.uniform(-3, 3), 0, 0), color='timber_dark', bevel=0.01, verts=10)
+    for sy in (-1, 1): random.uniform(-3, 3)                              # (the timber piles are gone; keep the dice rolls so the islets stay put)
     x += 3.0
 
 # ---------- platform ----------

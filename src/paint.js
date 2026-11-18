@@ -94,6 +94,15 @@ const PAINTERS = {
       wrap(x, y, rr + 2, (X, Y) => { dab(g, X + 1, Y + 1.5, rr, rr * 0.8, 0, '#5d564b', 0.5); dab(g, X, Y, rr, rr * 0.8, r(), c, 1); dab(g, X - rr * 0.3, Y - rr * 0.3, rr * 0.4, rr * 0.3, 0, '#e3dccb', 0.5); });
     }
   },
+  // Track ballast: tightly packed blue-grey stones, each lit on top and shadowed underneath.
+  ballast(g, r) {
+    g.fillStyle = '#5f6875'; g.fillRect(0, 0, SIZE, SIZE);
+    const tones = ['#6f7884', '#828c98', '#95a0ab', '#a9b3bc', '#7c7f86', '#8f8a84'];
+    for (let i = 0; i < 3800; i++) {
+      const x = r() * SIZE, y = r() * SIZE, rr = 2.5 + r() * 5, c = pick(tones, r());
+      wrap(x, y, rr + 2, (X, Y) => { dab(g, X + 1, Y + 1.5, rr, rr * 0.75, 0, '#3c434d', 0.55); dab(g, X, Y, rr, rr * 0.75, r(), c, 1); dab(g, X - rr * 0.3, Y - rr * 0.35, rr * 0.45, rr * 0.3, 0, '#dfe5ea', 0.45); });
+    }
+  },
   // Wood grain (grey, tinted by each part's own colour): plank bands, wavy grain lines, knots.
   wood(g, r) {
     g.fillStyle = '#c8c8c8'; g.fillRect(0, 0, SIZE, SIZE);
@@ -161,7 +170,7 @@ const PAINTERS = {
 };
 // How each kind is applied: `replace` uses the painted colours as they are; `tint` multiplies them with the part's own colour.
 const KINDS = { grass: { scale: 1 / 3.2, mode: 'replace' }, sand: { scale: 1 / 4, mode: 'replace' }, concrete: { scale: 1 / 4, mode: 'replace' },
-  gravel: { scale: 1 / 2, mode: 'replace' }, wood: { scale: 1 / 2.2, mode: 'tint' }, stone: { scale: 1 / 2.5, mode: 'tint' },
+  gravel: { scale: 1 / 2, mode: 'replace' }, ballast: { scale: 1 / 1.6, mode: 'replace' }, wood: { scale: 1 / 2.2, mode: 'tint' }, stone: { scale: 1 / 2.5, mode: 'tint' },
   bark: { scale: 1 / 1.6, mode: 'tint' }, plaster: { scale: 1 / 3, mode: 'tint' }, roof: { scale: 1 / 2.4, mode: 'tint' }, paint: { scale: 1 / 1.6, mode: 'tint' } };
 
 const textures = {};
@@ -176,6 +185,7 @@ export function paintedTexture(kind) {
 
 // Which Blender colours are which surface (the hex in the material name). Unlisted colours keep their flat paint.
 export const SURFACES = {
+  '8c97a3': 'ballast', '7a8490': 'stone', '6a7380': 'stone', '96a0aa': 'stone',
   '7db85a': 'grass', 'e6d6a8': 'sand', d2cbbc: 'concrete', a39c8f: 'concrete', c9bfa8: 'gravel', '8f877d': 'gravel',
   '9a6a45': 'wood', c9a374: 'wood', '8a5a3c': 'wood', '4a3226': 'wood', '4e3528': 'wood', b9b2a8: 'stone',
   '5a3f30': 'bark', f0e4c8: 'plaster', '41626f': 'roof', '2f4b58': 'roof', '5e8f7a': 'roof', '45725f': 'roof', f1e6cc: 'paint', e8f0f4: 'paint', b8403a: 'paint', f0e2c0: 'paint',

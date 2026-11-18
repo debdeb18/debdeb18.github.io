@@ -23,9 +23,9 @@ const PZ = 0.95, TRACK = -3.2;                                   // platform hei
 const NUMBERS = new Set(['sunI', 'hemiI', 'lamps', 'stars', 'glow', 'bloom']);                // everything else in a palette is a colour
 const pal = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, NUMBERS.has(k) ? v : new THREE.Color(v)]));
 const NIGHT = pal({ top: 0x070b24, mid: 0x1b2552, bot: 0x0e1638, sun: 0x8fa8ff, sunI: 0.45, sky: 0x3a4a80, ground: 0x182030, hemiI: 0.55, fog: 0x18214a, shallow: 0x1d5a6e, deep: 0x07142e, lamps: 1, cLit: 0x5d68a0, cShade: 0x20264a, cEdge: 0x8c96cc, stars: 1, glow: 0.45, bloom: 0.75 });
-const DAWN = pal({ top: 0x4a6fb0, mid: 0xffc2a0, bot: 0x8aa0c8, sun: 0xffb38a, sunI: 1.3, sky: 0xd8c8e8, ground: 0x8a9a78, hemiI: 1.0, fog: 0xf0c8b8, shallow: 0x7cc4c4, deep: 0x245a80, lamps: 0.5, cLit: 0xffe2d2, cShade: 0x9890c4, cEdge: 0xffd0b4, stars: 0.15, glow: 0.3, bloom: 0.45 });
-const DAY = pal({ top: 0x2f86e0, mid: 0xbfe4f3, bot: 0xbfe4ea, sun: 0xfff2d6, sunI: 3.0, sky: 0xb4d4f4, ground: 0x8a9c8c, hemiI: 1.2, fog: 0xd2ecf2, shallow: 0x5fd0c8, deep: 0x17639a, lamps: 0, cLit: 0xfbf8ee, cShade: 0xa3b0cf, cEdge: 0xffffff, stars: 0, glow: 0.2, bloom: 0.3 });
-const DUSK = pal({ top: 0x232a5c, mid: 0xf6b3a0, bot: 0x7a86b4, sun: 0xffa070, sunI: 1.5, sky: 0xc8a8c8, ground: 0x6a6a7a, hemiI: 0.95, fog: 0xe8b9b0, shallow: 0x6aa8b4, deep: 0x1a3c6a, lamps: 1, cLit: 0xffd9c4, cShade: 0x8a7bb0, cEdge: 0xffc4a0, stars: 0.1, glow: 0.6, bloom: 0.55 });
+const DAWN = pal({ top: 0x4a6fb0, mid: 0xffc2a0, bot: 0x8aa0c8, sun: 0xffb38a, sunI: 1.3, sky: 0xd8c8e8, ground: 0x8a9a78, hemiI: 1.0, fog: 0xf0c8b8, shallow: 0x6ab4c4, deep: 0x24508c, lamps: 0.5, cLit: 0xffe2d2, cShade: 0x9890c4, cEdge: 0xffd0b4, stars: 0.15, glow: 0.3, bloom: 0.45 });
+const DAY = pal({ top: 0x2f86e0, mid: 0xbfe4f3, bot: 0xbfe4ea, sun: 0xfff2d6, sunI: 3.0, sky: 0xb4d4f4, ground: 0x8a9c8c, hemiI: 1.2, fog: 0xd2ecf2, shallow: 0x45b8c8, deep: 0x1a4f96, lamps: 0, cLit: 0xfbf8ee, cShade: 0xa3b0cf, cEdge: 0xffffff, stars: 0, glow: 0.2, bloom: 0.3 });
+const DUSK = pal({ top: 0x232a5c, mid: 0xf6b3a0, bot: 0x7a86b4, sun: 0xffa070, sunI: 1.5, sky: 0xc8a8c8, ground: 0x6a6a7a, hemiI: 0.95, fog: 0xe8b9b0, shallow: 0x5a8fb4, deep: 0x1d3270, lamps: 1, cLit: 0xffd9c4, cShade: 0x8a7bb0, cEdge: 0xffc4a0, stars: 0.1, glow: 0.6, bloom: 0.55 });
 const KEYS = [[0, NIGHT], [5.2, NIGHT], [6.5, DAWN], [8.5, DAY], [16.4, DAY], [18.2, DUSK], [19.7, NIGHT], [24, NIGHT]];
 function mixPal(out, a, b, k) {
   for (const key in a) out[key] = a[key].isColor ? (out[key] || new THREE.Color()).lerpColors(a[key], b[key], k) : a[key] + (b[key] - a[key]) * k;
@@ -54,19 +54,19 @@ const hourNow = () => { if (!isNaN(forced)) return ((forced % 24) + 24) % 24; co
 
 // ---------- the sea floor: shallow banks under the line, the station and the islets, deep water beyond ----------
 function seaDepth(bx, by, islets) {
-  let d = Math.abs(by - TRACK) - 2.2;
-  d = Math.min(d, Math.max(-11 - bx, bx - 35, -2.5 - by, by - 11.5, 0) - 1.0);
+  const dt = Math.abs(by - TRACK) - 3.0;                                           // off the track bank the sea drops away fast
+  let d = Math.max(-11 - bx, bx - 35, -2.5 - by, by - 11.5, 0) - 1.0;
   for (const [ix, iy, ir] of islets) d = Math.min(d, Math.hypot(bx - ix, by - iy) - ir * 1.15);
-  let k = Math.min(1, Math.max(0, d / 8)); k = k * k * (3 - 2 * k);
+  let k = Math.min(Math.min(1, Math.max(0, dt / 3.5)), Math.min(1, Math.max(0, d / 8))); k = k * k * (3 - 2 * k);
   return 0.42 + 3.4 * k - Math.sin(bx * 0.7) * Math.cos(by * 0.9) * 0.05;
 }
 const DEPTH_GLSL = `
 uniform vec3 uIslets[16];
 float seaDepth(vec2 b) {
-  float d = abs(b.y - (${TRACK.toFixed(1)})) - 2.2;
-  d = min(d, max(max(max(-11.0 - b.x, b.x - 35.0), max(-2.5 - b.y, b.y - 11.5)), 0.0) - 1.0);
+  float dt = abs(b.y - (${TRACK.toFixed(1)})) - 3.0;
+  float d = max(max(max(-11.0 - b.x, b.x - 35.0), max(-2.5 - b.y, b.y - 11.5)), 0.0) - 1.0;
   for (int i = 0; i < 16; i++) d = min(d, length(b - uIslets[i].xy) - uIslets[i].z * 1.15);
-  float k = clamp(d / 8.0, 0.0, 1.0); k = k * k * (3.0 - 2.0 * k);
+  float k = min(clamp(dt / 3.5, 0.0, 1.0), clamp(d / 8.0, 0.0, 1.0)); k = k * k * (3.0 - 2.0 * k);
   return 0.42 + 3.4 * k - sin(b.x * 0.7) * cos(b.y * 0.9) * 0.05;
 }`;
 
@@ -107,8 +107,8 @@ function makeWater(U) {
         // the mirror: the scene rendered upside down, nudged by the ripples. Shallows stay see-through; deep water is a mirror.
         vec4 rp = uReflMat * vec4(vW, 1.0);
         vec2 ruv = rp.xy / rp.w + tilt.xz * 0.35;
-        vec3 refl = texture2D(uRefl, ruv).rgb;
-        float reflK = mix(0.28, 0.82, murk) * mix(0.65, 1.0, fres) * (1.0 - foam);
+        vec3 refl = texture2D(uRefl, ruv).rgb * mix(vec3(1.0), uDeep * 2.2 + 0.35, 0.35 * murk);   // the mirror takes on the sea's blue
+        float reflK = mix(0.3, 0.9, murk) * mix(0.75, 1.0, fres) * (1.0 - foam);       // deep water: almost a perfect mirror
         outgoingLight = mix(outgoingLight, refl, reflK);
         diffuseColor.a = max(diffuseColor.a, reflK);
         #include <opaque_fragment>`);

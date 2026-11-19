@@ -34,7 +34,7 @@ def strake(name, phi0, phi1, color, parent, n=26, out=0.0):
     s = o.modifiers.new('thick', 'SOLIDIFY'); s.thickness = 0.03; s.offset = -1
     return o
 
-def build(style='A'):
+def build(style='A'):                                                          # A (varnished wood) is the chosen one
     r = root('boat'); hull = r
     if style == 'A': bands = [0xA9713F, 0x9A6338, 0xA9713F, 0x8E5A32, 0x7C4D2C, 0x6B4227]; inside, rail = 0x8E5A32, 0x5E3A22
     elif style == 'B': bands = [0x4F8FA0, 0x4F8FA0, 0xF1E6CC, 0x4F8FA0, 0xB8403A, 0xB8403A]; inside, rail = 0xC9A374, 0x2F5C6A
@@ -52,15 +52,18 @@ def build(style='A'):
     for k in range(9):                                                          # ribs inside
         t = 0.12 + k * 0.095
         tube('rib', [tuple(point(t, ph, -0.035)) for ph in range(-85, 86, 17)], 0.014, inside, r)
-    box('floorboards', (L * 0.55, 0.36, 0.02), (0.05, 0, sheer(0.5) - depth(0.5) + 0.06), color=inside, parent=r, bevel=0.005)
+    fz = sheer(0.5) - depth(0.5) + 0.18                                         # floorboards: a deck above the waterline
+    for k in range(5):
+        y = (k - 2) * 0.17
+        plank('floorboard', (L * 0.66 - abs(k - 2) * 0.22, 0.16, 0.025), (0.08 + abs(k - 2) * 0.05, y, fz), (0, 0, 0), inside, r, bevel=0.006, nails=False)
     for t in (0.38, 0.72):                                                     # seats across
         wv = width(t) * 2 - 0.06
         plank('thwart', (0.24, wv, 0.04), (-L / 2 + t * L, 0, sheer(t) - 0.14), (0, 0, 0), inside, r, bevel=0.01, nails=False)
     plank('stern_seat', (0.3, width(0.93) * 2 - 0.08, 0.04), (-L / 2 + 0.93 * L, 0, sheer(0.93) - 0.12), (0, 0, 0), inside, r, bevel=0.01, nails=False)
-    t0 = 0.55                                                                   # oarlocks; the oars shipped, resting
-    for sg in (1, -1):                                                          # along each side, blades towards the bow
+    t0 = 0.55                                                                   # oarlocks; the oars shipped, resting on
+    for sg in (1, -1):                                                          # the seats inside the hull, blades to the bow
         p = point(t0, sg * 90, 0.03); cyl('oarlock', 0.012, 0.012, 0.08, tuple(p), color=0x3A3D44, parent=r, bevel=0, verts=8)
-        a = Vector((-L / 2 + 0.95 * L, sg * (width(0.9) - 0.12), sheer(0.9) - 0.1)); b = Vector((-L / 2 + 0.2 * L, sg * (width(0.2) - 0.1), sheer(0.2) - 0.06))
+        a = Vector((-L / 2 + 0.86 * L, sg * 0.13, 0.225)); b = Vector((-L / 2 + 0.24 * L, sg * 0.16, 0.25))   # lying on the seats,
         tube('oar', [tuple(a), tuple(b)], 0.02, 0xC9A374, r)
         d = (b - a).normalized()
         box('oar_blade', (0.34, 0.12, 0.015), tuple(b + d * 0.17 - Vector((0, 0, 0.0075))), (0, 0, math.degrees(math.atan2(d.y, d.x))), 0xC9A374, r, bevel=0.01)

@@ -29,7 +29,8 @@ Design in Blender
 - [x] Split into pieces: 47 models and a layout file in `models/terminal/`
 - [x] Train: judpro's Sketchfab model in maroon and golden cream
 - [x] Mirror water that stirs where things pass; ballast-bank railway; poles and wires removed; trees reshaped
-- [ ] Review, then fixes (the rowing boat needs a proper hull)
+- [ ] Review, then fixes
+- [x] Rowing boat with a proper hull: varnished wood, clinker planks, oars resting on the seats (`blender/assets/boat.py`, style A)
 
 Porch v2 (on the ruin), assets in `blender/assets/halt.py`, `heron.py`, `fish.py`
 - [x] Ruin pier, tower with arched windows, tall wall, front and back stairs from the porch's courses, seats, posters on the wall, crossing signal in the water, deck hooked over the back edge

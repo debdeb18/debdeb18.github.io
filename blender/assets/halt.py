@@ -285,13 +285,16 @@ def ruin_wall(r, rnd, x0, x1, yc, T, H, openings):
     def lim(x): return TOP + H if x > x0 + 1.8 else TOP + 0.6 + (x - x0) / 1.8 * (H - 0.6) + rnd.uniform(-0.2, 0.2)   # the broken end steps down
     while z < TOP + H - 0.1:
         h = min(rnd.uniform(0.38, 0.48), TOP + H - z)
+        h0 = h
+        if TOP + H - z <= 0.48: h = 0.46                                         # the top course: thick blocks
+        wtop = z + h
         a = x0 - (rnd.uniform(0.2, 0.45) if row % 2 else 0.0)
         rs = x0 + (rnd.uniform(0.0, 0.55) if row else 0.0)                      # each course ends ragged, its own way
         while a < x1 - 0.05:
             l = rnd.uniform(0.6, 1.15); a0, a1 = max(a, rs), min(a + l, x1); a += l
             if a1 - a0 < 0.18: continue
             c = (a0 + a1) / 2
-            if z + h * 0.5 > lim(c): continue
+            if z + h0 * 0.5 > lim(c): continue
             objs = ruin_block(r, rnd, (a1 - a0 - 0.03, T, h - 0.03), (c, yc + rnd.uniform(-0.015, 0.015), z), (rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-0.8, 0.8)), 'x', 0,
                               crack=0.0 if any(abs(c - ox) < 1.0 for (ox, _, _) in openings) else 0.15, backing=True)
             blocks.append((c, z, h, objs)); tops[round(c, 2)] = (c, z + h, a1 - a0)
@@ -316,12 +319,12 @@ def ruin_wall(r, rnd, x0, x1, yc, T, H, openings):
         l = min(rnd.uniform(0.8, 1.3), x1 - xs)
         if l > 0.2: bpy.data.objects.remove(painted_box('ledge', (l - 0.03, T + 0.3, 0.2), (xs + l / 2, yc, TOP + H), (0, 0, rnd.uniform(-1, 1)), color='stone_c', parent=r, bevel=0.03, along='top', rough=1.8))
         xs += l
-    for _ in range(6): grass_cap(r, rnd, rnd.uniform(x0 + 2.4, x1 - 0.5), yc, TOP + H - 0.03, rnd.uniform(0.6, 1.2), T + 0.2, 0)
+    for _ in range(6): grass_cap(r, rnd, rnd.uniform(x0 + 2.4, x1 - 0.5), yc, wtop - 0.03, rnd.uniform(0.6, 1.2), T + 0.2, 0)
     for xx in (x0 + 2.4, x0 + 4.3, x1 - 1.0):                                   # ivy down the front
-        ivy(r, rnd, xx, yc - T / 2, TOP + H + 0.1, 0, -1, rnd.uniform(1.5, 2.6))
+        ivy(r, rnd, xx, yc - T / 2, wtop + 0.1, 0, -1, rnd.uniform(1.5, 2.6))
     import random; rb = random.Random(7)                                       # and down the back (its own dice, so the stones stay put)
     for xx in (x0 + 1.4, x0 + 3.6, x1 - 2.2, x1 - 0.6):
-        ivy(r, rb, xx, yc + T / 2, TOP + H + 0.1, 0, 1, rb.uniform(1.6, 2.6))
+        ivy(r, rb, xx, yc + T / 2, wtop + 0.1, 0, 1, rb.uniform(1.6, 2.6))
     return blocks
 
 def bush(r, rnd, x, y, z, s=1.0):

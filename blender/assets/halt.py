@@ -521,7 +521,7 @@ def build():
             if rnd.random() < 0.3: moss_strip(r, rnd, XS0 + k * SD + 0.05, ya + l, top - 0.02, 1, 0, SD - 0.1)
             ya += l
     ruin_tower(r, rnd)
-    for (x, y, nx_, ny_, ln) in ((-3.2, -LY / 2 - 0.12, 0, -1, 1.2), (3.9, LY / 2 + 0.12, 0, 1, 1.4)):
+    for (x, y, nx_, ny_, ln) in ((-3.2, -LY / 2 - 0.12, 0, -1, 1.2), (2.4, LY / 2 + 0.12, 0, 1, 1.4)):
         ivy(r, rnd, x, y, TOP - 0.05, nx_, ny_, ln)                          # a little ivy over the pier's edge
     ruin_wall(r, rnd, wx0, wx1, WY, WT, WH, ())                              # no windows in the wall (the tower keeps its own)
     for lx in (-0.4, 3.6): lantern(r, lx, WF, TOP + 1.95)
@@ -580,7 +580,18 @@ def build():
     for sx in (-1, 1): cyl('bollard', 0.085, 0.075, 0.38, (bx + sx * 0.16, by, DZ), color='plank_d', parent=r, bevel=0.025, verts=12)   # the rope
     box('bollard_bar', (0.5, 0.1, 0.07), (bx, by, DZ + 0.26), color='plank', parent=r, bevel=0.015)                                    # looped over
     tube('rope_fig8', [(bx - 0.16, by + 0.09, DZ + 0.3), (bx + 0.16, by - 0.09, DZ + 0.33), (bx + 0.16, by + 0.09, DZ + 0.35), (bx - 0.16, by - 0.09, DZ + 0.37), (bx - 0.16, by + 0.09, DZ + 0.39)], 0.025, 0xD9C08E, r)
-    tube('rope', [(bx - 0.2, by + 0.05, DZ + 0.3), (bx - 0.55, by + 0.45, DZ - 0.2), (bx - 0.8, by + 1.0, 0.1)], 0.025, 0xD9C08E, r)
+    # the rest of the rope dropped off the post and left in a messy heap on the deck: loose, uneven loops, a few
+    # sprawling off the pile, and a loose end trailing out
+    cx, cy = bx + 0.55, by - 0.55; pts = [(bx - 0.2, by + 0.05, DZ + 0.3), (bx - 0.05, by - 0.2, DZ + 0.03), (cx - 0.25, cy + 0.2, DZ + 0.03)]
+    a = math.atan2(0.2, -0.25); n = 34
+    for i in range(n):
+        a += rnd.uniform(0.45, 0.75); k = i / n
+        rad = rnd.uniform(0.17, 0.27) * (1.35 if rnd.random() < 0.15 else 1.0)
+        ox, oy = rnd.uniform(-0.05, 0.05) + 0.06 * math.sin(k * 7), rnd.uniform(-0.05, 0.05)
+        pts.append((cx + ox + rad * math.cos(a) * 1.15, cy + oy + rad * math.sin(a), DZ + 0.026 + min(0.09, k * 0.12) * rnd.uniform(0.4, 1.0)))
+    ex, ey = pts[-1][0], pts[-1][1]
+    pts += [(ex + 0.15, ey - 0.12, DZ + 0.026), (ex + 0.32, ey - 0.08, DZ + 0.026), (ex + 0.42, ey - 0.22, DZ + 0.026)]
+    tube('rope', pts, 0.025, 0xD9C08E, r)
     bake_cuts()
     return r
 

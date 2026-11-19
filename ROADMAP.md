@@ -31,6 +31,15 @@ Design in Blender
 - [x] Mirror water that stirs where things pass; ballast-bank railway; poles and wires removed; trees reshaped
 - [ ] Review, then fixes (the rowing boat needs a proper hull)
 
+Porch v2 (on the ruin), assets in `blender/assets/halt.py`, `heron.py`, `fish.py`
+- [x] Ruin pier, tower with arched windows, tall wall, front and back stairs from the porch's courses, seats, posters on the wall, crossing signal in the water, deck hooked over the back edge
+- [ ] Choose the mooring post (options in `blender/concepts/bollard-options.png`)
+- [ ] Revisit the stone blocks at the end of the phase
+- [ ] Put the porch into the world (simplify the model on export)
+- [ ] Cat asleep in the tower nook ('cat_sleep' in the porch model): hidden when it rains or the weather is bad
+- [ ] Heron on the deck or the rocks, only when sunny: flies off when a train passes, comes back while it stays sunny
+- [ ] Fish by the back stairs; in rain only one or two, under the deck
+
 Build in the website
 - [x] Assemble the station, with walkable areas and collisions
 - [x] Trilingual name on the sign (어딘가 / Somewhere / Entah di mana)

@@ -55,6 +55,21 @@ def stone_face(r, rnd, along, fixed, axis):
             a += l
         z += h; row += 1
 
+def sleeping_cat(r, x, y, z, yaw):
+    """A ginger tabby curled up asleep, nose tucked into its tail. Its own named part ('cat_sleep'), so the world can
+    hide it when it rains."""
+    c = root('cat_sleep'); c.location = (x, y, z); c.rotation_euler = (0, 0, math.radians(yaw)); c.parent = r
+    ginger, dark, cream = 0xE39A55, 0xC9783A, 0xF6E2C4
+    ball('cat_body', 0.2, (0, 0, 0.1), (1.35, 1.0, 0.62), ginger, c)
+    for k in range(4): ball('cat_stripe', 0.05, (-0.12 + k * 0.08, 0.0, 0.2), (0.35, 1.6, 0.25), dark, c)
+    ball('cat_head', 0.11, (-0.2, -0.13, 0.12), (1.05, 1.0, 0.85), ginger, c)
+    ball('cat_muzzle', 0.05, (-0.25, -0.2, 0.1), (1, 0.8, 0.7), cream, c)
+    for sx in (-1, 1): cyl('cat_ear', 0.04, 0.003, 0.07, (-0.2 + sx * 0.07, -0.1, 0.2), (sx * 15, -20, 0), ginger, c, bevel=0, verts=6)
+    for sx in (-1, 1): box('cat_eye', (0.03, 0.006, 0.006), (-0.24 + sx * 0.04, -0.215, 0.135), (0, sx * 12, 0), 0x3B2A20, c, bevel=0)   # closed
+    tube('cat_tail', [(0.24, 0.05, 0.06), (0.25, -0.12, 0.05), (0.08, -0.24, 0.05), (-0.12, -0.25, 0.06), (-0.26, -0.22, 0.08)], [0.04, 0.038, 0.034, 0.03, 0.026], dark, c)
+    for sx in (-1, 1): ball('cat_paw', 0.04, (-0.1 + sx * 0.06, -0.2, 0.03), (1.2, 1, 0.6), cream, c)
+    return c
+
 def moss_tuft(r, rnd, x, y, z, s=1.0):
     """A small cushion of moss."""
     lump('moss', 0.05 * s, (x, y, z), (rnd.uniform(1.2, 2.2), rnd.uniform(1.0, 1.5), 0.6), rnd.choice(('moss_a', 'moss_b')), r, strength=0.35, grain=0.5, detail=2)
@@ -136,6 +151,7 @@ def floor_slabs(r, rnd, joints, rect=None, top=TOP, skip=lambda x, y: False, cli
 TX, TY, TR, TW = -LX / 2 - 1.5, -0.8, 2.45, 0.6                                  # the ruined tower (centre, outer radius, wall): it overlaps the end of the pier
 WINDOWS = ((250, TOP + 2.6, TOP + 3.7), (238, TOP + 0.5, TOP + 1.6), (290, TOP + 0.5, TOP + 1.6))   # (angle, sill, head), on its front
 DOOR = None
+NOOK = (12, TOP + 1.0, TOP + 1.5)                                               # where blocks are gone from the tower wall facing the wall: the cat's spot
 
 def ivy(r, rnd, x, y, z, nx, ny, length):
     """Ivy hanging down a wall from (x, y, z): a few strands of leafy clusters pressed flat to the wall, fuller at the
@@ -159,7 +175,7 @@ def ruin_tower(r, rnd):
     ivy hanging down; rubble inside and fallen blocks at its foot."""
     n = 18; z = BASE; row = 0; rm = TR - TW / 2; arc = 2 * math.pi * TR / n - 0.035
     cols = [rnd.uniform(-0.5, 0.3) for _ in range(n)]
-    tops = [BASE] * n; built = []
+    tops = [BASE] * n; built = []; nook = []
     def top(th, k):                                                            # standing all round, with a jagged broken crown
         return TOP + 4.4 + 0.5 * math.sin(th * 3 + 1) + cols[k] * 1.4
     def in_window(th, z0, z1):
@@ -171,6 +187,8 @@ def ruin_tower(r, rnd):
         for k in range(n):
             th = (k + off) / n * 2 * math.pi
             if z + h * 0.5 > top(th, k): continue
+            if abs(((th - math.radians(NOOK[0])) + math.pi) % (2 * math.pi) - math.pi) < 0.3 and NOOK[1] <= z < NOOK[2]:
+                nook.append((th, z, h)); continue                              # the nook: a few blocks gone from one course
             if row > 1 and rnd.random() < 0.03 and not in_window(th, z - 0.6, z + h + 0.6): continue
             built.append((th, z, h, ruin_block(r, rnd, (arc, TW, h - 0.03), (TX + rm * math.cos(th), TY + rm * math.sin(th), z),
                        (rnd.uniform(-1.5, 1.5), rnd.uniform(-1.5, 1.5), math.degrees(th) - 90 + rnd.uniform(-1.5, 1.5)), 'x', 0,
@@ -188,6 +206,14 @@ def ruin_tower(r, rnd):
         pts = [(TX + ex * (TR + 0.015) + tx_ * rr * 1.08 * math.cos(math.pi * i / 10), TY + ey * (TR + 0.015) + ty_ * rr * 1.08 * math.cos(math.pi * i / 10), ws + hb + rr * 1.08 * math.sin(math.pi * i / 10)) for i in range(11)]
         tube('arch', [(pts[0][0], pts[0][1], ws)] + pts + [(pts[-1][0], pts[-1][1], ws)], 0.045, 'stone_c', r)   # a moulding round the arch
         painted_box('sill', (ww + 0.2, TW + 0.12, 0.09), (TX + rm * ex, TY + rm * ey, ws - 0.09), (0, 0, math.degrees(th) - 90), color='stone_c', parent=r, bevel=0.02, along='x', rough=1.5)
+    if nook:                                                                   # close the back of the nook, the sleeping cat in it
+        nz, nh = nook[0][1], nook[0][2]; th0 = math.radians(NOOK[0])
+        for (th, z_, h_) in nook:
+            ri = TR - TW + 0.12
+            painted_box('nook_back', (2 * math.pi * TR / n * 0.75, 0.24, h_ - 0.03), (TX + ri * math.cos(th), TY + ri * math.sin(th), z_), (0, 0, math.degrees(th) - 90),
+                        color='stone_b', parent=r, bevel=0.03, along='x', rough=2.0, paint=dict(light=0xCFC7B4, mid=0xBDB4A0, low=0xA49B86, right=0xB4AB97))
+        rc = TR - TW / 2 + 0.06
+        sleeping_cat(r, TX + rc * math.cos(th0), TY + rc * math.sin(th0), nz + 0.005, math.degrees(th0) + 90)
     for k in range(n):                                                         # battlements, grass over the broken tops
         th = (k + 0.25) / n * 2 * math.pi; px, py = TX + rm * math.cos(th), TY + rm * math.sin(th)
         if tops[k] > TOP + 4.0 and k % 2 == 0:

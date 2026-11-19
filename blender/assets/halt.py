@@ -231,8 +231,7 @@ def ruin_tower(r, rnd):
             painted_box('nook_back', (2 * math.pi * TR / n * 0.75, 0.24, h_ - 0.03), (TX + ri * math.cos(th), TY + ri * math.sin(th), z_), (0, 0, math.degrees(th) - 90),
                         color='stone_b', parent=r, bevel=0.03, along='x', rough=2.0, paint=dict(light=0xCFC7B4, mid=0xBDB4A0, low=0xA49B86, right=0xB4AB97))
         rc = TR - TW / 2 + 0.06
-        from assets import cat_sleep
-        cat = cat_sleep.build(r); cat.location = (TX + rc * math.cos(th0), TY + rc * math.sin(th0), nz + 0.005); cat.rotation_euler = (0, 0, math.radians(math.degrees(th0) + 90))
+        # the cat asleep here: to do (cat_sleep.py is the work in progress)
     for k in range(n):                                                         # battlements, grass over the broken tops
         th = (k + 0.25) / n * 2 * math.pi; px, py = TX + rm * math.cos(th), TY + rm * math.sin(th)
         if tops[k] > TOP + 4.0 and k % 2 == 0:

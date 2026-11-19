@@ -322,7 +322,7 @@ def lantern(r, x, y, z):
     """A lantern on an iron bracket, fixed to the front of the wall."""
     tube('lantern_arm', [(x, y, z + 0.35), (x, y - 0.25, z + 0.42), (x, y - 0.35, z + 0.32)], 0.02, 'iron_d', r)
     cyl('lantern_cap', 0.12, 0.05, 0.08, (x, y - 0.35, z + 0.25), color='iron_d', parent=r, bevel=0.01, verts=12)
-    cyl('lantern', 0.09, 0.09, 0.22, (x, y - 0.35, z + 0.03), color='lamp_w', parent=r, bevel=0.03, emit=4.0, verts=12)
+    cyl('lantern', 0.09, 0.09, 0.22, (x, y - 0.35, z + 0.03), color='lamp_w', parent=r, bevel=0.03, emit=1.6, verts=12)
 
 def fence(r, p0, p1):
     """A white railing from p0 to p1 (on the platform top): posts with caps, top and bottom rails, close balusters."""
@@ -497,7 +497,7 @@ def build():
     WF = WY - WT / 2                                                           # the wall's front face
     wx0 = TX + TR + 1.6                                                         # it starts away from the tower
     wx1 = LX / 2 - 0.15
-    ch = (TOP - 0.3) / 2; XS0 = (wx0 + wx1) / 2; SD = 0.55; LOW = ch; XS1 = XS0 + SD   # stairs from the courses, the lower level
+    ch = (TOP - 0.3) / 2; XS0 = (wx0 + wx1) / 2; SD = 0.55; LOW = -0.05; XS1 = XS0 + 2 * SD   # two steps down to a level just under the water
     box('core', (LX - 0.5, LY / 2 - WF - 0.25, TOP - BASE - 0.06), (0, (WF + LY / 2 - 0.25) / 2, BASE), color='joint', parent=r, bevel=0.02)
     box('core', (XS0 + LX / 2 - 0.25, WF + LY / 2 - 0.25, TOP - BASE - 0.06), ((XS0 - LX / 2 + 0.25) / 2, (WF - LY / 2 + 0.25) / 2, BASE), color='joint', parent=r, bevel=0.02)
     box('core', (LX / 2 - XS0 - 0.25, WF + LY / 2 - 0.25, LOW - BASE - 0.06), ((XS0 + LX / 2 - 0.25) / 2, (WF - LY / 2 + 0.25) / 2, BASE), color='joint', parent=r, bevel=0.02)
@@ -510,15 +510,16 @@ def build():
     floor_slabs(r, rnd, joints, clipx=(XS0, WF))    # the upper floor
     floor_slabs(r, rnd, joints, rect=(XS1, LX / 2 + 0.03, -LY / 2 - 0.03, WF), top=LOW)   # the lower level
     for (x, y, dx, dy, ln) in joints: moss_strip(r, rnd, x, y, (LOW if (x > XS0 and y < WF) else TOP) - 0.005, dx, dy, ln)
-    ya = -LY / 2 - 0.02                                                          # the stairs down: the middle course sticks out one step
-    while ya < WF - 0.05:                                                        # past the floor course, the full depth of the front
-        l = min(rnd.uniform(0.5, 0.8), WF - ya)
-        if WF - (ya + l) < 0.25: l = WF - ya
-        painted_box('stair', (SD + 0.02, l - 0.03, ch - 0.02), (XS0 + SD / 2, ya + l / 2, ch + rnd.uniform(-0.01, 0.005)), (rnd.uniform(-0.6, 0.6), rnd.uniform(-0.6, 0.6), rnd.uniform(-1.2, 1.2)),
-                    color=rnd.choice(('stone_a', 'stone_b', 'stone_c', 'stone_d')), parent=r, bevel=0.045, jitter=0.008, along='top', band=0.1, rough=2.6, chisel=1.0,
-                    bite=0.12 if rnd.random() < 0.2 else 0.0)
-        if rnd.random() < 0.35: moss_strip(r, rnd, XS0 + 0.05, ya + l, 2 * ch - 0.02, 1, 0, SD - 0.1)
-        ya += l
+    for k, top in enumerate((TOP - (TOP - LOW) / 3, TOP - 2 * (TOP - LOW) / 3)):   # two steps down, each a course of blocks
+        ya = -LY / 2 - 0.02
+        while ya < WF - 0.05:
+            l = min(rnd.uniform(0.5, 0.8), WF - ya)
+            if WF - (ya + l) < 0.25: l = WF - ya
+            painted_box('stair', (SD + 0.02, l - 0.03, top - LOW + 0.1), (XS0 + k * SD + SD / 2, ya + l / 2, LOW - 0.1 + rnd.uniform(-0.01, 0.005)), (rnd.uniform(-0.6, 0.6), rnd.uniform(-0.6, 0.6), rnd.uniform(-1.2, 1.2)),
+                        color=rnd.choice(('stone_a', 'stone_b', 'stone_c', 'stone_d')), parent=r, bevel=0.045, jitter=0.008, along='top', band=0.1, rough=2.6, chisel=1.0,
+                        bite=0.12 if rnd.random() < 0.2 else 0.0)
+            if rnd.random() < 0.3: moss_strip(r, rnd, XS0 + k * SD + 0.05, ya + l, top - 0.02, 1, 0, SD - 0.1)
+            ya += l
     ruin_tower(r, rnd)
     for (x, y, nx_, ny_, ln) in ((-3.2, -LY / 2 - 0.12, 0, -1, 1.2), (3.9, LY / 2 + 0.12, 0, 1, 1.4)):
         ivy(r, rnd, x, y, TOP - 0.05, nx_, ny_, ln)                          # a little ivy over the pier's edge
@@ -526,9 +527,7 @@ def build():
     for lx in (-0.4, 3.6): lantern(r, lx, WF, TOP + 1.95)
     seat_row(r, -0.9, WF - 0.45, 4)                                             # the waiting spot, on the upper front
     crossing_signal(r, LX / 2 + 0.7, -LY / 2 + 0.4, BASE)                       # in the water, just past the front right end
-    posters(r, rnd, XS1 + 1.4, WF - 0.03, LOW + 1.35)                           # the station's information, pinned to the wall                                    # the board, on the lower level just past the stairs
-    for (bx, by) in ((XS1 + 2.2, WF - 0.35), (XS1 + 2.9, WF - 0.45)):
-        bush(r, rnd, bx, by, LOW - 0.05, 0.7)
+    posters(r, rnd, XS1 + 1.2, WF - 0.03, 1.675)                           # the station's information, pinned to the wall                                    # the board, on the lower level just past the stairs
     for (bx, by, bs) in ((TX - 1.2, TY - TR - 0.3, 1.2), (TX + 0.6, TY - TR - 0.5, 1.0), (TX - TR - 0.2, TY + 0.4, 1.1)):
         bush(r, rnd, bx, by, BASE + 0.4, bs)                                    # bushes at the foot of the tower
     # behind: stone stairs down from the back porch beside the tower, and a wooden deck out towards the boat

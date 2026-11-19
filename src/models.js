@@ -18,9 +18,12 @@ export function gradient() {
 }
 
 // A rim of light around every silhouette, like the bright outline painters give backlit shapes.
+// Its strength is shared and follows the light (a world turns it down at night, where a fixed rim reads as white blotches).
+export const RIM = { value: 0.22 };
 export function rimPatch(sh) {
-  sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>',
-    'float rimK = pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 3.0);\noutgoingLight += rimK * 0.22 * (diffuseColor.rgb * 0.6 + 0.4);\n#include <opaque_fragment>');
+  sh.uniforms.uRim = RIM;
+  sh.fragmentShader = 'uniform float uRim;\n' + sh.fragmentShader.replace('#include <opaque_fragment>',
+    'float rimK = pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 3.0);\noutgoingLight += rimK * uRim * (diffuseColor.rgb * 0.6 + 0.4);\n#include <opaque_fragment>');
 }
 function rim(m) { m.onBeforeCompile = rimPatch; m.customProgramCacheKey = () => 'rim'; return m; }
 

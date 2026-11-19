@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { makeWorld, sky, stars, softDot, makeCrack, sign, uPlayer } from '../kit.js';
 import { blob } from '../nature.js';
-import { loadLayout, loadModel, gradient } from '../models.js';
+import { loadLayout, loadModel, gradient, RIM } from '../models.js';
 import { leafify } from '../foliage.js';
 import { cumulus, cumulusMaterial } from '../clouds.js';
 import { grassField } from '../grass.js';
@@ -20,7 +20,7 @@ const PZ = 0.95, TRACK = -3.2;                                   // porch floor 
 // The v1 scenery, left out while the world is rebuilt from zero (the layout still lists it).
 const V1_SCENERY = ['islet_00', 'islet_01', 'islet_02', 'islet_03', 'islet_04', 'islet_05', 'islet_06', 'islet_07', 'islet_08', 'islet_09', 'islet_10', 'islet_11',
   'islet_12', 'islet_13', 'islet_14', 'islet_15', 'tree_a', 'tree_b', 'tree_c', 'pine', 'footbridge', 'buoy_red', 'buoy_yellow', 'lily_pads', 'wires', 'backdrop', 'far_islands', 'gulls'];
-const LOW = 0.325, SIGN_K = 0.6, RAIL_Z = -0.322;              // the porch's lower front level; the sign's size; the rail (its top at -0.05)
+const LOW = -0.05, RAIL_Z = -0.322;              // the porch's lower front level; the sign's size; the rail (its top at -0.05)
 
 // ---------- time of day: the sky follows the visitor's clock (or ?time=HH) ----------
 const NUMBERS = new Set(['sunI', 'hemiI', 'lamps', 'stars', 'glow', 'bloom']);                // everything else in a palette is a colour
@@ -214,10 +214,8 @@ export function buildTerminal() {
     if (/^islet_|^fences_planters$|^station_props$/.test(name)) leafify(model, 'bush', isBush, gradient(), { clumps: true });
   }, ['train', 'utility_pole', 'utility_pole_lamp', 'utility_pole_transformer', 'platform', 'station_building', 'canopy', 'bench', 'vending_machine', 'bin',
       'canopy_signs', 'fences_planters', 'platform_lamp', 'station_props', 'lantern_string', 'roof_extras', 'mooring', 'chair', 'suitcase', 'cat', 'boat', 'causeway',
-      'halt', 'fish', 'heron', 'heron_flying', 'rail', ...V1_SCENERY]).then((r) => {   // the v1 station and scenery are gone: the porch (below)
+      'halt', 'fish', 'heron', 'heron_flying', 'rail', 'station_sign', ...V1_SCENERY]).then((r) => {   // the v1 station and scenery are gone: the porch (below)
     placed = r.placed; w.glowMats.push(...r.glow); w.loaded = true;
-    const sg = (placed.station_sign || [])[0];                                  // the station sign stands on the porch's lower level
-    if (sg) { sg.position.copy(B(PX + 4.3, PY - 1.85, LOW)); sg.scale.setScalar(SIGN_K); }
     buildSeabed([]);                                                               // (no islets for now: built from zero)
   });
   // The train: "Spirited Away Train" by judpro (CC BY 4.0), prepared by blender/scenes/import_train.py. Its cab is at y = 0,
@@ -373,11 +371,6 @@ export function buildTerminal() {
     }, { max: perM2 > 30 ? 60000 : 24000 }));
   }
 
-  // The station name, drawn here so the Korean stays crisp (covers the board on the Blender sign).
-  const sk = SIGN_K / 0.8;                                                         // (the Blender sign is drawn at 0.8)
-  const name = sign(s, ['어딘가', 'SOMEWHERE  ·  ENTAH DI MANA', '←  Semarang                    Seoul  →'], 2.1 * sk, 0.82 * sk, PX + 4.3, LOW + 1.51 * sk, -(PY - 1.85 - 0.045 * SIGN_K),
-    { size: [0.34 * sk, 0.12 * sk, 0.11 * sk], fg: ['#2f3b52', '#5a6478', '#b0563f'], bg: '#f6eedb', res: 200 });
-  name.material = new THREE.MeshToonMaterial({ map: name.material.map });
 
 
   // ---------- painted cumulus, drifting with the wind ----------
@@ -414,8 +407,9 @@ export function buildTerminal() {
   let emitAcc = 0, spawnI = 0;
 
   // ---------- night lights on the platform ----------
-  const lamps = [B(PX - 0.4, PY - 0.31, PZ + 2.09), B(PX + 3.6, PY - 0.31, PZ + 2.09)].map((p) => {           // the lanterns on the wall
-    const l = new THREE.PointLight(0xffb870, 0, 13, 1.6); l.position.copy(p); s.add(l); return l;
+  // The lanterns on the wall, lit from a step out in front of them, so they light the porch without glaring on the stone.
+  const lamps = [B(PX - 0.4, PY - 1.0, PZ + 1.9), B(PX + 3.6, PY - 1.0, PZ + 1.9)].map((p) => {
+    const l = new THREE.PointLight(0xffb870, 0, 9, 1.8); l.position.copy(p); s.add(l); return l;
   });
 
   // ---------- walking, collisions, things to look at ----------
@@ -450,7 +444,7 @@ export function buildTerminal() {
   };
   w.heightAt = (x, z) => {
     const bx = x, by = -z, [lx, ly] = L_(bx, by);
-    if (onPier(lx, ly)) return ly < 0.04 ? PZ - (PZ - LOW) * THREE.MathUtils.clamp((lx - 1.05) / 0.9, 0, 1) : PZ;   // the front stairs down
+    if (onPier(lx, ly)) return ly < 0.04 ? PZ - (PZ - LOW) * THREE.MathUtils.clamp((lx - 1.05) / 1.3, 0, 1) : PZ;   // two steps down, into the shallows
     if (onDeck(lx, ly)) return PZ + 0.06;
     if (onBackStairs(lx, ly)) return PZ - PZ * THREE.MathUtils.clamp(stairOut(lx, ly) / 1.0, 0, 1);
     return Math.max(isletTop(bx, by), -0.3);                                       // on an islet, or wading
@@ -459,13 +453,11 @@ export function buildTerminal() {
   S(PX + 1.2, PY + 0.39, 8.3, 0.75);                                               // the tall wall
   S(PX - 0.9, PY - 0.41, 2.6, 0.55);                                               // the seats
   S(PX + 3.55, PY + 4.6, 0.6, 0.3);                                                // the mooring post
-  for (const sx of [-1, 1]) S(PX + 4.3 + sx * 0.87 * SIGN_K / 0.6, PY - 1.85, 0.3, 0.3);   // the sign's posts
 
   const SEAT = { x: PX - 1.21, y: PY - 0.41 };                                      // the second of the four seats
   w.hot(SEAT.x, -SEAT.y, 'Sit down and wait for the train', 'sit', { y: 1.7, r: 1.6 });
-  w.hot(PX + 2.43, -(PY + 0.01), 'Read the timetable', 'welcome', { y: 1.9, r: 1.3 });
-  w.hot(PX + 3.77, -(PY + 0.01), 'Read the notices', 'contact', { y: 1.8, r: 1.2 });
-  w.hot(PX + 4.3, -(PY - 1.85), 'Read the station sign', 'station', { y: 2.0, r: 1.5 });
+  w.hot(PX + 2.78, -(PY + 0.01), 'Read the timetable', 'welcome', { y: 1.9, r: 1.3 });
+  w.hot(PX + 3.85, -(PY + 0.01), 'Read the notices', 'contact', { y: 1.8, r: 1.2 });
 
   w.seat = { pos: B(SEAT.x, SEAT.y, PZ), yaw: 0 };
   w.standSpot = B(SEAT.x, SEAT.y - 0.7, PZ);
@@ -518,9 +510,10 @@ export function buildTerminal() {
     U.uSun.value = THREE.MathUtils.clamp((p.sunI - 0.8) / 1.6, 0, 1) * (1 - 0.8 * cloudy);   // sparkles need the sun
     cm.uniforms.lit.value.copy(p.cLit); cm.uniforms.shade.value.copy(p.cShade); cm.uniforms.edge.value.copy(p.cEdge); cm.uniforms.sun.value.copy(sd); cm.uniforms.haze.value.copy(p.mid);
     starField.material.opacity = p.stars;
-    for (const l of lamps) l.intensity = p.lamps * 9;
+    for (const l of lamps) l.intensity = p.lamps * 2.2;
     for (const m of w.glowMats) m.emissiveIntensity = m.userData.glow * (0.25 + 0.75 * Math.max(p.lamps, 0.2));
     w.bloom = p.bloom;
+    RIM.value = 0.22 * (0.2 + 0.8 * THREE.MathUtils.clamp((p.sunI - 0.45) / 2.0, 0, 1));   // the rim light fades at night
     const day = THREE.MathUtils.clamp((p.sunI - 0.45) / 2.55, 0, 1);              // 0 at night .. 1 at noon
     const kT = 0.95 + 0.15 * day;
     for (const m of trainMats) m.color.copy(m.userData.base).multiplyScalar(kT);

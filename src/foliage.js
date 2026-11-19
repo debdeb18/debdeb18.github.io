@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { uTime } from './kit.js';
 import { rimPatch } from './models.js';
+import { painted } from './paint.js';
 
 function rng(seed) { return () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }; }
 
@@ -93,7 +94,7 @@ export function leafify(model, kind, isCanopy, ramp, { clumps = false } = {}) {
     for (let i = 0; i < p.count; i += step) all.push(v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld).applyMatrix4(toModel).clone());
   });
   if (!all.length) return null;
-  for (const o of blobs) { o.material = o.material.clone(); o.material.color.multiplyScalar(0.62); o.castShadow = true; }   // the dark heart
+  for (const o of blobs) { o.material = painted(o.material.clone(), 'leaves', rimPatch); o.castShadow = true; }   // the heart: painted little leaves, not flat green
 
   const cfg = SETTINGS[kind], tones = kind === 'pine' ? PINE_TONES : TONES;
   const pos = [], nor = [], uv = [], col = [], sway = [], idx = [];

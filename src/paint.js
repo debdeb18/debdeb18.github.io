@@ -256,6 +256,21 @@ const PAINTERS = {
     for (let i = 0; i < 6; i++) { const x = r() * SIZE, y = r() * SIZE, rr = 18 + r() * 36; wrap(x, y, rr + 4, (X, Y) => { g.strokeStyle = '#b39a6c'; g.beginPath(); g.ellipse(X, Y, rr, rr * (0.7 + r() * 0.3), r() * 3, 0, 6.2832); g.stroke(); }); }
     for (let i = 0; i < 40; i++) { const x = r() * SIZE, y = r() * SIZE, len = 30 + r() * 90; wrap(x, y, len, (X, Y) => stroke(g, X, Y, len, 2 + r() * 4, Math.PI / 2 + (r() - 0.5) * 0.05, (r() - 0.5) * 3, '#bca77c', 0.18)); }
   },
+  // Leaves, after the painted-wall reference (its third swatch): little five-lobed leaves packed close in fresh greens,
+  // each with a soft darker shadow, lighter ones on top. Covers the leafy blobs under the leaf cards.
+  leaves(g, r) {
+    g.fillStyle = '#2f5a2c'; g.fillRect(0, 0, SIZE, SIZE);
+    const tones = ['#3f7434', '#4f863b', '#5f9842', '#72a94b', '#88ba55', '#a3cc66'];
+    const leaf = (X, Y, s, a, col, al) => {
+      g.globalAlpha = al; g.fillStyle = col; g.beginPath();
+      for (let k = 0; k < 5; k++) { const t = a + k * 1.2566, d = s * 0.55; g.moveTo(X + Math.cos(t) * d + s * 0.42, Y + Math.sin(t) * d); g.arc(X + Math.cos(t) * d, Y + Math.sin(t) * d, s * 0.42, 0, 6.2832); }
+      g.moveTo(X + s * 0.5, Y); g.arc(X, Y, s * 0.5, 0, 6.2832); g.fill();
+    };
+    for (let pass = 0; pass < 3; pass++) for (let i = 0; i < 900; i++) {
+      const x = r() * SIZE, y = r() * SIZE, s = 7 + r() * 7, a = r() * 6.28, c = pick(tones, Math.min(0.999, r() * 0.6 + pass * 0.2));
+      wrap(x, y, s * 1.6, (X, Y) => { leaf(X + 2, Y + 3, s, a, '#1f3d22', 0.35); leaf(X, Y, s, a, c, 1); });
+    }
+  },
   // A pebbly sea floor, after the rail reference: small rounded pebbles packed close, blue-grey, pale grey and sand,
   // each lit on top with a soft shadow under it and a bright glint, dark gaps between them.
   pebbles(g, r) {
@@ -278,7 +293,7 @@ const KINDS = { grass: { scale: 1 / 3.2, mode: 'replace' }, sand: { scale: 1 / 4
   gravel: { scale: 1 / 2, mode: 'replace' }, ballast: { scale: 1 / 1.6, mode: 'replace' }, wood: { scale: 1 / 2.2, mode: 'tint' }, stone: { scale: 1 / 2.5, mode: 'tint' },
   bark: { scale: 1 / 1.6, mode: 'tint' }, plaster: { scale: 1 / 3, mode: 'tint' }, roof: { scale: 1 / 2.4, mode: 'tint' }, paint: { scale: 1 / 1.6, mode: 'tint' },
   seatwood: { scale: 1 / 0.7, mode: 'replace' }, seatiron: { scale: 1 / 1.6, mode: 'replace' },
-  brick: { scale: 1 / 1.4, mode: 'tint' }, moss: { scale: 1 / 0.6, mode: 'replace' }, paper: { scale: 1 / 0.7, mode: 'tint' }, pebbles: { scale: 1 / 1.8, mode: 'replace' }, paving: { scale: 1 / 1.5, mode: 'tint' } };
+  brick: { scale: 1 / 1.4, mode: 'tint' }, moss: { scale: 1 / 0.6, mode: 'replace' }, paper: { scale: 1 / 0.7, mode: 'tint' }, pebbles: { scale: 1 / 1.8, mode: 'replace' }, leaves: { scale: 1 / 0.9, mode: 'replace' }, paving: { scale: 1 / 1.5, mode: 'tint' } };
 
 const textures = {};
 export function paintedTexture(kind) {

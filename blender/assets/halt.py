@@ -600,8 +600,22 @@ def build():
 
 def bake_cuts():
     """Apply the window cuts now and paint the new faces (the window reveals): a cut leaves them unpainted, black."""
-    dg = bpy.context.evaluated_depsgraph_get()
+    from mathutils.bvhtree import BVHTree
+    dg = bpy.context.evaluated_depsgraph_get(); trees = {}
+    def left_inside(o):                                                        # any of it still inside the opening: the cut failed
+        dg.update(); me = o.evaluated_get(dg).to_mesh(); mw = o.matrix_world; n = 0
+        for m in o.modifiers:
+            if m.type != 'BOOLEAN': continue
+            t = trees.get(m.object.name) or trees.setdefault(m.object.name, BVHTree.FromObject(m.object, dg))
+            for v in me.vertices:
+                p = mw @ v.co; hit = t.find_nearest(m.object.matrix_world.inverted() @ p)
+                if hit[0] is not None and (m.object.matrix_world.inverted() @ p - hit[0]).dot(hit[1]) < -0.02: n += 1
+        o.evaluated_get(dg).to_mesh_clear(); return n
     for o in [o for o in bpy.data.objects if o.type == 'MESH' and any(m.type == 'BOOLEAN' for m in o.modifiers)]:
+        if left_inside(o):                                                     # try the other solver, else leave the block out
+            for m in o.modifiers:
+                if m.type == 'BOOLEAN': m.solver = 'FLOAT'
+            if left_inside(o): print('window cut failed, block left out:', o.name); bpy.data.objects.remove(o); continue
         me = bpy.data.meshes.new_from_object(o.evaluated_get(dg), depsgraph=dg)
         at = me.color_attributes.get('Col')
         if at:

@@ -55,22 +55,37 @@ def stone_face(r, rnd, along, fixed, axis):
             a += l
         z += h; row += 1
 
+def lowpoly(o):
+    """Flat facets, like folded paper: no smoothing, no bevel."""
+    for p in o.data.polygons: p.use_smooth = False
+    for m in list(o.modifiers): o.modifiers.remove(m)
+    return o
+
+def lp_ball(name, rr, loc, scale, color, parent, seg=(9, 6)):
+    bm = bmesh.new(); bmesh.ops.create_uvsphere(bm, u_segments=seg[0], v_segments=seg[1], radius=rr)
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    o = bpy.data.objects.new(name, me); bpy.context.scene.collection.objects.link(o)
+    o.location = loc; o.scale = scale; o.data.materials.append(mat(color)); o.parent = parent
+    return lowpoly(o)
+
 def sleeping_cat(r, x, y, z, yaw):
-    """A slim black cat curled up asleep in the nook, big ears up, its long tail wrapped round its paws, eyes shut.
-    Its own named part ('cat_sleep'), so the world can hide it when it rains."""
+    """A low-poly ginger cat curled up asleep, after the user's reference: a round faceted body, its head resting on its
+    front paws, eyes shut, the tail wrapped round the front. Its own named part ('cat_sleep'), so the world can hide it
+    when it rains. Faces -Y in its own frame."""
     c = root('cat_sleep'); c.location = (x, y, z); c.rotation_euler = (0, 0, math.radians(yaw)); c.parent = r
-    black, sheen, inner = 0x25242B, 0x3A3944, 0x4A4550
-    ball('cat_body', 0.17, (0.02, 0, 0.09), (1.5, 0.9, 0.55), black, c)
-    ball('cat_back', 0.12, (0.06, 0.04, 0.13), (1.6, 0.6, 0.35), sheen, c)          # a soft sheen along the back
-    ball('cat_haunch', 0.1, (0.15, 0.03, 0.08), (1.1, 1.1, 0.8), black, c)
-    ball('cat_head', 0.085, (-0.2, -0.08, 0.1), (1.05, 1.0, 0.92), black, c)
-    ball('cat_cheek', 0.045, (-0.25, -0.13, 0.085), (1.1, 0.9, 0.8), black, c)
-    for sx in (-1, 1):                                                         # big upright ears
-        cyl('cat_ear', 0.042, 0.004, 0.11, (-0.2 + sx * 0.05, -0.06, 0.16), (sx * 12, -12, 0), black, c, bevel=0, verts=6)
-        cyl('cat_ear_in', 0.026, 0.003, 0.08, (-0.205 + sx * 0.05, -0.075, 0.165), (sx * 12, -12, 0), inner, c, bevel=0, verts=6)
-        box('cat_eye', (0.034, 0.006, 0.006), (-0.25 + sx * 0.035, -0.162, 0.115), (0, sx * 10, 0), 0x8A8794, c, bevel=0)   # shut
-    tube('cat_tail', [(0.27, 0.0, 0.06), (0.26, -0.13, 0.04), (0.1, -0.2, 0.035), (-0.08, -0.2, 0.04), (-0.18, -0.17, 0.05)], [0.026, 0.024, 0.022, 0.02, 0.016], black, c)
-    for sx in (-1, 1): ball('cat_paw', 0.03, (-0.12 + sx * 0.05, -0.16, 0.025), (1.3, 1, 0.6), black, c)
+    fur, shade = 0xE0904A, 0xC97A3A
+    lp_ball('cat_body', 0.19, (0.04, 0.02, 0.1), (1.35, 1.0, 0.62), fur, c)
+    lp_ball('cat_haunch', 0.12, (0.15, 0.06, 0.11), (1.0, 1.0, 0.85), fur, c)
+    for sx in (-1, 1): lp_ball('cat_paw', 0.045, (-0.17 + sx * 0.05, -0.15, 0.03), (1.6, 1.0, 0.65), fur, c, seg=(7, 5))
+    lp_ball('cat_head', 0.095, (-0.19, -0.1, 0.11), (1.0, 1.0, 0.85), fur, c, seg=(8, 6))
+    lp_ball('cat_muzzle', 0.04, (-0.21, -0.18, 0.085), (1.1, 1.0, 0.8), fur, c, seg=(6, 4))
+    for sx in (-1, 1):
+        o = cyl('cat_ear', 0.045, 0.003, 0.08, (-0.19 + sx * 0.055, -0.08, 0.17), (sx * 14, -10, 0), fur, c, bevel=0, verts=4); lowpoly(o)
+        box('cat_eye', (0.032, 0.006, 0.006), (-0.205 + sx * 0.035, -0.18, 0.12), (0, sx * 12, 0), 0x6A3E22, c, bevel=0)   # shut
+    pts = [(0.26, 0.04, 0.05), (0.27, -0.1, 0.04), (0.14, -0.2, 0.035), (-0.03, -0.22, 0.04)]
+    for i in range(len(pts) - 1):                                              # the tail, in faceted segments round the front
+        (ax, ay, az), (bx_, by_, bz) = pts[i], pts[i + 1]
+        lp_ball('cat_tail', 0.035, ((ax + bx_) / 2, (ay + by_) / 2, (az + bz) / 2), (math.hypot(bx_ - ax, by_ - ay) / 0.055, 1.0, 0.9), shade if i == 2 else fur, c, seg=(6, 4)).rotation_euler = (0, 0, math.atan2(by_ - ay, bx_ - ax))
     return c
 
 def moss_tuft(r, rnd, x, y, z, s=1.0):
@@ -231,6 +246,11 @@ def ruin_tower(r, rnd):
         a, d = rnd.uniform(0, 6.28), rnd.uniform(0, TR - TW - 0.3)
         rock('rubble', rnd.uniform(0.2, 0.4), (TX + d * math.cos(a), TY + d * math.sin(a), TOP - 0.2), (1.3, 1.0, 0.7), (0, 0, rnd.uniform(0, 360)), rnd.choice(('stone_a', 'stone_b', 'stone_c')), r, moss=0.3)
     grass_cap(r, rnd, TX, TY, TOP - 0.25, (TR - TW) * 1.9, (TR - TW) * 1.9, 0)
+    hx, hy = TX - 0.6, TY - TR - 1.1                                             # rocks in the shallows off the tower's front,
+    rock('heron_rock', 0.42, (hx, hy, -0.12), (1.4, 1.1, 0.55), (0, 0, 20), 'stone_b', r, moss=0.4, flat=0.55)   # where the
+    rock('heron_rock', 0.3, (hx + 0.55, hy - 0.25, -0.15), (1.2, 1.0, 0.5), (0, 0, -30), 'stone_a', r, moss=0.5, flat=0.5)   # heron stands
+    rock('heron_rock', 0.22, (hx - 0.5, hy + 0.2, -0.15), (1.1, 1.0, 0.5), (0, 0, 60), 'stone_c', r, moss=0.5, flat=0.5)
+    e = root('heron_spot'); e.location = (hx, hy, -0.12 + 0.42 * 0.55 * 0.55); e.parent = r   # an empty: the world puts the heron here
     for (a, d) in ((200, 0.5), (240, 0.8), (150, 0.3), (300, 0.6)):           # blocks fallen into the water
         ax = TX + (TR + d) * math.cos(math.radians(a)); ay = TY + (TR + d) * math.sin(math.radians(a))
         ruin_block(r, rnd, (rnd.uniform(0.6, 0.9), 0.45, 0.4), (ax, ay, BASE + 0.2), (rnd.uniform(-12, 12), rnd.uniform(-12, 12), rnd.uniform(0, 360)), 'x', 0, moss=0.5, crack=0.3)
@@ -560,9 +580,11 @@ def build():
         box('deck_brace', (0.08, math.hypot(ln, hz), 0.12), (px + (0.13 if px > (DX0 + DX1) / 2 else -0.13), LY / 2 + 0.75 + ln / 2, zb - 0.18 - hz / 2 - 0.55),
             (math.degrees(math.atan2(hz, ln)), 0, 0), 'plank', r, bevel=0.015, jitter=0.006)
     box('deck_cross', (DX1 - DX0, 0.14, 0.16), ((DX0 + DX1) / 2, DY1 - 0.22, zb - 0.18 - 0.16), color='plank_d', parent=r, bevel=0.02, jitter=0.008)
-    cyl('bollard', 0.12, 0.1, 0.5, (DX0 + 0.3, DY1 - 0.3, DZ), color='plank_d', parent=r, bevel=0.03, verts=12)
-    ball('bollard_cap', 0.13, (DX0 + 0.3, DY1 - 0.3, DZ + 0.52), (1, 1, 0.5), 'plank_d', r)
-    tube('rope', [(DX0 + 0.3, DY1 - 0.3, DZ + 0.4), (DX0 - 0.2, DY1 + 0.3, DZ - 0.3), (DX0 - 0.6, DY1 + 0.9, 0.1)], 0.02, 0xD9C08E, r)
+    bx, by = DX0 + 0.45, DY1 - 0.3                                              # the mooring post: twin posts with a bar (design E),
+    for sx in (-1, 1): cyl('bollard', 0.085, 0.075, 0.38, (bx + sx * 0.16, by, DZ), color='plank_d', parent=r, bevel=0.025, verts=12)   # the rope
+    box('bollard_bar', (0.5, 0.1, 0.07), (bx, by, DZ + 0.26), color='plank', parent=r, bevel=0.015)                                    # looped over
+    tube('rope_fig8', [(bx - 0.16, by + 0.09, DZ + 0.3), (bx + 0.16, by - 0.09, DZ + 0.33), (bx + 0.16, by + 0.09, DZ + 0.35), (bx - 0.16, by - 0.09, DZ + 0.37), (bx - 0.16, by + 0.09, DZ + 0.39)], 0.025, 0xD9C08E, r)
+    tube('rope', [(bx - 0.2, by + 0.05, DZ + 0.3), (bx - 0.55, by + 0.45, DZ - 0.2), (bx - 0.8, by + 1.0, 0.1)], 0.025, 0xD9C08E, r)
     bake_cuts()
     return r
 

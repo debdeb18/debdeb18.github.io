@@ -33,12 +33,13 @@ Design in Blender
 
 Porch v2 (on the ruin), assets in `blender/assets/halt.py`, `heron.py`, `fish.py`
 - [x] Ruin pier, tower with arched windows, tall wall, front and back stairs from the porch's courses, seats, posters on the wall, crossing signal in the water, deck hooked over the back edge
-- [ ] Choose the mooring post (options in `blender/concepts/bollard-options.png`)
+- [x] Mooring post: twin posts with a rope figure-of-eight (option E)
 - [ ] Revisit the stone blocks at the end of the phase
 - [ ] Put the porch into the world (simplify the model on export)
-- [ ] Cat asleep in the tower nook ('cat_sleep' in the porch model): hidden when it rains or the weather is bad
-- [ ] Heron on the deck or the rocks, only when sunny: flies off when a train passes, comes back while it stays sunny
-- [ ] Fish by the back stairs; in rain only one or two, under the deck
+- [x] Low-poly cat asleep in the tower nook ('cat_sleep' in the porch model)
+- [ ] Hide the cat when it rains or the weather is bad
+- [ ] Heron on the rocks in the shallows by the tower (the 'heron_spot' empty), only when sunny: flies off when a train passes, comes back while it stays sunny
+- [ ] Low-poly orange fish (`fish.py`) by the back stairs; in rain only one or two, under the deck
 
 Build in the website
 - [x] Assemble the station, with walkable areas and collisions

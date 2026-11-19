@@ -166,7 +166,7 @@ def floor_slabs(r, rnd, joints, rect=None, top=TOP, skip=lambda x, y: False, cli
             if row > 0 and rnd.random() < 0.06: joints.append((x0 + 0.05, y, 1, 0, x1 - x0 - 0.1))
         y += d; row += 1
 
-TX, TY, TR, TW = -LX / 2 - 1.5, -0.8, 2.45, 0.6                                  # the ruined tower (centre, outer radius, wall): it overlaps the end of the pier
+TX, TY, TR, TW = -LX / 2 - 1.5, -0.55, 2.45, 0.6                                  # the ruined tower (centre, outer radius, wall): it overlaps the end of the pier
 WINDOWS = ((250, TOP + 2.6, TOP + 3.7), (238, TOP + 0.5, TOP + 1.6), (290, TOP + 0.5, TOP + 1.6))   # (angle, sill, head), on its front
 DOOR = None
 NOOK = (12, TOP + 1.0, TOP + 1.5)                                               # where blocks are gone from the tower wall facing the wall: the cat's spot
@@ -246,7 +246,7 @@ def ruin_tower(r, rnd):
         a, d = rnd.uniform(0, 6.28), rnd.uniform(0, TR - TW - 0.3)
         rock('rubble', rnd.uniform(0.2, 0.4), (TX + d * math.cos(a), TY + d * math.sin(a), TOP - 0.2), (1.3, 1.0, 0.7), (0, 0, rnd.uniform(0, 360)), rnd.choice(('stone_a', 'stone_b', 'stone_c')), r, moss=0.3)
     grass_cap(r, rnd, TX, TY, TOP - 0.25, (TR - TW) * 1.9, (TR - TW) * 1.9, 0)
-    hx, hy = TX - 0.6, TY - TR - 1.1                                             # rocks in the shallows off the tower's front,
+    hx, hy = TX - TR - 1.0, TY + 0.4                                              # rocks in the shallows beside the tower,
     rock('heron_rock', 0.42, (hx, hy, -0.12), (1.4, 1.1, 0.55), (0, 0, 20), 'stone_b', r, moss=0.4, flat=0.55)   # where the
     rock('heron_rock', 0.3, (hx + 0.55, hy - 0.25, -0.15), (1.2, 1.0, 0.5), (0, 0, -30), 'stone_a', r, moss=0.5, flat=0.5)   # heron stands
     rock('heron_rock', 0.22, (hx - 0.5, hy + 0.2, -0.15), (1.1, 1.0, 0.5), (0, 0, 60), 'stone_c', r, moss=0.5, flat=0.5)

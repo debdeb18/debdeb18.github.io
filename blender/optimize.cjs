@@ -14,8 +14,11 @@ for (const world of fs.readdirSync(path.join(root, 'blender/export'))) {
       execFileSync(bin, ['resize', path.join(from, f), tmp, '--width', '1024', '--height', '1024'], { stdio: 'ignore' });
       execFileSync(bin, ['optimize', tmp, path.join(to, f), '--compress', 'meshopt', '--texture-compress', 'webp', '--simplify', 'true', '--simplify-ratio', '0.5', '--simplify-error', '0.0005'], { stdio: 'ignore' });
       fs.unlinkSync(tmp);
-    } else
-    execFileSync(bin, ['optimize', path.join(from, f), path.join(to, f), '--compress', 'meshopt', '--texture-compress', 'false', '--simplify', 'false', '--palette', 'false'], { stdio: 'ignore' });
+    } else {
+      const simplify = f === 'halt.glb' || f === 'rail.glb';  // the sculpted porch and the pebble bed: lighter, no visible loss
+      execFileSync(bin, ['optimize', path.join(from, f), path.join(to, f), '--compress', 'meshopt', '--texture-compress', 'false', '--palette', 'false',
+        ...(simplify ? ['--simplify', 'true', '--simplify-ratio', '0.5', '--simplify-error', '0.0005'] : ['--simplify', 'false'])], { stdio: 'ignore' });
+    }
     before += fs.statSync(path.join(from, f)).size; after += fs.statSync(path.join(to, f)).size;
   }
   console.log(`${world}: ${(before / 1e6).toFixed(1)} MB -> ${(after / 1e6).toFixed(1)} MB`);

@@ -8,7 +8,7 @@ export const CONTENT = {
   welcome: {
     kicker: 'Notice board', title: 'You have arrived Somewhere',
     body: `<p>Hi, I'm <b>Deby Angelina</b>, a backend / platform software engineer in Seoul. This platform is my portfolio.</p>
-      <p>Three lines leave from here. Sit on the chair, pick a ticket, and when the train passes, the air behind it cracks open.</p>
+      <p>Three lines leave from here. Sit on the bench, pick a ticket, and when the train passes, the air behind it cracks open.</p>
       <ul><li><b>Home among the stars</b>: who I am</li><li><b>The Office</b>: my work, projects and how I work</li><li><b>The Night Market</b>: everything outside work</li></ul>
       <p class="hint">In a hurry? The buttons in the top-right corner skip the train.</p>`,
   },

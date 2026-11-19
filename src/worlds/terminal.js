@@ -1,7 +1,6 @@
 // The terminal: a little country station on a railway that runs just under the sea.
 // The station itself is built in Blender (models/terminal); this file adds what moves: water, sky, clouds, the train, the cutscene.
 import * as THREE from 'three';
-import { Reflector } from 'three/addons/objects/Reflector.js';
 import { makeWorld, sky, stars, softDot, makeCrack, sign, uPlayer } from '../kit.js';
 import { blob } from '../nature.js';
 import { loadLayout, loadModel, gradient } from '../models.js';
@@ -17,7 +16,11 @@ export const DEST = {
 };
 
 const B = (x, y, z = 0) => new THREE.Vector3(x, z, -y);       // Blender (x right, y away, z up) -> three
-const PZ = 0.95, TRACK = -3.2;                                   // platform height; the line (Blender y)
+const PZ = 0.95, TRACK = -3.2;                                   // porch floor height; the line (Blender y)
+// The v1 scenery, left out while the world is rebuilt from zero (the layout still lists it).
+const V1_SCENERY = ['islet_00', 'islet_01', 'islet_02', 'islet_03', 'islet_04', 'islet_05', 'islet_06', 'islet_07', 'islet_08', 'islet_09', 'islet_10', 'islet_11',
+  'islet_12', 'islet_13', 'islet_14', 'islet_15', 'tree_a', 'tree_b', 'tree_c', 'pine', 'footbridge', 'buoy_red', 'buoy_yellow', 'lily_pads', 'wires', 'backdrop', 'far_islands', 'gulls'];
+const LOW = 0.325, SIGN_K = 0.6, RAIL_Z = -0.322;              // the porch's lower front level; the sign's size; the rail (its top at -0.05)
 
 // ---------- time of day: the sky follows the visitor's clock (or ?time=HH) ----------
 const NUMBERS = new Set(['sunI', 'hemiI', 'lamps', 'stars', 'glow', 'bloom']);                // everything else in a palette is a colour
@@ -70,18 +73,61 @@ float seaDepth(vec2 b) {
   return 0.42 + 3.4 * k - sin(b.x * 0.7) * cos(b.y * 0.9) * 0.05;
 }`;
 
+// The porch's footprint and its tower (Blender x, y): the water draws a thin foam line round them, as round the islets.
+const PX = 0, PY = 1.4;                                            // where the porch stands (blender/assets/halt.py, centred)
+const PORCH = [PX, PY, 5.5, 2.3], TOWER = [PX - 7.0, PY - 0.55, 2.45];
+
+// Ghibli-style water (docs/ghibli-water.md): flat painted colour in hard bands (lightest in a rim along every shore,
+// then by depth), see-through in the shallows, wobbly cell-like highlight lines, a thin white foam line round every
+// shore with a second ring that pulses, blinking sparkles; plus the train's bow wave and wake, and rings round a wader.
+const WATER_GLSL = `
+vec2 wHash(vec2 p) { p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3))); return fract(sin(p) * 43758.5453); }
+float wNoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(wHash(i).x, wHash(i + vec2(1, 0)).x, f.x), mix(wHash(i + vec2(0, 1)).x, wHash(i + vec2(1, 1)).x, f.x), f.y); }
+// distance to the nearest cell edge of a slowly moving Voronoi pattern (the 'distance to edge' feature)
+float cellEdge(vec2 x, float t) {
+  vec2 n = floor(x), f = fract(x), mg, mr; float md = 8.0;
+  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+    vec2 g = vec2(float(i), float(j)), o = 0.5 + 0.5 * sin(t + 6.2831 * wHash(n + g)), r = g + o - f; float d = dot(r, r);
+    if (d < md) { md = d; mr = r; mg = g; } }
+  md = 8.0;
+  for (int j = -2; j <= 2; j++) for (int i = -2; i <= 2; i++) {
+    vec2 g = mg + vec2(float(i), float(j)), o = 0.5 + 0.5 * sin(t + 6.2831 * wHash(n + g)), r = g + o - f;
+    if (dot(mr - r, mr - r) > 0.00001) md = min(md, dot(0.5 * (mr + r), normalize(r - mr))); }
+  return md;
+}
+// distance to the nearest point of a slowly moving Voronoi pattern (for sparkles)
+float cellDot(vec2 x, float t) {
+  vec2 n = floor(x), f = fract(x); float md = 8.0;
+  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+    vec2 g = vec2(float(i), float(j)), o = 0.5 + 0.5 * sin(t + 6.2831 * wHash(n + g)); md = min(md, length(g + o - f)); }
+  return md;
+}
+uniform vec4 uPorch; uniform vec3 uTower;
+float shoreDist(vec2 b) {                                          // metres from the nearest shore: islets, the porch, its tower
+  vec2 q = abs(b - uPorch.xy) - uPorch.zw; float s = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+  s = min(s, length(b - uTower.xy) - uTower.z);
+  for (int i = 0; i < 16; i++) s = min(s, length(b - uIslets[i].xy) - uIslets[i].z * 0.99);
+  return s;
+}`;
+
 function makeWater(U) {
-  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.14, metalness: 0, transparent: true, depthWrite: false });
+  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0, transparent: true, depthWrite: false });
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = 'varying vec3 vW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime;\nuniform vec3 uShallow, uDeep, uSky, uTrain, uPlayer;\nuniform float uStir;\nuniform sampler2D uRefl;\nuniform mat4 uReflMat;\n' + DEPTH_GLSL + '\n' + sh.fragmentShader
+    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime, uSun;\nuniform vec3 uShallow, uDeep, uSky, uTrain, uPlayer;\nuniform float uStir;\n' + DEPTH_GLSL + WATER_GLSL + '\n' + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
         vec2 bp = vec2(vW.x, -vW.z);
-        float dep = seaDepth(bp);
-        float murk = 1.0 - exp(-dep * 0.85);                     // the deeper, the darker and less see-through
-        diffuseColor.rgb = mix(uShallow, uDeep, murk);
-        diffuseColor.a = mix(0.36, 1.0, smoothstep(0.0, 0.95, murk));
+        float dep = seaDepth(bp), shore = shoreDist(bp);
+        float wob = (wNoise(bp * 3.0 + uTime * 0.2) - 0.5) * 0.12;                // edges that wobble, as if drawn by hand
+        // the colour bands: a light rim along every shore, then by depth; hard steps, like paint
+        vec3 rim = mix(uShallow, vec3(1.0), 0.28), mid = mix(uShallow, uDeep, 0.55);
+        vec3 col = uDeep; float alpha = 1.0;
+        if (dep < 2.2 + wob * 4.0) { col = mid; alpha = 0.9; }
+        if (dep < 0.9 + wob * 2.0) { col = uShallow; alpha = 0.55; }                // over the line and the banks: see-through
+        if (shore < 0.75 + wob) { col = rim; alpha = 0.38; }                         // the shallows at the shore: clearest
+        diffuseColor.rgb = col; diffuseColor.a = alpha;
         // the train pushes a bow wave and leaves a wake; both grow with its speed (uTrain = front x, speed 0..1, length)
         float along = bp.x - uTrain.x, side = abs(bp.y - (${TRACK.toFixed(1)}));
         float bow = smoothstep(-1.6, -0.2, along) * (1.0 - smoothstep(-0.2, 0.6, along)) * (1.0 - smoothstep(1.4, 2.6 + uTrain.y * 2.0, side));
@@ -90,34 +136,29 @@ function makeWater(U) {
         float wake = body * smoothstep(1.3, 1.45, side) * (1.0 - smoothstep(spread - 0.3, spread + 0.4, side));
         float ripple = 0.55 + 0.45 * sin(bp.x * 6.0 + uTime * 9.0) * sin(bp.y * 9.0 - uTime * 6.0);
         float foam = uTrain.y * clamp(bow * 1.4 + wake * ripple, 0.0, 1.0);
-        foam += smoothstep(0.6, 0.44, dep) * (0.35 + 0.25 * sin(uTime * 1.4 + bp.x * 2.7 + bp.y * 1.9));   // lace around the shores
         float pd = length(bp - vec2(uPlayer.x, -uPlayer.z));                     // rings spreading from legs in the water
         float wet = 1.0 - smoothstep(0.05, 0.25, uPlayer.y);
         for (int k = 0; k < 2; k++) { float rr = 0.35 + fract(uTime * 0.7 + float(k) * 0.5) * 1.3; foam += wet * (1.0 - smoothstep(0.0, 0.07, abs(pd - rr))) * (1.0 - (rr - 0.35) / 1.3) * 0.8; }
-        foam += wet * (1.0 - smoothstep(0.2, 0.4, pd)) * 0.5;
-        foam = clamp(foam, 0.0, 1.0);
-        // how stirred-up the water is here: along the train and its wake (fading out behind it), and around a wader who
-        // is moving (uStir fades back to calm a few seconds after they stop)
+        // how stirred-up the water is: along the train and its wake, and round a wader who is moving
         float trainStir = min(1.0, uTrain.y * 3.0) * clamp(bow * 1.5 + body * (1.0 - smoothstep(1.4, 7.0 + uTrain.y * 6.0, side)) * (1.0 - smoothstep(0.0, uTrain.z + 30.0 * uTrain.y, along) * 0.7), 0.0, 1.0);
-        float walkStir = wet * uStir * (1.0 - smoothstep(0.3, 4.0, pd));
-        float stir = clamp(trainStir + walkStir, 0.0, 1.0);
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0), foam * 0.85);
-        diffuseColor.a = max(diffuseColor.a, foam * 0.9);`)
-      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-        vec2 q = vec2(vW.x, -vW.z) * 0.9;
-        float h1 = sin(q.x * 1.7 + uTime * 1.1 + sin(q.y * 1.3 + uTime * 0.4) * 2.0), h2 = sin(q.y * 2.3 - uTime * 0.9 + q.x * 0.5);
-        vec3 tilt = vec3(h1 * 0.022 + h2 * 0.012, 0.0, h2 * 0.022 - h1 * 0.01);         // a calm, glassy sea
-        float c1 = sin(q.x * 5.0 - uTime * 6.0 + sin(q.y * 4.0) * 1.5), c2 = sin(q.y * 6.0 + uTime * 5.0 + q.x * 1.3);
-        tilt += vec3(c1 * 0.09 + c2 * 0.05, 0.0, c2 * 0.09 - c1 * 0.04) * stir;         // choppier where something passes
-        normal = normalize(normal + (viewMatrix * vec4(tilt, 0.0)).xyz);`)
-      .replace('#include <opaque_fragment>', `float fres = pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 3.0);
-        // the mirror: the scene rendered upside down, nudged by the ripples. Shallows stay see-through; deep water is a mirror.
-        vec4 rp = uReflMat * vec4(vW, 1.0);
-        vec2 ruv = rp.xy / rp.w + tilt.xz * (0.08 + 0.3 * stir);                        // only a gentle waver
-        vec3 refl = texture2D(uRefl, ruv).rgb * mix(vec3(1.0), uDeep * 2.2 + 0.35, 0.35 * murk);   // the mirror takes on the sea's blue
-        float reflK = mix(0.3, 0.9, murk) * mix(0.75, 1.0, fres) * (1.0 - foam);       // deep water: almost a perfect mirror
-        outgoingLight = mix(outgoingLight, refl, reflK);
-        diffuseColor.a = max(diffuseColor.a, reflK);
+        float stir = clamp(trainStir + wet * uStir * (1.0 - smoothstep(0.3, 4.0, pd)), 0.0, 1.0);
+        // wobbly cell-like highlight lines, here and there (more where the water is stirred)
+        vec2 cp = bp * 1.1 + (vec2(wNoise(bp * 1.6 + 3.1), wNoise(bp * 1.6 + 7.7)) - 0.5) * 0.35;
+        float lines = 1.0 - step(0.018 + 0.03 * stir, cellEdge(cp, uTime * 0.25));        // thin lines, small cells,
+        lines *= step(0.66 - 0.3 * stir, wNoise(bp * 0.09 + uTime * 0.012));             // only in patches here and there
+        // the thin shore foam, a dark inked line just outside it, and a second ring that pulses in and out
+        float fl = 1.0 - step(0.09, shore + wob * 0.5);
+        float ink = (1.0 - step(0.15, shore + wob * 0.5)) * (1.0 - fl);
+        float ring = 1.0 - step(0.035, abs(shore - (0.32 + 0.06 * sin(uTime * 0.9)) + wob * 0.4));
+        // sparkles that blink, in the sun
+        float spark = (1.0 - step(0.035, cellDot(bp * 2.2, uTime * 0.6))) * step(0.62, wNoise(bp * 0.5 + uTime * 0.35)) * uSun;
+        float white = clamp(max(max(lines * 0.85, max(fl, ring * 0.8)), max(spark, foam)), 0.0, 1.0) * step(0.0, shore);
+        diffuseColor.rgb = mix(diffuseColor.rgb, uDeep * 0.6, ink * 0.6 * step(0.0, shore));
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.91, 0.98, 1.0), white);
+        diffuseColor.a = max(diffuseColor.a, white * 0.95);`)
+      .replace('#include <opaque_fragment>', `float fres = pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 4.0);
+        outgoingLight = mix(diffuseColor.rgb, outgoingLight, 0.3);                    // flat painted colour, with a hint of shadow
+        outgoingLight = mix(outgoingLight, uSky, fres * 0.35);                          // and the sky toward the horizon
         #include <opaque_fragment>`);
   };
   return m;
@@ -127,7 +168,7 @@ export function buildTerminal() {
   const w = makeWorld('terminal', 'The Terminal');
   const s = w.scene;
   w.groundY = PZ;
-  w.spawn.copy(B(-3.9, 0.9, PZ)); w.spawnYaw = Math.PI / 2;
+  w.spawn.copy(B(PX - 3.5, PY - 1.2, PZ)); w.spawnYaw = Math.PI / 2;
   w.cam = { dist: 11, pitch: 0.34, yaw: 0.12 };
   w.bloom = 0.35;
   w.glowMats = [];
@@ -143,30 +184,12 @@ export function buildTerminal() {
 
   // ---------- water and sea floor ----------
   const U = { uTime: { value: 0 }, uIslets: { value: Array.from({ length: 16 }, () => new THREE.Vector3(1e4, 1e4, 0)) },
-    uShallow: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uSky: { value: new THREE.Color() }, uTrain: { value: new THREE.Vector3(1e4, 0, 25) }, uPlayer, uStir: { value: 0 }, uRefl: { value: null }, uReflMat: { value: new THREE.Matrix4() } };
+    uShallow: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uSky: { value: new THREE.Color() }, uTrain: { value: new THREE.Vector3(1e4, 0, 25) }, uPlayer, uStir: { value: 0 }, uSun: { value: 1 },
+    uPorch: { value: new THREE.Vector4(...PORCH) }, uTower: { value: new THREE.Vector3(...TOWER) } };
   const water = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), makeWater(U));
   water.position.set(55, 0, 0); water.receiveShadow = true; water.renderOrder = 1; water.userData.noShadow = true;
   s.add(water);
-  // The reflection: three.js's Reflector renders the scene mirrored in the water plane into a texture each frame. It draws
-  // nothing itself; the water samples its texture. Half resolution (a quarter on phones); grass and spray are left out.
-  const coarse = matchMedia('(pointer: coarse)').matches;
-  const rs = (coarse ? 0.35 : 0.5) * Math.min(devicePixelRatio, 2);
-  const mirror = new Reflector(new THREE.PlaneGeometry(900, 900), { textureWidth: Math.round(innerWidth * rs), textureHeight: Math.round(innerHeight * rs), clipBias: 0.003, multisample: 0 });
-  mirror.rotation.x = -Math.PI / 2; mirror.position.set(55, 0.001, 0);
-  mirror.material.colorWrite = false; mirror.material.depthWrite = false; mirror.renderOrder = -1; mirror.userData.noShadow = true;
-  s.add(mirror);
-  const reflMat = mirror.material.uniforms.textureMatrix.value, mirrorInv = new THREE.Matrix4();
-  U.uRefl.value = mirror.getRenderTarget().texture;
-  const hideInMirror = [];                                                          // filled once grass and spray exist
-  const mirrorDraw = mirror.onBeforeRender;
-  mirror.onBeforeRender = (renderer, scene, camera) => {
-    if (camera.isReflectionCamera) return;
-    water.visible = false; for (const o of hideInMirror) o.visible = false;
-    mirrorDraw.call(mirror, renderer, scene, camera);
-    water.visible = true; for (const o of hideInMirror) o.visible = true;
-    mirror.updateMatrixWorld(); mirrorInv.copy(mirror.matrixWorld).invert();
-    U.uReflMat.value.copy(reflMat).multiply(mirrorInv);                            // world position -> reflection texture
-  };
+  const hideInMirror = [];                                                          // (the old mirror water's list; kept for the grass and spray)
   const floorMat = painted(new THREE.MeshToonMaterial({ color: 0xe6d6a8 }), 'sand');
   const deepFloor = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x14304a }));
   deepFloor.position.set(55, -4.3, 0); deepFloor.userData.noShadow = true; s.add(deepFloor);
@@ -185,19 +208,17 @@ export function buildTerminal() {
   const isCanopy = (m) => CANOPY.test(m.name || '');
   const BUSH = /^c_(3a8547|6fb04f|2a6643)/;                                       // bushes, planter shrubs, potted plants
   const isBush = (m) => BUSH.test(m.name || '');
+  w.glowMats = [];
   w.ready = loadLayout('models/terminal', s, (n, of) => w.progress(n, of), (name, model) => {
     if (/^tree_|^pine$/.test(name)) leafify(model, name === 'pine' ? 'pine' : 'broad', isCanopy, gradient(), { clumps: true });   // each puff gets its own round light
     if (/^islet_|^fences_planters$|^station_props$/.test(name)) leafify(model, 'bush', isBush, gradient(), { clumps: true });
-  }, ['train', 'utility_pole', 'utility_pole_lamp', 'utility_pole_transformer']).then((r) => {
-    placed = r.placed; w.glowMats = r.glow; w.loaded = true;
-    w.camBlockers = ['station_building', 'canopy', 'roof_extras'].flatMap((n) => placed[n] || []);   // the camera won't pass through these
-    buildSeabed(r.layout.islets || []);
-    ISL = r.layout.islets || [];
-    plantGrass(ISL);
-    for (const [x, y] of NORTH()) w.solid(x, -y, 0.9, 0.9);                        // tree trunks
-    S(7.94, 13.4, 1.2, 1.0); S(15.93, 11.98, 0.35, 0.35); S(31.6, 10.15, 0.3, 0.3);   // shrine, lantern post, hammock post
-    trees = [...(placed.tree_a || []), ...(placed.tree_b || []), ...(placed.tree_c || []), ...(placed.pine || [])].map((o) => ({ o, ph: Math.random() * 6.28 }));
-    makeShafts(trees.map((t) => t.o));
+  }, ['train', 'utility_pole', 'utility_pole_lamp', 'utility_pole_transformer', 'platform', 'station_building', 'canopy', 'bench', 'vending_machine', 'bin',
+      'canopy_signs', 'fences_planters', 'platform_lamp', 'station_props', 'lantern_string', 'roof_extras', 'mooring', 'chair', 'suitcase', 'cat', 'boat', 'causeway',
+      'halt', 'fish', 'heron', 'heron_flying', 'rail', ...V1_SCENERY]).then((r) => {   // the v1 station and scenery are gone: the porch (below)
+    placed = r.placed; w.glowMats.push(...r.glow); w.loaded = true;
+    const sg = (placed.station_sign || [])[0];                                  // the station sign stands on the porch's lower level
+    if (sg) { sg.position.copy(B(PX + 4.3, PY - 1.85, LOW)); sg.scale.setScalar(SIGN_K); }
+    buildSeabed([]);                                                               // (no islets for now: built from zero)
   });
   // The train: "Spirited Away Train" by judpro (CC BY 4.0), prepared by blender/scenes/import_train.py. Its cab is at y = 0,
   // it runs along +y, so turned to run along +x it leads with the cab toward -x, the way it travels here.
@@ -211,7 +232,39 @@ export function buildTerminal() {
     s.add(train); nextTrain = 6;
     return glow;
   });
-  w.ready = Promise.all([w.ready, trainReady]).then(([, glow]) => { w.glowMats.push(...glow); });
+  // ---------- the porch on the ruin (blender/assets/halt.py), the rail, the boat, the heron and the fish ----------
+  let heronSpot = null;
+  const porchReady = loadModel('models/terminal/halt.glb').then(({ scene, glow }) => {
+    scene.position.copy(B(PX, PY, 0)); s.add(scene);
+    leafify(scene, 'bush', isBush, gradient(), { clumps: true });                 // its bushes, ivy and grass: v1's leaf cards
+    w.camBlockers = [scene];                                                       // the camera pulls in rather than pass through
+    const hs = scene.getObjectByName('heron_spot'); if (hs) { scene.updateMatrixWorld(true); heronSpot = hs.getWorldPosition(new THREE.Vector3()); }
+    return glow;
+  });
+  const railReady = loadModel('models/terminal/rail.glb').then(({ scene }) => {   // a 12 m stretch, repeated along the line
+    for (let i = 0; i < 20; i++) { const o = i ? scene.clone() : scene; o.position.copy(B(-64 + 12 * i, TRACK, RAIL_Z)); s.add(o); }
+    return [];
+  });
+  let boat = null;
+  const boatReady = loadModel('models/terminal/boat.glb').then(({ scene }) => {
+    boat = scene; boat.position.copy(B(PX + 1.3, PY + 6.3, -0.12)); boat.rotation.y = 0.3; s.add(boat);
+    return [];
+  });
+  const heron = { stand: null, fly: null, wings: [], state: 'gone', t: 0, wait: 0 };
+  const heronReady = Promise.all([loadModel('models/terminal/heron.glb'), loadModel('models/terminal/heron_flying.glb')]).then(([a, b]) => {
+    heron.stand = a.scene; heron.fly = b.scene; a.scene.visible = b.scene.visible = false; s.add(a.scene, b.scene);
+    heron.wings = ['heron_wing_l', 'heron_wing_r'].map((n) => b.scene.getObjectByName(n));
+    return [];
+  });
+  const fishes = [];
+  const fishReady = loadModel('models/terminal/fish.glb').then(({ scene }) => {
+    for (let i = 0; i < 5; i++) {
+      const o = i ? scene.clone() : scene; o.scale.setScalar(0.9 + Math.random() * 0.4); s.add(o);
+      fishes.push({ o, r: 0.8 + Math.random() * 1.6, sp: (0.25 + Math.random() * 0.25) * (Math.random() < 0.5 ? -1 : 1), ph: Math.random() * 6.28, dz: 0.18 + Math.random() * 0.1 });
+    }
+    return [];
+  });
+  w.ready = Promise.all([w.ready, trainReady, porchReady, railReady, boatReady, heronReady, fishReady]).then((all) => { for (const g of all.slice(1)) w.glowMats.push(...(g || [])); });
   let trees = [], train = null, nextTrain = 1e9;
 
   // ---------- light shafts: soft beams of sun slanting down through the tree crowns ----------
@@ -320,32 +373,12 @@ export function buildTerminal() {
     }, { max: perM2 > 30 ? 60000 : 24000 }));
   }
 
-  // ---------- a plank ramp from the deck down to the islets ----------
-  const plankMat = painted(new THREE.MeshToonMaterial({ color: 0x9a6a45, gradientMap: gradient() }), 'wood');
-  for (let i = 0; i < 6; i++) {
-    const by = 10.15 + i * 0.3, k = (by - 10.0) / 1.8, z = PZ + (0.41 - PZ) * k;
-    const pl = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.06, 0.28), plankMat); pl.position.copy(B(8, by, z - 0.03)); pl.rotation.x = -0.29;
-    pl.castShadow = pl.receiveShadow = true; s.add(pl);
-  }
-  for (const dx of [-0.72, 0.72]) {
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.3, 8), plankMat); post.position.copy(B(8 + dx, 11.75, -0.1)); post.castShadow = true; s.add(post);
-  }
-
   // The station name, drawn here so the Korean stays crisp (covers the board on the Blender sign).
-  const name = sign(s, ['어딘가', 'SOMEWHERE  ·  ENTAH DI MANA', '←  Semarang                    Seoul  →'], 2.1, 0.82, -6.2, PZ + 1.51, -(1.9 - 0.045 * 0.8),
-    { size: [0.34, 0.12, 0.11], fg: ['#2f3b52', '#5a6478', '#b0563f'], bg: '#f6eedb', res: 200 });
+  const sk = SIGN_K / 0.8;                                                         // (the Blender sign is drawn at 0.8)
+  const name = sign(s, ['어딘가', 'SOMEWHERE  ·  ENTAH DI MANA', '←  Semarang                    Seoul  →'], 2.1 * sk, 0.82 * sk, PX + 4.3, LOW + 1.51 * sk, -(PY - 1.85 - 0.045 * SIGN_K),
+    { size: [0.34 * sk, 0.12 * sk, 0.11 * sk], fg: ['#2f3b52', '#5a6478', '#b0563f'], bg: '#f6eedb', res: 200 });
   name.material = new THREE.MeshToonMaterial({ map: name.material.map });
 
-
-  // ---------- far islands with little villages ----------
-  for (const [x, y, r, z] of [[190, 100, 80, 0.2], [230, -80, 95, 0.22], [140, 190, 70, 0.18], [150, -180, 70, 0.16]]) {
-    blob(s, x, -2, -y, r, 0x3f8a6a, 0x9ad88a, { squash: [1.0, z, 1.0], lump: 0.25 });
-    for (let k = 0; k < 4; k++) {
-      const hx = x - r * 0.45 + k * 9, hy = y + (k % 2) * 8 - r * 0.2, hz = r * z * 0.72 - 2;
-      const hm = new THREE.Mesh(new THREE.BoxGeometry(5, 4, 5), new THREE.MeshToonMaterial({ color: 0xf3ead6 })); hm.position.copy(B(hx, hy, hz + 2)); s.add(hm);
-      const rf = new THREE.Mesh(new THREE.ConeGeometry(4.2, 2.4, 4), new THREE.MeshToonMaterial({ color: 0xc9604a })); rf.position.copy(B(hx, hy, hz + 5.2)); rf.rotation.y = Math.PI / 4; s.add(rf);
-    }
-  }
 
   // ---------- painted cumulus, drifting with the wind ----------
   const cm = cumulusMaterial();
@@ -371,11 +404,6 @@ export function buildTerminal() {
   // ---------- gulls ----------
   const gulls = [];
   const gullMat = new THREE.MeshToonMaterial({ color: 0xffffff, side: THREE.DoubleSide });
-  for (let i = 0; i < 6; i++) {
-    const g = new THREE.Group(), wings = [-1, 1].map((sd) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.22).translate(0.45 * sd, 0, 0), gullMat); m.rotation.x = -Math.PI / 2; g.add(m); return m; });
-    g.userData = { wings, cx: 30 + Math.random() * 50, cz: -10 - Math.random() * 25, r: 8 + Math.random() * 10, h: 13 + Math.random() * 9, sp: 0.15 + Math.random() * 0.12, ph: Math.random() * 6.28 };
-    s.add(g); gulls.push(g);
-  }
 
   // ---------- spray thrown up by the train ----------
   const SN = 420, sp = new Float32Array(SN * 3), sv = new Float32Array(SN * 3), life = new Float32Array(SN);
@@ -386,18 +414,21 @@ export function buildTerminal() {
   let emitAcc = 0, spawnI = 0;
 
   // ---------- night lights on the platform ----------
-  const lamps = [B(3, 0.6, PZ + 1.95), B(8.3, 0.6, PZ + 1.95), B(13.7, 0.6, PZ + 1.95), B(19.2, 0.6, PZ + 1.95), B(-8.2, 1.2, PZ + 4.0), B(27.5, 1.2, PZ + 4.0)].map((p) => {
+  const lamps = [B(PX - 0.4, PY - 0.31, PZ + 2.09), B(PX + 3.6, PY - 0.31, PZ + 2.09)].map((p) => {           // the lanterns on the wall
     const l = new THREE.PointLight(0xffb870, 0, 13, 1.6); l.position.copy(p); s.add(l); return l;
   });
 
   // ---------- walking, collisions, things to look at ----------
-  // Where you can walk: the platform, the deck, a plank ramp down to the islets behind the station, the islets
-  // themselves, and the shallow water between them (you wade). Islet data arrives with the models.
+  // Where you can walk: the porch (upper front, back, the stairs down to the lower front level), its back stairs down
+  // into the water, the wooden deck, the islets behind it, and the shallow water all round them (you wade). The porch
+  // sits at (PX, PY); everything below is in its own coordinates (lx, ly), Blender-style. Islet data arrives with the models.
   let ISL = [];
   const NORTH = () => ISL.filter(([, y]) => y > 9);
-  const RAMP = { x0: 7.25, x1: 8.75, y0: 10.0, y1: 11.8 };
-  const onPlatform = (bx, by) => (bx > -10.8 && bx < 34.8 && by > -1.25 && by < 3.05) || (bx > -4.8 && bx < 28.8 && by > 2.9 && by < 10.2);
-  const onRamp = (bx, by) => bx > RAMP.x0 && bx < RAMP.x1 && by >= RAMP.y0 && by <= RAMP.y1;
+  const L_ = (bx, by) => [bx - PX, by - PY];
+  const onPier = (lx, ly) => Math.abs(lx) < 5.45 && Math.abs(ly) < 2.25 && Math.hypot(lx + 7.0, ly + 0.55) > 2.6;
+  const onDeck = (lx, ly) => lx > 3.15 && lx < 4.55 && ly >= 2.25 && ly < 4.85;
+  const stairOut = (lx, ly) => Math.max(ly - 2.3, -5.5 - lx);                     // how far out from the porch on the back stairs
+  const onBackStairs = (lx, ly) => lx > -6.45 && lx < -3.35 && ly > 1.1 && ly < 3.2 && stairOut(lx, ly) > -0.05 && Math.hypot(lx + 7.0, ly + 0.55) > 2.6;
   const isletTop = (bx, by) => {                                                   // height of the sand and grass mounds (Blender z)
     let h = -1;
     for (const [x, y, r] of ISL) {
@@ -407,41 +438,40 @@ export function buildTerminal() {
     }
     return h;
   };
-  const wading = (bx, by) => by > 10.7 && by < 19 && bx > -22 && bx < 46 && seaDepth(bx, by, ISL) < 0.62;
+  const wading = (bx, by) => {
+    const [lx, ly] = L_(bx, by);
+    if (by < PY - 0.6 || Math.abs(lx) < 5.5 && Math.abs(ly) < 2.3 || Math.hypot(lx + 7.0, ly + 0.55) < 2.6) return false;
+    return bx > -22 && bx < 46 && by < 19 && seaDepth(bx, by, ISL) < 0.62;
+  };
   w.inside = (x, z) => {
-    const bx = x, by = -z;
-    if (by > 2.8 && by < 3.2 && (bx < 0.5 || bx > 23.5)) return false;            // the white fences
-    if (onPlatform(bx, by) || onRamp(bx, by)) return true;
+    const bx = x, by = -z, [lx, ly] = L_(bx, by);
+    if (onPier(lx, ly) || onDeck(lx, ly) || onBackStairs(lx, ly)) return true;
     return NORTH().some(([ix, iy, ir]) => Math.hypot(bx - ix, by - iy) < ir * 0.93) || wading(bx, by);
   };
   w.heightAt = (x, z) => {
-    const bx = x, by = -z;
-    if (onPlatform(bx, by)) return PZ;
-    if (onRamp(bx, by)) { const end = isletTop(8, RAMP.y1); return PZ + (Math.max(end, 0) - PZ) * (by - RAMP.y0) / (RAMP.y1 - RAMP.y0); }
+    const bx = x, by = -z, [lx, ly] = L_(bx, by);
+    if (onPier(lx, ly)) return ly < 0.04 ? PZ - (PZ - LOW) * THREE.MathUtils.clamp((lx - 1.05) / 0.9, 0, 1) : PZ;   // the front stairs down
+    if (onDeck(lx, ly)) return PZ + 0.06;
+    if (onBackStairs(lx, ly)) return PZ - PZ * THREE.MathUtils.clamp(stairOut(lx, ly) / 1.0, 0, 1);
     return Math.max(isletTop(bx, by), -0.3);                                       // on an islet, or wading
   };
   const S = (bx, by, sx, sy) => w.solid(bx, -by, sx, sy);
-  S(11, 5.6, 12.3, 5.3);                                                           // the station building
-  for (const x of [1.5, 5, 8.5, 12, 15.5, 19, 22.5]) S(x, -0.45, 0.36, 0.36);   // canopy posts
-  for (const x of [1.5, 19, 22.5]) S(x, 2.95, 0.3, 0.3);
-  S(14.9, 2.65, 2.3, 0.8); S(8.95, 2.72, 1.05, 0.7); S(12.72, 2.78, 0.55, 0.55); S(9.75, 2.8, 0.45, 0.45); S(19.5, 2.65, 1.6, 0.85);
-  for (const [x, y] of [[5.5, 2.65], [6.2, 2.75], [16.6, 2.7], [1.6, -0.1], [22.4, -0.1], [17.4, 2.75]]) S(x, y, 0.5, 0.5);
-  S(-2.6, -0.2, 0.62, 0.62); S(-1.75, -0.25, 0.6, 0.35);                         // chair, suitcase
-  S(-7.36, 1.9, 0.3, 0.3); S(-5.04, 1.9, 0.3, 0.3);                               // sign posts
-  S(-8.2, 2.4, 0.3, 0.3); S(27.5, 2.4, 0.3, 0.3);                                 // lamps
-  for (const x of [-9, -6.3, -3.4, 25, 28, 31]) S(x, 2.55, 1.55, 0.6);           // planters
+  S(PX + 1.2, PY + 0.39, 8.3, 0.75);                                               // the tall wall
+  S(PX - 0.9, PY - 0.41, 2.6, 0.55);                                               // the seats
+  S(PX + 3.55, PY + 4.6, 0.6, 0.3);                                                // the mooring post
+  for (const sx of [-1, 1]) S(PX + 4.3 + sx * 0.87 * SIGN_K / 0.6, PY - 1.85, 0.3, 0.3);   // the sign's posts
 
-  w.hot(-2.6, 0.2, 'Sit down and wait for the train', 'sit', { y: 1.7, r: 1.6 });
-  w.hot(7.9, -2.35, 'Read the timetable', 'welcome', { y: 2.1, r: 1.3 });
-  w.hot(8.95, -1.95, 'Check the vending machine', 'contact', { y: 2.3, r: 1.2 });
-  w.hot(-6.2, -1.2, 'Read the station sign', 'station', { y: 2.7, r: 1.6 });
-  w.hot(14.35, -1.95, 'Say hello to the cat', 'cat', { y: 1.4, r: 1.3 });
+  const SEAT = { x: PX - 1.21, y: PY - 0.41 };                                      // the second of the four seats
+  w.hot(SEAT.x, -SEAT.y, 'Sit down and wait for the train', 'sit', { y: 1.7, r: 1.6 });
+  w.hot(PX + 2.43, -(PY + 0.01), 'Read the timetable', 'welcome', { y: 1.9, r: 1.3 });
+  w.hot(PX + 3.77, -(PY + 0.01), 'Read the notices', 'contact', { y: 1.8, r: 1.2 });
+  w.hot(PX + 4.3, -(PY - 1.85), 'Read the station sign', 'station', { y: 2.0, r: 1.5 });
 
-  w.seat = { pos: B(-2.6, -0.2, PZ), yaw: 0.15 };
-  w.standSpot = B(-2.6, 0.55, PZ);
+  w.seat = { pos: B(SEAT.x, SEAT.y, PZ), yaw: 0 };
+  w.standSpot = B(SEAT.x, SEAT.y - 0.7, PZ);
 
   // ---------- the dimension crack ----------
-  const CX = -2.6, CZ = -TRACK;                                                    // where it opens: over the line, in front of the chair
+  const CX = SEAT.x, CZ = -TRACK;                                                  // where it opens: over the line, in front of the seat
   const crack = makeCrack();
   crack.position.set(CX, -0.1, CZ); crack.setOpen(0); s.add(crack);
   w.crack = crack;
@@ -485,6 +515,7 @@ export function buildTerminal() {
     hemi.color.copy(p.sky); hemi.groundColor.copy(p.ground); hemi.intensity = p.hemiI;
     s.fog.color.copy(p.fog);
     U.uShallow.value.copy(p.shallow); U.uDeep.value.copy(p.deep); U.uSky.value.copy(p.mid);
+    U.uSun.value = THREE.MathUtils.clamp((p.sunI - 0.8) / 1.6, 0, 1) * (1 - 0.8 * cloudy);   // sparkles need the sun
     cm.uniforms.lit.value.copy(p.cLit); cm.uniforms.shade.value.copy(p.cShade); cm.uniforms.edge.value.copy(p.cEdge); cm.uniforms.sun.value.copy(sd); cm.uniforms.haze.value.copy(p.mid);
     starField.material.opacity = p.stars;
     for (const l of lamps) l.intensity = p.lamps * 9;
@@ -530,10 +561,10 @@ export function buildTerminal() {
   // ---------- the cutscene: four shots ----------
   const END = 7.6, V = (a) => new THREE.Vector3(...a);
   const shots = [
-    { t: 0, from: V([-0.9, 2.6, -2.5]), to: V([-1.3, 2.35, -1.9]), look: V([CX, 1.8, CZ]) },          // waiting, behind the chair
-    { t: 1.5, from: V([-9.5, 1.15, 1.9]), to: V([-9.5, 1.3, 2.05]), look: V([40, 1.6, CZ]) },         // at the platform edge, the train bearing down
-    { t: 3.05, from: V([0.6, 2.4, -3.4]), to: V([-0.8, 2.45, -2.0]), look: V([CX, 2.4, CZ]) },        // it passes, the air tears
-    { t: 5.7, from: V([-1.4, 2.1, -1.4]), to: V([-2.4, 1.9, 1.7]), look: V([CX, 2.6, CZ + 1]) },     // walking in
+    { t: 0, from: V([CX + 1.7, PZ + 1.6, -SEAT.y - 0.3]), to: V([CX + 1.25, PZ + 1.45, -SEAT.y - 0.15]), look: V([CX, 1.8, CZ]) },   // waiting, beside the seat
+    { t: 1.5, from: V([PX - 3.6, PZ + 0.25, -(PY - 2.3) - 0.1]), to: V([PX - 3.6, PZ + 0.4, -(PY - 2.3)]), look: V([40, 1.6, CZ]) },  // the edge, the train bearing down
+    { t: 3.05, from: V([CX + 2.4, PZ + 1.5, -SEAT.y + 0.5]), to: V([CX + 1.0, PZ + 1.55, -SEAT.y + 0.8]), look: V([CX, 2.4, CZ]) },  // it passes, the air tears
+    { t: 5.7, from: V([CX + 0.6, PZ + 1.15, -SEAT.y - 0.1]), to: V([CX - 0.2, PZ + 0.95, -SEAT.y + 2.6]), look: V([CX, 2.6, CZ + 1]) },   // walking in
     { t: END },
   ];
   w.cine = { pos: shots[0].from.clone(), look: shots[0].look.clone(), snap: false, shake: 0, glow: 0 };
@@ -546,13 +577,51 @@ export function buildTerminal() {
     rayMat.color.set(DEST[dest].color).multiplyScalar(1.4); ring.material.color.set(DEST[dest].color).multiplyScalar(2); motes.material.color.set(DEST[dest].color).lerp(new THREE.Color(0xffffff), 0.5);
     startRun(95 + 1.2 * 40, 40);                                                   // reaches the crack about 3 s in
   };
-  w.walkIn = (k, p) => p.set(CX, PZ - (PZ - 0.02) * THREE.MathUtils.smoothstep(k, 0.36, 0.5), 0.2 + k * 3.2);
+  const z0 = -SEAT.y, z1 = CZ + 0.2, kEdge = (-(PY - 2.3) - z0) / (z1 - z0);           // off the porch's front edge, into the crack
+  w.walkIn = (k, p) => p.set(CX, PZ - (PZ - 0.02) * THREE.MathUtils.smoothstep(k, kEdge, kEdge + 0.12), z0 + k * (z1 - z0));
   w.reset = () => {
     seq = null; w.seqT = 0; moodK = 0; crack.setOpen(0); crack.setPortal(null); crackLight.intensity = 0; motes.visible = false;
     rayMat.opacity = ring.material.opacity = 0; run = null; nextTrain = 20;
     Object.assign(w.cine, { snap: false, shake: 0, glow: 0 }); w.cine.pos.copy(shots[0].from); w.cine.look.copy(shots[0].look);
   };
 
+  // ---------- the heron, the fish, the boat ----------
+  // The heron stands on its rock only in sunshine; when a train comes (or the weather turns) it takes off and flies away
+  // north, and comes back a while after, if the sun is still out. The fish circle in the shallows by the back stairs; in
+  // rain only two stay, under the deck.
+  const FLY = new THREE.Vector3(14, 9, -24), fpos = new THREE.Vector3(), fprev = new THREE.Vector3();
+  const FISH_AT = B(PX - 4.0, PY + 4.2, 0), FISH_RAIN = B(PX + 3.85, PY + 3.6, 0);
+  function animals(t, dt) {
+    if (boat) { boat.position.y = -0.12 + Math.sin(t * 0.8) * 0.025; boat.rotation.z = Math.sin(t * 0.6) * 0.02; boat.rotation.x = Math.sin(t * 0.7 + 1) * 0.015; }
+    const rain = cloudy > 0.6;
+    fishes.forEach((f, i) => {
+      const here = rain ? FISH_RAIN : FISH_AT, r = rain ? 0.35 + i * 0.1 : f.r;
+      f.o.visible = !rain || i < 2;
+      const a = t * f.sp + f.ph;
+      f.o.position.set(here.x + Math.cos(a) * r, -f.dz, here.z + Math.sin(a) * r * 0.7);
+      const dx = -Math.sin(a) * Math.sign(f.sp), dz = Math.cos(a) * 0.7 * Math.sign(f.sp);
+      f.o.rotation.y = Math.atan2(dz, -dx) + Math.sin(t * 6 + f.ph) * 0.12;       // facing the way it swims, tail wagging
+    });
+    if (!heron.stand || !heronSpot) return;
+    const sunny = cloudy < 0.35 && P.sunI > 1.2;
+    const trainNear = run && run.x < heronSpot.x + 45 && run.x + TRAIN_LEN > heronSpot.x - 12;
+    const away = fpos.copy(heronSpot).add(FLY);
+    const h = heron;
+    if (h.state === 'stand' && (trainNear || !sunny)) { h.state = 'off'; h.t = 0; }
+    if (h.state === 'gone') { h.wait = sunny && !trainNear ? h.wait + dt : 0; if (h.wait > 12) { h.state = 'in'; h.t = 0; } }
+    if (h.state === 'off' || h.state === 'in') {
+      h.t += dt / 5; const k = Math.min(1, h.t), e = h.state === 'off' ? k : 1 - k;
+      fprev.copy(h.fly.position);
+      h.fly.position.lerpVectors(heronSpot, away, e * e * (3 - 2 * e)); h.fly.position.y += Math.sin(Math.PI * e) * 2.5 + 0.6 * Math.min(1, e * 6);
+      const d = fprev.sub(h.fly.position).negate();
+      if (d.lengthSq() > 1e-6) h.fly.rotation.y = Math.atan2(d.z, -d.x);
+      const flap = Math.sin(t * 8) * 0.55; if (h.wings[0]) h.wings[0].rotation.x = -flap; if (h.wings[1]) h.wings[1].rotation.x = flap;
+      if (k >= 1) { h.state = h.state === 'off' ? 'gone' : 'stand'; h.wait = 0; }
+    }
+    if (h.state === 'stand' || (h.state === 'gone' && h.wait === 0 && sunny && !trainNear && t < 2)) h.state = 'stand';
+    h.stand.visible = h.state === 'stand'; h.fly.visible = h.state === 'off' || h.state === 'in';
+    if (h.stand.visible) { h.stand.position.copy(heronSpot); h.stand.rotation.y = 2.6; }
+  }
   const water0 = new THREE.Vector3();
   const lastP = new THREE.Vector3(); let stir = 0;
   w.ticks.push((t, dt) => {
@@ -580,6 +649,7 @@ export function buildTerminal() {
       g.position.set(u.cx + Math.cos(a) * u.r, u.h + Math.sin(t * 0.5 + u.ph) * 0.8, u.cz + Math.sin(a) * u.r); g.rotation.y = -a;
       const flap = Math.sin(t * 7 + u.ph) * 0.45; u.wings[0].rotation.y = flap; u.wings[1].rotation.y = -flap;
     }
+    animals(t, dt);
     // a train passes every so often, even when nobody is leaving
     if (!seq && !run && (nextTrain -= dt) < 0) { startRun(150, 14 + Math.random() * 6); nextTrain = 35 + Math.random() * 20; }
     trainTick(t, dt); sprayTick(dt);

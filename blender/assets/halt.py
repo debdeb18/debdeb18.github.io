@@ -98,14 +98,13 @@ def ruin_face(r, rnd, along, fixed, axis, lo=None, hi=None, top=TOP, base=BASE, 
             l = rnd.uniform(0.7, 1.4)
             a0, a1 = max(a, lo), min(a + l, hi); a += l
             if a1 - a0 < 0.15: continue
-            if row > 0 and z + h < top - 0.2 and rnd.random() < 0.06: continue  # a block fallen out
-            ll = a1 - a0 - 0.035; c = (a0 + a1) / 2; pos = fixed + out * rnd.uniform(-0.01, 0.04)
-            tilt, yaw = rnd.uniform(-2, 2), rnd.uniform(-1.5, 1.5)
+            ll = a1 - a0 - 0.035; c = (a0 + a1) / 2; pos = fixed + out * rnd.uniform(-0.005, 0.02)
+            tilt, yaw = rnd.uniform(-0.6, 0.6), rnd.uniform(-0.5, 0.5)
             if axis == 'x': ruin_block(r, rnd, (ll, 0.3, h - 0.035), (c, pos - out * 0.12, z), (0, tilt, yaw), 'x', out, moss=moss)
             else: ruin_block(r, rnd, (0.3, ll, h - 0.035), (pos - out * 0.12, c, z), (tilt, 0, yaw), 'y', out, moss=moss)
         z += h; row += 1
 
-def floor_slabs(r, rnd, joints, rect=None, top=TOP, skip=lambda x, y: False):
+def floor_slabs(r, rnd, joints, rect=None, top=TOP, skip=lambda x, y: False, clipx=None):
     """The top course of the porch: big stone blocks laid in staggered rows (no slabs), flush with the faces below,
     their tops the walking surface; a few cracked or sunk a little."""
     X0, X1, Y0, Y1 = rect or (-LX / 2 - 0.03, LX / 2 + 0.03, -LY / 2 - 0.03, LY / 2 + 0.03)
@@ -116,12 +115,13 @@ def floor_slabs(r, rnd, joints, rect=None, top=TOP, skip=lambda x, y: False):
         x = X0 + 0.02 - (rnd.uniform(0.2, 0.5) if row % 2 else 0)
         while x < X1 - 0.05:
             w = rnd.uniform(0.8, 1.3); x0, x1 = max(x, X0 + 0.02), min(x + w, X1 - 0.02); x += w
+            if clipx and y + d / 2 < clipx[1]: x1 = min(x1, clipx[0])           # trimmed at the top of the front stairs
             if x1 - x0 < 0.2: continue
             if math.hypot((x0 + x1) / 2 - TX, y + d / 2 - TY) < TR - 0.2: continue   # inside the tower
             if skip((x0 + x1) / 2, y + d / 2): continue
             sz = (x1 - x0 - 0.035, d - 0.035, 0.3); loc = ((x0 + x1) / 2, y + d / 2, top - 0.3 + rnd.uniform(-0.015, 0.008))
             rot = (rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1))
-            kw = dict(color=rnd.choice(('stone_a', 'stone_b', 'stone_c', 'stone_d')), parent=r, bevel=0.055, jitter=0.006, bite=0.2 if rnd.random() < 0.25 else 0.0, along='top', band=0.1, rough=2.4, paint=dict(light=0xFFFDF6, mid=0xE8E5DC, low=0xD4CEBC))
+            kw = dict(color=rnd.choice(('stone_a', 'stone_b', 'stone_c', 'stone_d')), parent=r, bevel=0.055, jitter=0.006, bite=0.12 if rnd.random() < 0.15 else 0.0, along='top', band=0.1, rough=2.4, paint=dict(light=0xFFFDF6, mid=0xE8E5DC, low=0xD4CEBC))
             if rnd.random() < 0.22:
                 t = rnd.uniform(0, math.pi); n = (math.cos(t), math.sin(t), 0); k = (rnd.uniform(-0.2, 0.2), rnd.uniform(-0.2, 0.2), 0)
                 for sgn in (1, -1):
@@ -432,16 +432,16 @@ def build():
     ruin_face(r, rnd, LY, LX / 2, 'y', lo=WF); ruin_face(r, rnd, LY, LX / 2, 'y', hi=WF, top=LOW)
     ruin_face(r, rnd, LX, WF, 'x', lo=XS0, top=TOP, base=LOW - 0.1, out=-1)    # the face under the wall, above the lower level
     joints = []
-    floor_slabs(r, rnd, joints, skip=lambda x, y: x > XS0 - 0.1 and y < WF)    # the upper floor
+    floor_slabs(r, rnd, joints, clipx=(XS0, WF))    # the upper floor
     floor_slabs(r, rnd, joints, rect=(XS1, LX / 2 + 0.03, -LY / 2 - 0.03, WF), top=LOW)   # the lower level
     for (x, y, dx, dy, ln) in joints: moss_strip(r, rnd, x, y, (LOW if (x > XS0 and y < WF) else TOP) - 0.005, dx, dy, ln)
     ya = -LY / 2 - 0.02                                                          # the stairs down: the middle course sticks out one step
     while ya < WF - 0.05:                                                        # past the floor course, the full depth of the front
         l = min(rnd.uniform(0.5, 0.8), WF - ya)
         if WF - (ya + l) < 0.25: l = WF - ya
-        painted_box('stair', (SD + 0.02, l - 0.03, ch - 0.02), (XS0 + SD / 2, ya + l / 2, ch + rnd.uniform(-0.02, 0.01)), (rnd.uniform(-1.5, 1.5), rnd.uniform(-1.5, 1.5), rnd.uniform(-3, 3)),
+        painted_box('stair', (SD + 0.02, l - 0.03, ch - 0.02), (XS0 + SD / 2, ya + l / 2, ch + rnd.uniform(-0.01, 0.005)), (rnd.uniform(-0.6, 0.6), rnd.uniform(-0.6, 0.6), rnd.uniform(-1.2, 1.2)),
                     color=rnd.choice(('stone_a', 'stone_b', 'stone_c', 'stone_d')), parent=r, bevel=0.045, jitter=0.008, along='top', band=0.1, rough=2.6, chisel=1.0,
-                    bite=0.18 if rnd.random() < 0.35 else 0.0)
+                    bite=0.12 if rnd.random() < 0.2 else 0.0)
         if rnd.random() < 0.35: moss_strip(r, rnd, XS0 + 0.05, ya + l, 2 * ch - 0.02, 1, 0, SD - 0.1)
         ya += l
     ruin_tower(r, rnd)
@@ -468,16 +468,16 @@ def build():
         while xa < xt + width - 0.05:
             l = min(rnd.uniform(0.5, 0.75), xt + width - xa)
             if xt + width - (xa + l) < 0.25: l = xt + width - xa
-            painted_box('back_step', (l - 0.03, depth, z1 - z0 - 0.02), (xa + l / 2, LY / 2 + depth / 2, z0 + rnd.uniform(-0.02, 0.01)), (rnd.uniform(-1.5, 1.5), rnd.uniform(-1.5, 1.5), rnd.uniform(-3, 3)),
-                        color=rnd.choice(('stone_a', 'stone_b', 'stone_c', 'stone_d')), bite=0.18 if rnd.random() < 0.35 else 0.0, **kw)
+            painted_box('back_step', (l - 0.03, depth, z1 - z0 - 0.02), (xa + l / 2, LY / 2 + depth / 2, z0 + rnd.uniform(-0.01, 0.005)), (rnd.uniform(-0.6, 0.6), rnd.uniform(-0.6, 0.6), rnd.uniform(-1.2, 1.2)),
+                        color=rnd.choice(('stone_a', 'stone_b', 'stone_c', 'stone_d')), bite=0.12 if rnd.random() < 0.2 else 0.0, **kw)
             if rnd.random() < 0.3: moss_strip(r, rnd, xa + l, LY / 2 + 0.05, z1 - 0.02, 0, 1, depth - 0.1)
             xa += l
         ya = yt                                                                 # and round the end, towards the tower
         while ya < LY / 2 + depth - 0.05:
             l = min(rnd.uniform(0.5, 0.75), LY / 2 + depth - ya)
             if LY / 2 + depth - (ya + l) < 0.25: l = LY / 2 + depth - ya
-            painted_box('back_step', (depth, l - 0.03, z1 - z0 - 0.02), (xt - depth / 2, ya + l / 2, z0 + rnd.uniform(-0.02, 0.01)), (rnd.uniform(-1.5, 1.5), rnd.uniform(-1.5, 1.5), rnd.uniform(-3, 3)),
-                        color=rnd.choice(('stone_a', 'stone_b', 'stone_c', 'stone_d')), bite=0.18 if rnd.random() < 0.35 else 0.0, **kw)
+            painted_box('back_step', (depth, l - 0.03, z1 - z0 - 0.02), (xt - depth / 2, ya + l / 2, z0 + rnd.uniform(-0.01, 0.005)), (rnd.uniform(-0.6, 0.6), rnd.uniform(-0.6, 0.6), rnd.uniform(-1.2, 1.2)),
+                        color=rnd.choice(('stone_a', 'stone_b', 'stone_c', 'stone_d')), bite=0.12 if rnd.random() < 0.2 else 0.0, **kw)
             if rnd.random() < 0.3: moss_strip(r, rnd, xt - depth + 0.05, ya + l, z1 - 0.02, 1, 0, depth - 0.1)
             ya += l
     # the deck hooks over the porch's back edge: the planks lying on the porch are thin, the ones off it thick, so its top
@@ -496,12 +496,17 @@ def build():
         else:
             plank('deck_plank', (DX1 - DX0, 0.3, th), ((DX0 + DX1) / 2, yy + 0.15, DT - th), (0, 0, rnd.uniform(-1.2, 1.2)), col, r, bevel=0.016)
         yy += 0.32
-    for px in (DX0 + 0.14, DX1 - 0.14):
-        for py in (LY / 2 + 0.7, DY1 - 0.2):
-            cyl('deck_post', 0.09, 0.08, DT - 0.15 - BASE, (px, py, BASE), color='timber_dark', parent=r, bevel=0.01, verts=10)
-        box('deck_beam', (0.14, DY1 - LY / 2 - 0.05, 0.16), (px, (LY / 2 + DY1) / 2 + 0.02, DT - 0.15 - 0.16), color='timber_dark', parent=r, bevel=0.02)
-    cyl('bollard', 0.12, 0.1, 0.5, (DX0 + 0.3, DY1 - 0.3, DZ + 0.06), color='timber_dark', parent=r, bevel=0.03, verts=12)
-    ball('bollard_cap', 0.13, (DX0 + 0.3, DY1 - 0.3, DZ + 0.58), (1, 1, 0.5), 'timber_dark', r)
+    zb = DT - 0.15                                                              # under the thick planks
+    for px in (DX0 + 0.16, DX1 - 0.16):
+        box('deck_beam', (0.16, DY1 - LY / 2 + 0.3, 0.18), (px, (LY / 2 - 0.3 + DY1) / 2, zb - 0.18), (0, 0, rnd.uniform(-0.6, 0.6)), 'plank_d', r, bevel=0.025, jitter=0.01)   # set into the stone
+        for py in (LY / 2 + 0.75, DY1 - 0.22):
+            box('deck_post', (0.18, 0.18, zb - 0.18 - BASE), (px, py, BASE), (rnd.uniform(-1.5, 1.5), rnd.uniform(-1.5, 1.5), rnd.uniform(-4, 4)), 'plank_d', r, bevel=0.03, jitter=0.012)
+        ln = DY1 - 0.22 - (LY / 2 + 0.75); hz = 1.0                                # a diagonal brace between the posts
+        box('deck_brace', (0.08, math.hypot(ln, hz), 0.12), (px + (0.13 if px > (DX0 + DX1) / 2 else -0.13), LY / 2 + 0.75 + ln / 2, zb - 0.18 - hz / 2 - 0.55),
+            (math.degrees(math.atan2(hz, ln)), 0, 0), 'plank', r, bevel=0.015, jitter=0.006)
+    box('deck_cross', (DX1 - DX0, 0.14, 0.16), ((DX0 + DX1) / 2, DY1 - 0.22, zb - 0.18 - 0.16), color='plank_d', parent=r, bevel=0.02, jitter=0.008)
+    cyl('bollard', 0.12, 0.1, 0.5, (DX0 + 0.3, DY1 - 0.3, DZ), color='plank_d', parent=r, bevel=0.03, verts=12)
+    ball('bollard_cap', 0.13, (DX0 + 0.3, DY1 - 0.3, DZ + 0.52), (1, 1, 0.5), 'plank_d', r)
     tube('rope', [(DX0 + 0.3, DY1 - 0.3, DZ + 0.4), (DX0 - 0.2, DY1 + 0.3, DZ - 0.3), (DX0 - 0.6, DY1 + 0.9, 0.1)], 0.02, 0xD9C08E, r)
     bake_cuts()
     return r

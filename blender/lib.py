@@ -265,12 +265,20 @@ def painted_box(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='stone', parent=
             co = [0, 0, 0]; co[nax] = sf * 0.5; co[ea] = ge * (0.5 - w / size[ea])
             no = [0, 0, 0]; no[nax] = sf * math.cos(t) * size[nax]; no[ea] = ge * math.sin(t) * size[ea]
             knock(tuple(co), tuple(no))
-    if bite:                                                                  # broken: a chunk gone from one top edge
-        ea = random.choice((0, 1)); ge = random.choice((-1, 1)); w = bite * random.uniform(0.7, 1.0); t = math.radians(random.uniform(25, 40))
-        co = [0, 0, 0.5]; co[ea] = ge * (0.5 - w / size[ea])
-        no = [0, 0, 0]; no[2] = math.cos(t) * size[2]; no[ea] = ge * math.sin(t) * size[ea]
-        bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=co, plane_no=no, clear_outer=True)
-        bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary], sides=0)
+    if bite:                                                                  # broken: a chunk gone from part of one top edge,
+        ea = random.choice((0, 1)); ge = random.choice((-1, 1)); oa = 1 - ea      # its break jagged (two or three facets),
+        L = size[oa]; c0 = random.uniform(-0.35, 0.35) * L; half = random.uniform(0.15, 0.3) * L   # not a clean cut
+        for f in range(random.randint(2, 3)):
+            w = bite * random.uniform(0.5, 1.0); t = math.radians(random.uniform(30, 60)); tw = math.radians(random.uniform(-35, 35))
+            co = [0, 0, 0.5]; co[ea] = ge * (0.5 - w / size[ea]); co[oa] = (c0 + (f - 1) * half * 0.6) / L
+            no = [0, 0, 0]; no[2] = math.cos(t) * size[2]; no[ea] = ge * math.sin(t) * math.cos(tw) * size[ea]; no[oa] = math.sin(t) * math.sin(tw) * L
+            for side in (-1, 1):                                              # limit each facet to its own stretch of the edge
+                pass
+            bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=co, plane_no=no, clear_outer=False)
+            for v in bm.verts:                                                # pull the stretch's top-edge vertices onto the facet
+                d = sum((v.co[i] - co[i]) * no[i] for i in range(3)) / math.sqrt(sum(n * n for n in no))
+                if d > 0 and abs(v.co[oa] * L - (c0 + (f - 1) * half * 0.6)) < half:
+                    for i in range(3): v.co[i] -= d * no[i] / math.sqrt(sum(n * n for n in no))
     R = random.uniform
     bumps = [(R(-0.5, 0.5), R(-0.5, 0.5), R(0.15, 0.4), R(-1, 1)) for _ in range(5)]          # swells and dips in the face
     chips = [(random.choice((-0.5, 0.5)), R(-0.5, 0.5), R(0.04, 0.1)) for _ in range(random.randint(0, 1 + int(rough * 1.5)))]   # bites out of an edge

@@ -296,24 +296,26 @@ def posters(r, rnd, x, y, z):
     """Papers pinned and pasted straight onto the wall, like wanted posters but with the station's information: the
     timetable, a map of the islands, notices, an old faded one half torn away. Each a little crooked, pinned at its
     corners. (x, z) is the centre of the cluster on the wall face at y; they face -Y."""
-    def paper(px, pz, w, h, roll, col, lines=0, head=None, pins=4, curl=0.0):
+    AGED = dict(light=0xE6D6AE, mid=0xFFFFFF, low=0xC9B48A, right=0xEDE2C6)   # yellowed top, stained foot, browned edges
+    def paper(px, pz, w, h, roll, col, lines=0, head=None, pins=4, curl=0.0, torn=False):
         e = root('poster'); e.location = (px, y - 0.012, pz); e.rotation_euler = (0, math.radians(roll), 0); e.parent = r
-        box('paper', (w, 0.012, h), (0, 0, -h / 2), color=col, parent=e, bevel=0.003, jitter=0.004)
-        if curl: box('curl', (w * 0.22, 0.012, h * 0.16), (w / 2 - w * 0.11, -0.02, -h / 2), (8, 0, -20), col, e, bevel=0.003)   # a lifted corner
+        clip = ((0.1, 0, 0.15), (0.6, 0, 0.8)) if torn else None                   # torn away across one corner
+        painted_box('paper', (w, 0.012, h), (0, 0, -h / 2), color=col, parent=e, bevel=0.002, along='x', band=0.14, sculpt=False, paint=AGED, clip=clip)
+        if curl: painted_box('curl', (w * 0.22, 0.012, h * 0.16), (w / 2 - w * 0.11, -0.02, -h / 2), (8, 0, -20), color=col, parent=e, bevel=0.002, along='x', sculpt=False, paint=AGED)
         if head: box('head', (w * 0.9, 0.012, h * 0.13), (0, -0.006, h / 2 - h * 0.18), color=head, parent=e, bevel=0.002)
         for i in range(lines):
-            box('ink', (w * rnd.uniform(0.5, 0.8), 0.012, 0.022), (rnd.uniform(-0.04, 0.04) * w, -0.008, h / 2 - h * 0.3 - i * (h * 0.6 / max(1, lines - 1)) - 0.011), color='iron_d', parent=e, bevel=0)
+            box('ink', (w * rnd.uniform(0.5, 0.8), 0.012, 0.022), (rnd.uniform(-0.04, 0.04) * w, -0.008, h / 2 - h * 0.3 - i * (h * 0.6 / max(1, lines - 1)) - 0.011), color=0x5E5048, parent=e, bevel=0)   # faded ink
         for (sx, sz) in ((-1, 1), (1, 1), (-1, -1), (1, -1))[:pins]:
             ball('pin', 0.018, (sx * (w / 2 - 0.035), -0.014, sz * (h / 2 - 0.035)), (1, 0.6, 1), 0x8A5236, e)
         return e
-    paper(x - 0.72, z + 0.12, 0.62, 0.86, rnd.uniform(-2, 2), 'board', lines=8, head=0x2F6F9A)          # the timetable
+    paper(x - 0.72, z + 0.12, 0.62, 0.86, rnd.uniform(-2, 2), 'board', lines=8, head=0x4C7A96)          # the timetable
     m = paper(x + 0.05, z + 0.28, 0.66, 0.5, rnd.uniform(-4, 4), 0xE8F1F2, pins=2)                        # the map
     for (dx, dz, rr) in ((-0.15, -0.05, 0.09), (0.08, 0.04, 0.06), (0.2, -0.1, 0.045)):
         cyl('map_island', rr, rr, 0.012, (dx, -0.012, dz), (90, 0, 0), 0x7DB85A, m, bevel=0, verts=14)
     box('map_line', (0.56, 0.012, 0.018), (0, -0.014, -0.17), (0, 4, 0), 0xB8403A, m, bevel=0)
     paper(x + 0.02, z - 0.32, 0.4, 0.4, rnd.uniform(-6, 6), 0xF2C46A, lines=3, curl=1.0)                 # a notice
     paper(x + 0.62, z + 0.05, 0.36, 0.5, rnd.uniform(-5, 5), 0xE8A0A0, lines=4, pins=3)                   # another
-    paper(x + 0.6, z - 0.45, 0.3, 0.22, rnd.uniform(-10, 10), 0xD8CFB8, lines=2, pins=1)                  # old, faded, half gone
+    paper(x + 0.6, z - 0.45, 0.3, 0.22, rnd.uniform(-10, 10), 0xD8CFB8, lines=2, pins=1, torn=True)                  # old, faded, half gone
     paper(x - 0.25, z + 0.68, 0.3, 0.2, rnd.uniform(-8, 8), 0xE2D9C2, lines=2, pins=2)
 
 def info_board(r, x, y, z0=TOP):

@@ -245,13 +245,24 @@ const PAINTERS = {
     }
     for (let i = 0; i < 500; i++) { const x = r() * SIZE, y = r() * SIZE; if (n(x, y) > 0.55) dab(g, x, y, 1 + r(), 1 + r(), 0, '#d6e98a', 0.8); }
   },
+  // Old paper (grey, tinted by each poster's colour): soft yellowed blotches, brown foxing spots, faint water rings and
+  // drip marks running down.
+  paper(g, r) {
+    const n = fbm(noiseField(r, 3), noiseField(r, 7), noiseField(r, 15));
+    g.fillStyle = '#e4e4e4'; g.fillRect(0, 0, SIZE, SIZE);
+    for (let i = 0; i < 500; i++) { const x = r() * SIZE, y = r() * SIZE; wrap(x, y, 40, (X, Y) => dab(g, X, Y, 12 + r() * 30, 10 + r() * 22, r() * 3, n(x, y) > 0.5 ? '#d6cdb4' : '#ececec', 0.3)); }
+    for (let i = 0; i < 70; i++) { const x = r() * SIZE, y = r() * SIZE; wrap(x, y, 6, (X, Y) => dab(g, X, Y, 1 + r() * 3.5, 1 + r() * 3, r() * 3, r() < 0.6 ? '#a8865a' : '#c2a274', 0.55)); }
+    g.globalAlpha = 0.25; g.lineWidth = 2;
+    for (let i = 0; i < 6; i++) { const x = r() * SIZE, y = r() * SIZE, rr = 18 + r() * 36; wrap(x, y, rr + 4, (X, Y) => { g.strokeStyle = '#b39a6c'; g.beginPath(); g.ellipse(X, Y, rr, rr * (0.7 + r() * 0.3), r() * 3, 0, 6.2832); g.stroke(); }); }
+    for (let i = 0; i < 40; i++) { const x = r() * SIZE, y = r() * SIZE, len = 30 + r() * 90; wrap(x, y, len, (X, Y) => stroke(g, X, Y, len, 2 + r() * 4, Math.PI / 2 + (r() - 0.5) * 0.05, (r() - 0.5) * 3, '#bca77c', 0.18)); }
+  },
 };
 // How each kind is applied: `replace` uses the painted colours as they are; `tint` multiplies them with the part's own colour.
 const KINDS = { grass: { scale: 1 / 3.2, mode: 'replace' }, sand: { scale: 1 / 4, mode: 'replace' }, concrete: { scale: 1 / 4, mode: 'replace' },
   gravel: { scale: 1 / 2, mode: 'replace' }, ballast: { scale: 1 / 1.6, mode: 'replace' }, wood: { scale: 1 / 2.2, mode: 'tint' }, stone: { scale: 1 / 2.5, mode: 'tint' },
   bark: { scale: 1 / 1.6, mode: 'tint' }, plaster: { scale: 1 / 3, mode: 'tint' }, roof: { scale: 1 / 2.4, mode: 'tint' }, paint: { scale: 1 / 1.6, mode: 'tint' },
   seatwood: { scale: 1 / 0.7, mode: 'replace' }, seatiron: { scale: 1 / 1.6, mode: 'replace' },
-  brick: { scale: 1 / 1.4, mode: 'tint' }, moss: { scale: 1 / 0.6, mode: 'replace' }, paving: { scale: 1 / 1.5, mode: 'tint' } };
+  brick: { scale: 1 / 1.4, mode: 'tint' }, moss: { scale: 1 / 0.6, mode: 'replace' }, paper: { scale: 1 / 0.7, mode: 'tint' }, paving: { scale: 1 / 1.5, mode: 'tint' } };
 
 const textures = {};
 export function paintedTexture(kind) {
@@ -269,7 +280,7 @@ export const SURFACES = {
   '7db85a': 'grass', 'e6d6a8': 'sand', d2cbbc: 'concrete', a39c8f: 'concrete', c9bfa8: 'gravel', '8f877d': 'gravel',
   '9a6a45': 'wood', c9a374: 'wood', '8a5a3c': 'wood', '4a3226': 'wood', '4e3528': 'wood', b9b2a8: 'stone',
   '5a3f30': 'bark', f0e4c8: 'plaster', '41626f': 'roof', '2f4b58': 'roof', '5e8f7a': 'roof', '45725f': 'roof', f1e6cc: 'paint', e8f0f4: 'paint', b8403a: 'paint', f0e2c0: 'paint',
-  a0623a: 'seatwood', '6f9a4c': 'moss', '8db463': 'moss', e6e0cf: 'brick', d8d2c0: 'brick', efebdf: 'brick', d2d3c1: 'brick', d8cbb0: 'paving', cdbf9f: 'paving', e2d7be: 'paving', c2c1a8: 'paving', e9e0c9: 'paving', '2f3036': 'seatiron',
+  a0623a: 'seatwood', f3ead2: 'paper', e8f1f2: 'paper', f2c46a: 'paper', e8a0a0: 'paper', d8cfb8: 'paper', e2d9c2: 'paper', '6f9a4c': 'moss', '8db463': 'moss', e6e0cf: 'brick', d8d2c0: 'brick', efebdf: 'brick', d2d3c1: 'brick', d8cbb0: 'paving', cdbf9f: 'paving', e2d7be: 'paving', c2c1a8: 'paving', e9e0c9: 'paving', '2f3036': 'seatiron',
 };
 export function surfaceOf(material) { const m = /^c_([0-9a-f]{6})/.exec(material.name || ''); return m ? SURFACES[m[1]] : null; }
 

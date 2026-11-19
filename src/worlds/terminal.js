@@ -103,7 +103,18 @@ float cellDot(vec2 x, float t) {
     vec2 g = vec2(float(i), float(j)), o = 0.5 + 0.5 * sin(t + 6.2831 * wHash(n + g)); md = min(md, length(g + o - f)); }
   return md;
 }
-uniform vec4 uPorch; uniform vec3 uTower;
+uniform vec4 uPorch; uniform vec3 uTower; uniform vec3 uBoat;
+// Inside the boat's hull at the waterline (blender/assets/boat.py: the same width, depth and sheer), so the sea isn't drawn
+// in the boat. uBoat: its x, z and turn.
+bool inBoat(vec3 p) {
+  vec2 d = p.xz - uBoat.xy; float c = cos(uBoat.z), s = sin(uBoat.z);
+  float t = (d.x * c - d.y * s + 1.5) / 3.0, y = abs(d.x * s + d.y * c);
+  if (t <= 0.0 || t >= 1.0) return false;
+  float w = 0.62 * (t < 0.45 ? sin(t / 0.45 * 1.5708) : 1.0 - 0.32 * pow((t - 0.45) / 0.55, 2.0));
+  float dp = 0.42 * (0.45 + 0.55 * sin(3.14159 * (0.08 + 0.84 * t))), sh = 0.28 + 0.16 * pow(1.0 - t, 3.0);
+  float k = clamp((sh - 0.12) / dp, 0.0, 1.0);
+  return y < 0.97 * w * sin(acos(pow(k, 1.25)));
+}
 float shoreDist(vec2 b) {                                          // metres from the nearest shore: islets, the porch, its tower
   vec2 q = abs(b - uPorch.xy) - uPorch.zw; float s = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
   s = min(s, length(b - uTower.xy) - uTower.z);
@@ -118,6 +129,7 @@ function makeWater(U) {
     sh.vertexShader = 'varying vec3 vW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime, uSun;\nuniform vec3 uShallow, uDeep, uSky, uTrain, uPlayer;\nuniform float uStir;\n' + DEPTH_GLSL + WATER_GLSL + '\n' + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
+        if (inBoat(vW)) discard;
         vec2 bp = vec2(vW.x, -vW.z);
         float dep = seaDepth(bp), shore = shoreDist(bp);
         float wob = (wNoise(bp * 3.0 + uTime * 0.2) - 0.5) * 0.12;                // edges that wobble, as if drawn by hand
@@ -185,7 +197,7 @@ export function buildTerminal() {
   // ---------- water and sea floor ----------
   const U = { uTime: { value: 0 }, uIslets: { value: Array.from({ length: 16 }, () => new THREE.Vector3(1e4, 1e4, 0)) },
     uShallow: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uSky: { value: new THREE.Color() }, uTrain: { value: new THREE.Vector3(1e4, 0, 25) }, uPlayer, uStir: { value: 0 }, uSun: { value: 1 },
-    uPorch: { value: new THREE.Vector4(...PORCH) }, uTower: { value: new THREE.Vector3(...TOWER) } };
+    uPorch: { value: new THREE.Vector4(...PORCH) }, uTower: { value: new THREE.Vector3(...TOWER) }, uBoat: { value: new THREE.Vector3(1e4, 1e4, 0) } };
   const water = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), makeWater(U));
   water.position.set(55, 0, 0); water.receiveShadow = true; water.renderOrder = 1; water.userData.noShadow = true;
   s.add(water);
@@ -246,6 +258,7 @@ export function buildTerminal() {
   let boat = null;
   const boatReady = loadModel('models/terminal/boat.glb').then(({ scene }) => {
     boat = scene; boat.position.copy(B(PX + 1.3, PY + 6.3, -0.12)); boat.rotation.y = 0.3; s.add(boat);
+    U.uBoat.value.set(boat.position.x, boat.position.z, boat.rotation.y);         // no sea inside the hull
     return [];
   });
   const heron = { stand: null, fly: null, wings: [], state: 'gone', t: 0, wait: 0 };

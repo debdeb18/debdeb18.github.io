@@ -415,7 +415,7 @@ def build():
     WT, WH = 0.7, 3.2
     WY = -LY / 2 + (LY - WT) * 3 / 5 + WT / 2                                  # the space in front of it and behind it is 3 : 2
     WF = WY - WT / 2                                                           # the wall's front face
-    wx0 = TX + TR + 0.8                                                         # it starts a little away from the tower
+    wx0 = TX + TR + 1.6                                                         # it starts away from the tower
     wx1 = LX / 2 - 0.15
     XS0 = (wx0 + wx1) / 2; NS = 4; SD = 0.4; LOW = TOP - 0.6; XS1 = XS0 + NS * SD  # the stairs down, and the lower level
     box('core', (LX - 0.5, LY / 2 - WF - 0.25, TOP - BASE - 0.06), (0, (WF + LY / 2 - 0.25) / 2, BASE), color='joint', parent=r, bevel=0.02)
@@ -436,10 +436,10 @@ def build():
     ruin_tower(r, rnd)
     for (x, y, nx_, ny_, ln) in ((-3.2, -LY / 2 - 0.12, 0, -1, 1.2), (3.9, LY / 2 + 0.12, 0, 1, 1.4)):
         ivy(r, rnd, x, y, TOP - 0.05, nx_, ny_, ln)                          # a little ivy over the pier's edge
-    ruin_wall(r, rnd, wx0, wx1, WY, WT, WH, ((-0.9, TOP + 1.25, TOP + 2.55), (2.9, TOP + 1.25, TOP + 2.55)))
-    for lx in (-1.7, 0.4, 4.2): lantern(r, lx, WF, TOP + 1.95)
-    seat_row(r, -2.2, WF - 0.45, 4)                                             # the waiting spot, on the upper front
-    trash_can(r, -2.2 - 4 * 0.62 / 2 - 0.45, WF - 0.45)
+    ruin_wall(r, rnd, wx0, wx1, WY, WT, WH, ())                              # no windows in the wall (the tower keeps its own)
+    for lx in (-0.4, 3.6): lantern(r, lx, WF, TOP + 1.95)
+    seat_row(r, -0.9, WF - 0.45, 4)                                             # the waiting spot, on the upper front
+    trash_can(r, -0.9 - 4 * 0.62 / 2 - 0.45, WF - 0.45)
     crossing_signal(r, LX / 2 - 0.8, -LY / 2 + 0.65)                            # front right, on the lower level
     info_board(r, XS1 + 1.1, WF - 0.45, LOW)                                    # the board, on the lower level just past the stairs
     for (bx, by) in ((XS1 + 2.2, WF - 0.35), (XS1 + 2.9, WF - 0.45)):

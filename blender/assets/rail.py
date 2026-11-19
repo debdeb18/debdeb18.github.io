@@ -3,7 +3,7 @@ profile (rounded head, thin web, wide foot), blue-grey with a bright worn line a
 laid close together, each a little different; spikes and tie plates holding the rails; pebbles and sand settled
 between the sleepers, no raised bank. Built along X, centred; origin on the sea floor at the track's middle."""
 import math, random, bmesh
-from mathutils import Vector
+from mathutils import Vector, Matrix
 from lib import *
 VIEW = dict(angle=-25, lift=0.35, res=(1100, 650), samples=32, zoom=1.6)
 LEN, GAUGE = 12.0, 1.435
@@ -23,19 +23,38 @@ def rail_bar(name, y, parent):
     box('rail_top', (LEN, 0.04, 0.006), (0, y, 0.148), color=STEEL_TOP, parent=parent, bevel=0.002, rough=0.25)   # the worn shine
     return o
 
+def pebble_bed(r, rnd):
+    """Real 3D pebbles, all in one mesh: two overlapping layers of small rounded stones, each lit on top and darker
+    underneath, thinning out unevenly at the sides so the edge is ragged, piled up around the sleepers."""
+    tones = [Vector(((h >> 16 & 255) / 255, (h >> 8 & 255) / 255, (h & 255) / 255)) for h in (0x6F8394, 0x7E92A2, 0x93A3AE, 0xA7B2B8, 0xA3977D, 0x8A8B87, 0xBFC6C9, 0x5F6E7B)]
+    bm = bmesh.new(); col = bm.verts.layers.color.new('Col')
+    for layer, (n, rmin, rmax, z0) in enumerate(((1100, 0.08, 0.13, -0.03), (1100, 0.06, 0.1, 0.03))):
+        for _ in range(n):
+            y = rnd.uniform(-1.75, 1.75)
+            edge = (abs(y) - 1.25) / 0.5                                          # thin out unevenly past 1.25 m from the middle
+            if edge > 0 and rnd.random() < edge: continue
+            x = rnd.uniform(-LEN / 2, LEN / 2); rr = rnd.uniform(rmin, rmax)
+            sq = (rnd.uniform(1.0, 1.4), rnd.uniform(0.8, 1.1), rnd.uniform(0.55, 0.75))
+            m = Matrix.Translation((x, y, z0 + rr * sq[2] * 0.4)) @ Matrix.Rotation(rnd.uniform(0, 6.3), 4, 'Z') @ Matrix.Diagonal((sq[0] * rr, sq[1] * rr, sq[2] * rr, 1))
+            res = bmesh.ops.create_icosphere(bm, subdivisions=1, radius=1.0, matrix=m)
+            base = rnd.choice(tones)
+            for v in res['verts']:
+                t = max(0.0, min(1.0, (v.co.z - (z0 - 0.02)) / (rr * 1.2)))
+                c = base * (0.55 + 0.5 * t)                                       # darker underneath, lit on top
+                v[col] = (min(1, c.x), min(1, c.y), min(1, c.z), 1.0)
+    me = bpy.data.meshes.new('pebbles'); bm.to_mesh(me); bm.free()
+    for p in me.polygons: p.use_smooth = True
+    o = bpy.data.objects.new('pebbles', me); bpy.context.scene.collection.objects.link(o)
+    o.data.materials.append(mat_vc(0xFFFFFF)); o.parent = r
+    return o
+
 def build():
     r = root('rail'); rnd = random.Random(4)
-    bm = bmesh.new(); bmesh.ops.create_grid(bm, x_segments=240, y_segments=64, size=0.5)   # the bed: a carpet of pebbles
-    for v in bm.verts: v.co.x *= LEN + 0.6; v.co.y *= 3.2                                # with real depth, one bump per pebble
-    me = bpy.data.meshes.new('bed'); bm.to_mesh(me); bm.free()
-    bed = bpy.data.objects.new('bed', me); bpy.context.scene.collection.objects.link(bed); bed.data.materials.append(mat(BED)); bed.parent = r
-    tex = bpy.data.textures.new('pebbles', 'VORONOI'); tex.noise_scale = 0.13; tex.distance_metric = 'DISTANCE'
-    d = bed.modifiers.new('pebbles', 'DISPLACE'); d.texture = tex; d.texture_coords = 'GLOBAL'; d.strength = -0.06; d.mid_level = 0.0
-    sm = bed.modifiers.new('round', 'SMOOTH'); sm.factor = 0.9; sm.iterations = 6     # rounded pebbles, not points
-    for i in range(70):                                                          # a few bigger stones among them
-        x, y = rnd.uniform(-LEN / 2, LEN / 2), rnd.uniform(-1.5, 1.5)
-        rock('pebble', rnd.uniform(0.06, 0.12), (x, y, -0.03), (1.3, 1.0, 0.5), (0, 0, rnd.uniform(0, 360)),
-             rnd.choice((0x9AA3AB, 0xB4AC98, 0x8C8F92, 0xC3CCD1)), r, flat=0.4, detail=1)
+    bm = bmesh.new(); bmesh.ops.create_grid(bm, x_segments=1, y_segments=1, size=0.5)   # a hidden underlayer, painted with
+    for v in bm.verts: v.co.x *= LEN; v.co.y *= 2.5; v.co.z = 0.0                          # pebbles, so gaps read as pebbles
+    me = bpy.data.meshes.new('underlayer'); bm.to_mesh(me); bm.free()
+    ul = bpy.data.objects.new('underlayer', me); bpy.context.scene.collection.objects.link(ul); ul.data.materials.append(mat(BED)); ul.parent = r
+    pebble_bed(r, rnd)
     x = -LEN / 2 + 0.25
     while x < LEN / 2:                                                          # sleepers close together, each a bit different
         w = rnd.uniform(0.2, 0.24)

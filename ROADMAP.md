@@ -37,6 +37,8 @@ Porch v2 (on the ruin), assets in `blender/assets/halt.py`, `heron.py`, `fish.py
 - [x] Mooring post: twin posts with a rope figure-of-eight (option E)
 - [ ] Revisit the stone blocks at the end of the phase
 - [ ] Put the porch into the world (simplify the model on export)
+- [ ] New rail (`blender/assets/rail.py`) replaces the v1 causeway
+- [ ] Ghibli-style water after `docs/ghibli-water.md` (bands, cell lines, thin shore foam, sparkles, see-through shallows)
 - [ ] The cat asleep in the tower nook: design still to settle (`cat_sleep.py` is the work in progress; the nook is empty for now)
 - [ ] Hide the cat when it rains or the weather is bad
 - [x] Low-poly heron standing (`heron.py`) and flying (`heron_flying.py`, wings flap)

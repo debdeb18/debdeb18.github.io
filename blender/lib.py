@@ -223,7 +223,7 @@ def plank(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, b
     return o
 
 def painted_box(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='stone', parent=None, bevel=0.02, jitter=0.0, along='x',
-                band=0.18, paint=None, sculpt=True, face=0, rough=1.0, clip=None, moss=0.0, chisel=0.0, **mk):
+                band=0.18, paint=None, sculpt=True, face=0, rough=1.0, clip=None, moss=0.0, chisel=0.0, bite=0.0, **mk):
     """A box with hand-painted light and shade on its vertices, like a painted stone or tile: a light band along the
     top and the left, a darker, stained band along the bottom and the right. `along` is the face's horizontal axis
     ('x' or 'y'); a flat tile (along='top') gets a light rim all round its top. The colour multiplies `color`.
@@ -265,6 +265,12 @@ def painted_box(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='stone', parent=
             co = [0, 0, 0]; co[nax] = sf * 0.5; co[ea] = ge * (0.5 - w / size[ea])
             no = [0, 0, 0]; no[nax] = sf * math.cos(t) * size[nax]; no[ea] = ge * math.sin(t) * size[ea]
             knock(tuple(co), tuple(no))
+    if bite:                                                                  # broken: a chunk gone from one top edge
+        ea = random.choice((0, 1)); ge = random.choice((-1, 1)); w = bite * random.uniform(0.7, 1.0); t = math.radians(random.uniform(25, 40))
+        co = [0, 0, 0.5]; co[ea] = ge * (0.5 - w / size[ea])
+        no = [0, 0, 0]; no[2] = math.cos(t) * size[2]; no[ea] = ge * math.sin(t) * size[ea]
+        bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=co, plane_no=no, clear_outer=True)
+        bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary], sides=0)
     R = random.uniform
     bumps = [(R(-0.5, 0.5), R(-0.5, 0.5), R(0.15, 0.4), R(-1, 1)) for _ in range(5)]          # swells and dips in the face
     chips = [(random.choice((-0.5, 0.5)), R(-0.5, 0.5), R(0.04, 0.1)) for _ in range(random.randint(0, 1 + int(rough * 1.5)))]   # bites out of an edge

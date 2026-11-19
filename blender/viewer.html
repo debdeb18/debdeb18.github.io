@@ -6,7 +6,8 @@
 </head><body>
 <script type="module">
 import * as THREE from 'three';
-import { loadModel } from '../src/models.js';
+import { loadModel, gradient } from '../src/models.js';
+import { leafify } from '../src/foliage.js';
 const q = new URLSearchParams(location.search), v = (k, d) => (q.get(k) || d).split(',').map(Number);
 const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(devicePixelRatio);
 renderer.setSize(innerWidth, innerHeight); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -19,6 +20,7 @@ const sun = new THREE.DirectionalLight(0xfff0d8, 2.4); sun.position.set(...v('su
 sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -10, right: 10, top: 10, bottom: -10 }); sun.shadow.bias = -0.0005; scene.add(sun);
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshToonMaterial({ color: 0xd8cbb0 })); ground.rotation.x = -Math.PI / 2; ground.position.y = -1.3; ground.receiveShadow = true; scene.add(ground);
 const { scene: model } = await loadModel(q.get('m') || '../models/halt.glb'); scene.add(model);
+leafify(model, 'bush', (m) => /^c_(3a8547|6fb04f|2a6643)/.test(m.name || ''), gradient(), { clumps: true });   // v1's leaf cards on the bushes
 if (q.has('normals')) model.traverse((o) => { if (o.isMesh) o.material = new THREE.MeshNormalMaterial(); });
 if (q.has('vcol')) model.traverse((o) => { if (o.isMesh) o.material = new THREE.MeshBasicMaterial({ vertexColors: !!o.geometry.attributes.color, color: o.geometry.attributes.color ? 0xffffff : 0x888888 }); });
 camera.lookAt(...v('at', '0,1,0'));

@@ -575,9 +575,6 @@ def build():
         box('deck_beam', (0.16, DY1 - LY / 2 + 0.3, 0.18), (px, (LY / 2 - 0.3 + DY1) / 2, zb - 0.18), (0, 0, rnd.uniform(-0.6, 0.6)), 'plank_d', r, bevel=0.025, jitter=0.01)   # set into the stone
         for py in (LY / 2 + 0.75, DY1 - 0.22):
             box('deck_post', (0.18, 0.18, zb - 0.18 - BASE), (px, py, BASE), (rnd.uniform(-1.5, 1.5), rnd.uniform(-1.5, 1.5), rnd.uniform(-4, 4)), 'plank_d', r, bevel=0.03, jitter=0.012)
-        ln = DY1 - 0.22 - (LY / 2 + 0.75); hz = 1.0                                # a diagonal brace between the posts
-        box('deck_brace', (0.08, math.hypot(ln, hz), 0.12), (px + (0.13 if px > (DX0 + DX1) / 2 else -0.13), LY / 2 + 0.75 + ln / 2, zb - 0.18 - hz / 2 - 0.55),
-            (math.degrees(math.atan2(hz, ln)), 0, 0), 'plank', r, bevel=0.015, jitter=0.006)
     box('deck_cross', (DX1 - DX0, 0.14, 0.16), ((DX0 + DX1) / 2, DY1 - 0.22, zb - 0.18 - 0.16), color='plank_d', parent=r, bevel=0.02, jitter=0.008)
     bx, by = DX0 + 0.45, DY1 - 0.3                                              # the mooring post: twin posts with a bar (design E),
     for sx in (-1, 1): cyl('bollard', 0.085, 0.075, 0.38, (bx + sx * 0.16, by, DZ), color='plank_d', parent=r, bevel=0.025, verts=12)   # the rope

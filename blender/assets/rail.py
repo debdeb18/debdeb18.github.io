@@ -7,7 +7,7 @@ from mathutils import Vector
 from lib import *
 VIEW = dict(angle=-25, lift=0.35, res=(1100, 650), samples=32, zoom=1.6)
 LEN, GAUGE = 12.0, 1.435
-STEEL, STEEL_TOP, SLEEPER, SLEEPER_D, PLATE, BED = 0x5E6B7C, 0xC9D3DD, 0x4A3B34, 0x3A2E2A, 0x3A3D44, 0xB8AE96
+STEEL, STEEL_TOP, SLEEPER, SLEEPER_D, PLATE, BED = 0x5E6B7C, 0xC9D3DD, 0x55493F, 0x433A34, 0x3A3D44, 0xA9A08A
 
 def rail_bar(name, y, parent):
     """One rail: an extruded rail profile along X, with its worn top as a separate bright strip."""
@@ -25,11 +25,16 @@ def rail_bar(name, y, parent):
 
 def build():
     r = root('rail'); rnd = random.Random(4)
-    box('bed', (LEN + 0.6, 3.2, 0.08), (0, 0, -0.08), color=BED, parent=r, bevel=0.03)
-    for i in range(1400):                                                        # pebbles settled on the bed and between sleepers
+    bm = bmesh.new(); bmesh.ops.create_grid(bm, x_segments=240, y_segments=64, size=0.5)   # the bed: a carpet of pebbles
+    for v in bm.verts: v.co.x *= LEN + 0.6; v.co.y *= 3.2                                # with real depth, one bump per pebble
+    me = bpy.data.meshes.new('bed'); bm.to_mesh(me); bm.free()
+    bed = bpy.data.objects.new('bed', me); bpy.context.scene.collection.objects.link(bed); bed.data.materials.append(mat(BED)); bed.parent = r
+    tex = bpy.data.textures.new('pebbles', 'VORONOI'); tex.noise_scale = 0.07; tex.distance_metric = 'DISTANCE'
+    d = bed.modifiers.new('pebbles', 'DISPLACE'); d.texture = tex; d.texture_coords = 'GLOBAL'; d.strength = -0.05; d.mid_level = 0.0
+    for i in range(70):                                                          # a few bigger stones among them
         x, y = rnd.uniform(-LEN / 2, LEN / 2), rnd.uniform(-1.5, 1.5)
-        rock('pebble', rnd.uniform(0.03, 0.08), (x, y, -0.015), (1.3, 1.0, 0.55), (0, 0, rnd.uniform(0, 360)),
-             rnd.choice((0x9AA3AB, 0xB4AC98, 0x8C8F92, 0xA89C84)), r, flat=0.4, detail=1)
+        rock('pebble', rnd.uniform(0.06, 0.12), (x, y, -0.03), (1.3, 1.0, 0.5), (0, 0, rnd.uniform(0, 360)),
+             rnd.choice((0x9AA3AB, 0xB4AC98, 0x8C8F92, 0xC3CCD1)), r, flat=0.4, detail=1)
     x = -LEN / 2 + 0.25
     while x < LEN / 2:                                                          # sleepers close together, each a bit different
         w = rnd.uniform(0.2, 0.24)

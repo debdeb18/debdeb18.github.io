@@ -209,7 +209,7 @@ def ruin_wall(r, rnd, x0, x1, yc, T, H, openings):
     big pale blocks, its left end broken down in steps, a projecting ledge along the top, round-arched openings
     (x, sill, head) cut through it, grass on the broken tops and ivy down the front."""
     z = TOP - 0.04; row = 0; blocks = []; tops = {}
-    def lim(x): return TOP + H if x > x0 + 1.8 else TOP + 0.5 + (x - x0) / 1.8 * (H - 0.5) + rnd.uniform(-0.25, 0.25)
+    def lim(x): return TOP + H                                             # full height all the way into the tower
     while z < TOP + H - 0.1:
         h = min(rnd.uniform(0.38, 0.48), TOP + H - z)
         a = x0 - (rnd.uniform(0.2, 0.45) if row % 2 else 0.0)
@@ -228,14 +228,12 @@ def ruin_wall(r, rnd, x0, x1, yc, T, H, openings):
         painted_box('sill', (1.0, T + 0.12, 0.09), (ox, yc, sill - 0.09), color='stone_c', parent=r, bevel=0.02, along='x', rough=1.5)
         pts = [(ox + 0.43 * math.cos(math.pi * i / 10), yc - T / 2 - 0.015, head - 0.4 + 0.43 * math.sin(math.pi * i / 10)) for i in range(11)]
         tube('arch', [(pts[0][0], pts[0][1], sill)] + pts + [(pts[-1][0], pts[-1][1], sill)], 0.045, 'stone_c', r)
-    xs = x0 + 1.8                                                              # the ledge along the full-height top
+    xs = x0                                                                    # the ledge along the top
     while xs < x1 - 0.05:
         l = min(rnd.uniform(0.8, 1.3), x1 - xs)
         if l > 0.2: painted_box('ledge', (l - 0.03, T + 0.3, 0.2), (xs + l / 2, yc, TOP + H), (0, 0, rnd.uniform(-1, 1)), color='stone_c', parent=r, bevel=0.03, along='top', rough=1.8)
         xs += l
-    for (c, zt, w) in tops.values():                                           # grass over the broken stepped end, and the top
-        if c < x0 + 1.8 and rnd.random() < 0.8: grass_cap(r, rnd, c, yc, zt - 0.03, w * 1.05, T * 1.2, 0)
-    for _ in range(5): grass_cap(r, rnd, rnd.uniform(x0 + 2, x1 - 0.5), yc, TOP + H + 0.17, rnd.uniform(0.6, 1.2), T + 0.2, 0)
+    for _ in range(6): grass_cap(r, rnd, rnd.uniform(x0 + 0.5, x1 - 0.5), yc, TOP + H + 0.17, rnd.uniform(0.6, 1.2), T + 0.2, 0)
     for xx in (x0 + 2.4, x0 + 4.3, x1 - 1.0):                                   # ivy down the front
         ivy(r, rnd, xx, yc - T / 2, TOP + H + 0.1, 0, -1, rnd.uniform(1.5, 2.6))
     return blocks
@@ -403,9 +401,10 @@ def build():
     for (x, y, nx_, ny_, ln) in ((-3.2, -LY / 2 - 0.12, 0, -1, 1.2), (1.6, -LY / 2 - 0.12, 0, -1, 0.8), (3.9, LY / 2 + 0.12, 0, 1, 1.4), (LX / 2 + 0.12, -1.6, 1, 0, 1.0)):
         ivy(r, rnd, x, y, TOP - 0.05, nx_, ny_, ln)                          # a little ivy over the pier's edge
     # v2.2: a tall ruined wall from the tower along the platform, the waiting spot in front of it
-    WY, WT, WH = 0.75, 0.7, 3.2
-    ruin_wall(r, rnd, TX + TR - TW - 0.05, LX / 2 - 2.6, WY, WT, WH,       # it starts inside the tower's wall, so they are joined
-              ((-2.4, TOP + 1.25, TOP + 2.55), (1.4, TOP + 1.25, TOP + 2.55)))
+    WT, WH = 0.7, 3.2
+    WY = -LY / 2 + (LY - WT) * 2 / 5 + WT / 2                                  # the space in front of it and behind it is 2 : 3
+    wx0 = TX + math.sqrt((TR - TW / 2) ** 2 - (WY - TY) ** 2)                   # it starts in the middle of the tower's wall
+    ruin_wall(r, rnd, wx0, LX / 2 - 2.6, WY, WT, WH, ((-2.4, TOP + 1.25, TOP + 2.55), (1.4, TOP + 1.25, TOP + 2.55)))
     for lx in (-3.9, -0.5, 2.6): lantern(r, lx, WY - WT / 2, TOP + 1.95)
     seat_row(r, -0.5, WY - WT / 2 - 0.45, 4)
     trash_can(r, -0.5 - 4 * 0.62 / 2 - 0.45, WY - WT / 2 - 0.45)

@@ -56,9 +56,17 @@ const weatherNow = () => {
 const hourNow = () => { if (!isNaN(forced)) return ((forced % 24) + 24) % 24; const d = new Date(); return d.getHours() + d.getMinutes() / 60; };
 
 // ---------- the sea floor: shallow banks under the line, the station and the islets, deep water beyond ----------
+const PX = 0, PY = 1.4;                                            // where the porch stands (blender/assets/halt.py, centred)
+// The bank round the porch and its tower follows their shape, with a wandering, uneven edge (the same sums in the
+// shader below, so the painted bands match the floor and where you can wade).
+function bankEdge(bx, by) {
+  const qx = Math.max(Math.abs(bx - PX) - 5.5, 0), qy = Math.max(Math.abs(by - PY) - 2.3, 0);
+  const dp = Math.hypot(qx, qy) - 2.0, dtw = Math.hypot(bx - (PX - 7.0), by - (PY - 0.55)) - 2.45 - 2.2;
+  return Math.min(dp, dtw) + Math.sin(bx * 0.31 + 1.3) * Math.sin(by * 0.27 + 0.4) * 0.9 + Math.sin(bx * 0.73 + by * 0.41) * 0.35 + Math.sin(bx * 0.17 - by * 0.23 + 2.0) * 0.8;
+}
 function seaDepth(bx, by, islets) {
-  const dt = Math.abs(by - TRACK) - 3.0;                                           // off the track bank the sea drops away fast
-  let d = Math.max(-11 - bx, bx - 35, -2.5 - by, by - 11.5, 0) - 1.0;
+  const dt = Math.abs(by - TRACK) - 3.0 + Math.sin(bx * 0.21 + 0.7) * 0.6 + Math.sin(bx * 0.53) * 0.25;   // off the track bank the sea drops away
+  let d = bankEdge(bx, by);
   for (const [ix, iy, ir] of islets) d = Math.min(d, Math.hypot(bx - ix, by - iy) - ir * 1.15);
   let k = Math.min(Math.min(1, Math.max(0, dt / 3.5)), Math.min(1, Math.max(0, d / 8))); k = k * k * (3 - 2 * k);
   return 0.42 + 3.4 * k - Math.sin(bx * 0.7) * Math.cos(by * 0.9) * 0.05;
@@ -66,15 +74,16 @@ function seaDepth(bx, by, islets) {
 const DEPTH_GLSL = `
 uniform vec3 uIslets[16];
 float seaDepth(vec2 b) {
-  float dt = abs(b.y - (${TRACK.toFixed(1)})) - 3.0;
-  float d = max(max(max(-11.0 - b.x, b.x - 35.0), max(-2.5 - b.y, b.y - 11.5)), 0.0) - 1.0;
+  float dt = abs(b.y - (${TRACK.toFixed(1)})) - 3.0 + sin(b.x * 0.21 + 0.7) * 0.6 + sin(b.x * 0.53) * 0.25;
+  vec2 q = max(abs(b - vec2(${PX.toFixed(1)}, ${PY.toFixed(1)})) - vec2(5.5, 2.3), 0.0);
+  float d = min(length(q) - 2.0, length(b - vec2(${(PX - 7).toFixed(1)}, ${(PY - 0.55).toFixed(2)})) - 4.65)
+    + sin(b.x * 0.31 + 1.3) * sin(b.y * 0.27 + 0.4) * 0.9 + sin(b.x * 0.73 + b.y * 0.41) * 0.35 + sin(b.x * 0.17 - b.y * 0.23 + 2.0) * 0.8;
   for (int i = 0; i < 16; i++) d = min(d, length(b - uIslets[i].xy) - uIslets[i].z * 1.15);
   float k = min(clamp(dt / 3.5, 0.0, 1.0), clamp(d / 8.0, 0.0, 1.0)); k = k * k * (3.0 - 2.0 * k);
   return 0.42 + 3.4 * k - sin(b.x * 0.7) * cos(b.y * 0.9) * 0.05;
 }`;
 
 // The porch's footprint and its tower (Blender x, y): the water draws a thin foam line round them, as round the islets.
-const PX = 0, PY = 1.4;                                            // where the porch stands (blender/assets/halt.py, centred)
 const PORCH = [PX, PY, 5.5, 2.3], TOWER = [PX - 7.0, PY - 0.55, 2.45];
 
 // Ghibli-style water (docs/ghibli-water.md): flat painted colour in hard bands (lightest in a rim along every shore,
@@ -138,7 +147,7 @@ function makeWater(U) {
         vec3 col = uDeep; float alpha = 1.0;
         if (dep < 2.2 + wob * 4.0) { col = mid; alpha = 0.9; }
         if (dep < 0.9 + wob * 2.0) { col = uShallow; alpha = 0.55; }                // over the line and the banks: see-through
-        if (shore < 0.75 + wob) { col = rim; alpha = 0.38; }                         // the shallows at the shore: clearest
+        if (shore < 0.55 + wob * 3.0 + (wNoise(bp * 0.7) - 0.5) * 0.5) { col = rim; alpha = 0.38; }                         // the shallows at the shore: clearest
         diffuseColor.rgb = col; diffuseColor.a = alpha;
         // the train pushes a bow wave and leaves a wake; both grow with its speed (uTrain = front x, speed 0..1, length)
         float along = bp.x - uTrain.x, side = abs(bp.y - (${TRACK.toFixed(1)}));

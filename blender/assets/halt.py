@@ -67,37 +67,40 @@ def ruin_block(r, rnd, size, loc, rot, along, face, color=None, moss=0.0, crack=
         return [painted_box('ruin', size, loc, rot, clip=(tuple((k - sgn * g) if i == ax else 0 for i in range(3)), tuple(sgn * c for c in n)), **kw) for sgn in (1, -1)]
     return [painted_box('ruin', size, loc, rot, **kw)]
 
-def ruin_face(r, rnd, along, fixed, axis):
+def ruin_face(r, rnd, along, fixed, axis, lo=None, hi=None, top=TOP, base=BASE, out=None):
     """One side of the old pier: courses of big weathered blocks, laid unevenly, a few fallen out."""
-    z = BASE; row = 0; out = 1 if fixed > 0 else -1
-    while z < TOP - 0.15:
-        h = min(rnd.uniform(0.42, 0.58), TOP - 0.1 - z)
-        if TOP - 0.1 - (z + h) < 0.25: h = TOP - 0.1 - z
-        a = -along / 2 - (rnd.uniform(0.2, 0.6) if row % 2 else 0.0)
+    lo = -along / 2 if lo is None else lo; hi = along / 2 if hi is None else hi
+    z = base; row = 0; out = out or (1 if fixed > 0 else -1)
+    while z < top - 0.15:
+        h = min(rnd.uniform(0.42, 0.58), top - 0.1 - z)
+        if top - 0.1 - (z + h) < 0.25: h = top - 0.1 - z
+        a = lo - (rnd.uniform(0.2, 0.6) if row % 2 else 0.0)
         moss = 0.6 if row == 0 else (0.3 if row == 1 else 0.0)
-        while a < along / 2 - 0.05:
+        while a < hi - 0.05:
             l = rnd.uniform(0.7, 1.4)
-            a0, a1 = max(a, -along / 2), min(a + l, along / 2); a += l
+            a0, a1 = max(a, lo), min(a + l, hi); a += l
             if a1 - a0 < 0.15: continue
-            if row > 0 and z + h < TOP - 0.2 and rnd.random() < 0.06: continue  # a block fallen out
+            if row > 0 and z + h < top - 0.2 and rnd.random() < 0.06: continue  # a block fallen out
             ll = a1 - a0 - 0.035; c = (a0 + a1) / 2; pos = fixed + out * rnd.uniform(-0.01, 0.04)
             tilt, yaw = rnd.uniform(-2, 2), rnd.uniform(-1.5, 1.5)
             if axis == 'x': ruin_block(r, rnd, (ll, 0.3, h - 0.035), (c, pos - out * 0.12, z), (0, tilt, yaw), 'x', out, moss=moss)
             else: ruin_block(r, rnd, (0.3, ll, h - 0.035), (pos - out * 0.12, c, z), (tilt, 0, yaw), 'y', out, moss=moss)
         z += h; row += 1
 
-def floor_slabs(r, rnd, joints):
+def floor_slabs(r, rnd, joints, rect=None, top=TOP, skip=lambda x, y: False):
     """The top: big worn floor slabs of the old ruin in staggered rows, a few cracked or sunk a little."""
-    y = -LY / 2 + 0.02; row = 0
-    while y < LY / 2 - 0.1:
-        d = min(rnd.uniform(0.75, 1.0), LY / 2 - 0.02 - y)
-        if LY / 2 - 0.02 - (y + d) < 0.3: d = LY / 2 - 0.02 - y
-        x = -LX / 2 + 0.02 - (rnd.uniform(0.2, 0.5) if row % 2 else 0)
-        while x < LX / 2 - 0.05:
-            w = rnd.uniform(0.8, 1.3); x0, x1 = max(x, -LX / 2 + 0.02), min(x + w, LX / 2 - 0.02); x += w
+    X0, X1, Y0, Y1 = rect or (-LX / 2, LX / 2, -LY / 2, LY / 2)
+    y = Y0 + 0.02; row = 0
+    while y < Y1 - 0.1:
+        d = min(rnd.uniform(0.75, 1.0), Y1 - 0.02 - y)
+        if Y1 - 0.02 - (y + d) < 0.3: d = Y1 - 0.02 - y
+        x = X0 + 0.02 - (rnd.uniform(0.2, 0.5) if row % 2 else 0)
+        while x < X1 - 0.05:
+            w = rnd.uniform(0.8, 1.3); x0, x1 = max(x, X0 + 0.02), min(x + w, X1 - 0.02); x += w
             if x1 - x0 < 0.2: continue
             if math.hypot((x0 + x1) / 2 - TX, y + d / 2 - TY) < TR - 0.2: continue   # inside the tower
-            sz = (x1 - x0 - 0.03, d - 0.03, 0.08); loc = ((x0 + x1) / 2, y + d / 2, TOP - 0.08 + rnd.uniform(-0.012, 0.006))
+            if skip((x0 + x1) / 2, y + d / 2): continue
+            sz = (x1 - x0 - 0.03, d - 0.03, 0.08); loc = ((x0 + x1) / 2, y + d / 2, top - 0.08 + rnd.uniform(-0.012, 0.006))
             rot = (rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1))
             kw = dict(color=rnd.choice(('tile_a', 'tile_b', 'tile_c', 'tile_d', 'tile_e')), parent=r, bevel=0.015, jitter=0.004, along='top', band=0.1, rough=2.2)
             if rnd.random() < 0.22:
@@ -112,6 +115,7 @@ def floor_slabs(r, rnd, joints):
 
 TX, TY, TR, TW = -LX / 2 - 1.5, 0.5, 2.45, 0.6                                  # the ruined tower (centre, outer radius, wall): it overlaps the end of the pier
 WINDOWS = ((115, TOP + 1.3, TOP + 2.5), (65, TOP + 2.9, TOP + 4.0), (165, TOP + 2.7, TOP + 3.8))   # (angle, sill, head)
+DOOR = (24, TOP - 0.03, TOP + 2.05)                                             # the doorway in from the back porch
 
 def ivy(r, rnd, x, y, z, nx, ny, length):
     """Ivy hanging down a wall from (x, y, z): a few strands of leafy clusters pressed flat to the wall, fuller at the
@@ -140,7 +144,7 @@ def ruin_tower(r, rnd):
         c = max(0.0, math.cos(th - math.radians(115)))
         return TOP + 1.8 + 3.6 * c ** 0.5 + cols[k] * (0.4 + c)
     def in_window(th, z0, z1):
-        for (wa, ws, wh) in WINDOWS:
+        for (wa, ws, wh) in WINDOWS + (DOOR,):
             if abs(((th - math.radians(wa)) + math.pi) % (2 * math.pi) - math.pi) < 0.17 and z1 > ws and z0 < wh: return True
         return False
     while z < TOP + 5.6:
@@ -164,6 +168,13 @@ def ruin_tower(r, rnd):
         pts = [(TX + ex * (TR + 0.015) + tx_ * rr * 1.08 * math.cos(math.pi * i / 10), TY + ey * (TR + 0.015) + ty_ * rr * 1.08 * math.cos(math.pi * i / 10), ws + hb + rr * 1.08 * math.sin(math.pi * i / 10)) for i in range(11)]
         tube('arch', [(pts[0][0], pts[0][1], ws)] + pts + [(pts[-1][0], pts[-1][1], ws)], 0.045, 'stone_c', r)   # a moulding round the arch
         painted_box('sill', (ww + 0.2, TW + 0.12, 0.09), (TX + rm * ex, TY + rm * ey, ws - 0.09), (0, 0, math.degrees(th) - 90), color='stone_c', parent=r, bevel=0.02, along='x', rough=1.5)
+    da = math.radians(DOOR[0]); dx, dy = math.cos(da), math.sin(da)               # the doorway, and steps down inside
+    door = arch_cutter(TX + dx * rm, TY + dy * rm, dx, dy, DOOR[1], DOOR[2], 0.95, TW + 0.8)
+    for (bt, bz, bh, objs) in built:
+        if abs(((bt - da) + math.pi) % (2 * math.pi) - math.pi) < 0.45 and bz < DOOR[2] + 0.05 and bz + bh > DOOR[1] - 0.05: cut_with(objs, door)
+    for k in range(3):
+        rr_ = TR - TW - 0.2 - k * 0.35
+        painted_box('door_step', (0.34, 1.0, 0.3 - k * 0.08), (TX + dx * rr_, TY + dy * rr_, TOP - 0.55), (0, 0, DOOR[0] + 90), color='stone_b', parent=r, bevel=0.03, along='top', band=0.1, rough=2.0)
     for k in range(n):                                                         # battlements, grass over the broken tops
         th = (k + 0.25) / n * 2 * math.pi; px, py = TX + rm * math.cos(th), TY + rm * math.sin(th)
         if tops[k] > TOP + 4.0 and k % 2 == 0:
@@ -267,10 +278,10 @@ def fence(r, p0, p1):
         t = i / m; x, y = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
         box('baluster', (0.06, 0.06, 0.72), (x, y, z + 0.18), (0, 0, ang), 'rail_w', r, bevel=0.009)   # square, with rounded edges
 
-def info_board(r, x, y):
+def info_board(r, x, y, z0=TOP):
     """The board along the back fence: train times on the left, station notices and a map of the islands on the
     right, under a little tiled hood, on two timber legs. Faces the track (-Y)."""
-    z = TOP; W, H, zb = 1.7, 1.05, z + 0.75
+    z = z0; W, H, zb = 1.7, 1.05, z + 0.75
     for sx in (-1, 1): box('board_leg', (0.12, 0.12, zb - z + H + 0.25), (x + sx * (W / 2 - 0.05), y + 0.04, z), color='timber_dark', parent=r, bevel=0.02)
     box('board_back', (W, 0.07, H), (x, y, zb), color='timber', parent=r, bevel=0.02)
     box('board_frame_t', (W + 0.08, 0.1, 0.07), (x, y - 0.02, zb + H - 0.035), color='timber_dark', parent=r, bevel=0.015)
@@ -390,42 +401,45 @@ def crossing_signal(r, x, y):
 def build():
     PAL.update(COLOURS)
     rnd = random.Random(9); r = root('halt')
-    # the old pier of the ruin: big weathered blocks round a core, the top paved with its old floor slabs
-    box('core', (LX - 0.5, LY - 0.5, TOP - BASE - 0.06), (0, 0, BASE), color='joint', parent=r, bevel=0.02)
-    ruin_face(r, rnd, LX, -LY / 2, 'x'); ruin_face(r, rnd, LX, LY / 2, 'x')
-    ruin_face(r, rnd, LY, -LX / 2, 'y'); ruin_face(r, rnd, LY, LX / 2, 'y')
-    joints = []
-    floor_slabs(r, rnd, joints)
-    for (x, y) in joints: moss_tuft(r, rnd, x, y, TOP + 0.004, rnd.uniform(0.7, 1.1))
-    ruin_tower(r, rnd)
-    for (x, y, nx_, ny_, ln) in ((-3.2, -LY / 2 - 0.12, 0, -1, 1.2), (1.6, -LY / 2 - 0.12, 0, -1, 0.8), (3.9, LY / 2 + 0.12, 0, 1, 1.4), (LX / 2 + 0.12, -1.6, 1, 0, 1.0)):
-        ivy(r, rnd, x, y, TOP - 0.05, nx_, ny_, ln)                          # a little ivy over the pier's edge
-    # v2.2: a tall ruined wall from the tower along the platform, the waiting spot in front of it
+    # v2.2: the old pier of the ruin with a tall ruined wall along it. In front of the wall the platform runs along its
+    # left half, then stairs go down to a lower level in front of its right half; behind the wall, a porch its full length.
     WT, WH = 0.7, 3.2
-    WY = -LY / 2 + (LY - WT) * 2 / 5 + WT / 2                                  # the space in front of it and behind it is 2 : 3
+    WY = -LY / 2 + (LY - WT) * 3 / 5 + WT / 2                                  # the space in front of it and behind it is 3 : 2
+    WF = WY - WT / 2                                                           # the wall's front face
     wx0 = TX + math.sqrt((TR - TW / 2) ** 2 - (WY - TY) ** 2)                   # it starts in the middle of the tower's wall
-    ruin_wall(r, rnd, wx0, LX / 2 - 2.6, WY, WT, WH, ((-2.4, TOP + 1.25, TOP + 2.55), (1.4, TOP + 1.25, TOP + 2.55)))
-    for lx in (-3.9, -0.5, 2.6): lantern(r, lx, WY - WT / 2, TOP + 1.95)
-    seat_row(r, -0.5, WY - WT / 2 - 0.45, 4)
-    trash_can(r, -0.5 - 4 * 0.62 / 2 - 0.45, WY - WT / 2 - 0.45)
-    crossing_signal(r, 1.9, -LY / 2 + 0.7)
-    # the right end: steps up to a landing behind the end of the wall, the info board there among bushes
-    LH = 0.45; lx0, lx1, ly0, ly1 = LX / 2 - 2.55, LX / 2 - 0.05, 0.2, LY / 2 - 0.05
-    for k in range(3):                                                          # steps up from the platform
-        painted_box('step', (0.38, 1.0, LH / 3 * (k + 1)), (lx0 - 0.95 + k * 0.36 + 0.18, ly0 + 0.55, TOP - 0.02), color=rnd.choice(('stone_a', 'stone_b')), parent=r, bevel=0.03, along='top', band=0.1, rough=2.0)
-    xs = lx0
-    while xs < lx1 - 0.05:                                                      # the landing: a block of big slabs
-        l = min(rnd.uniform(0.8, 1.2), lx1 - xs)
-        painted_box('landing', (l - 0.03, ly1 - ly0 - 0.03, LH + 0.08), (xs + l / 2, (ly0 + ly1) / 2, TOP - 0.08), (0, 0, rnd.uniform(-0.8, 0.8)), color=rnd.choice(('tile_a', 'tile_b', 'tile_e')), parent=r, bevel=0.03, along='top', band=0.1, rough=2.0)
-        xs += l
-    info_board(r, (lx0 + lx1) / 2 + 0.2, ly1 - 0.55)                            # facing the steps... the board's own legs stand on the landing
-    for (bx, by) in ((lx0 + 0.35, ly1 - 0.4), (lx1 - 0.35, ly1 - 0.35), (lx1 - 0.3, ly0 + 0.4)):
-        bush(r, rnd, bx, by, TOP + LH - 0.05, 0.7)
+    wx1 = LX / 2 - 0.15
+    XS0 = (wx0 + wx1) / 2; NS = 4; SD = 0.4; LOW = TOP - 0.6; XS1 = XS0 + NS * SD  # the stairs down, and the lower level
+    box('core', (LX - 0.5, LY / 2 - WF - 0.25, TOP - BASE - 0.06), (0, (WF + LY / 2 - 0.25) / 2, BASE), color='joint', parent=r, bevel=0.02)
+    box('core', (XS0 + LX / 2 - 0.25, WF + LY / 2 - 0.25, TOP - BASE - 0.06), ((XS0 - LX / 2 + 0.25) / 2, (WF - LY / 2 + 0.25) / 2, BASE), color='joint', parent=r, bevel=0.02)
+    box('core', (LX / 2 - XS0 - 0.25, WF + LY / 2 - 0.25, LOW - BASE - 0.06), ((XS0 + LX / 2 - 0.25) / 2, (WF - LY / 2 + 0.25) / 2, BASE), color='joint', parent=r, bevel=0.02)
+    ruin_face(r, rnd, LX, -LY / 2, 'x', hi=XS0); ruin_face(r, rnd, LX, -LY / 2, 'x', lo=XS0, top=LOW)
+    ruin_face(r, rnd, LX, LY / 2, 'x')
+    ruin_face(r, rnd, LY, -LX / 2, 'y')
+    ruin_face(r, rnd, LY, LX / 2, 'y', lo=WF); ruin_face(r, rnd, LY, LX / 2, 'y', hi=WF, top=LOW)
+    ruin_face(r, rnd, LX, WF, 'x', lo=XS0, top=TOP, base=LOW - 0.1, out=-1)    # the face under the wall, above the lower level
+    joints = []
+    floor_slabs(r, rnd, joints, skip=lambda x, y: x > XS0 - 0.1 and y < WF)    # the upper floor
+    floor_slabs(r, rnd, joints, rect=(XS1, LX / 2, -LY / 2, WF), top=LOW)     # the lower level
+    for (x, y) in joints: moss_tuft(r, rnd, x, y, (LOW if (x > XS0 and y < WF) else TOP) + 0.004, rnd.uniform(0.7, 1.1))
+    for k in range(NS):                                                          # the stairs down, the full depth of the front
+        painted_box('stair', (SD + 0.02, WF + LY / 2 - 0.04, TOP - LOW - k * (TOP - LOW) / NS + 0.06), (XS0 + k * SD + SD / 2, (WF - LY / 2) / 2, LOW - 0.08),
+                    (0, 0, rnd.uniform(-0.8, 0.8)), color=rnd.choice(('stone_a', 'stone_b', 'stone_c')), parent=r, bevel=0.03, along='top', band=0.08, rough=2.0)
+    ruin_tower(r, rnd)
+    for (x, y, nx_, ny_, ln) in ((-3.2, -LY / 2 - 0.12, 0, -1, 1.2), (3.9, LY / 2 + 0.12, 0, 1, 1.4)):
+        ivy(r, rnd, x, y, TOP - 0.05, nx_, ny_, ln)                          # a little ivy over the pier's edge
+    ruin_wall(r, rnd, wx0, wx1, WY, WT, WH, ((-2.4, TOP + 1.25, TOP + 2.55), (1.4, TOP + 1.25, TOP + 2.55)))
+    for lx in (-3.9, -1.0, 2.6): lantern(r, lx, WF, TOP + 1.95)
+    seat_row(r, -2.2, WF - 0.45, 4)                                             # the waiting spot, on the upper front
+    trash_can(r, -2.2 - 4 * 0.62 / 2 - 0.45, WF - 0.45)
+    crossing_signal(r, XS0 - 0.6, -LY / 2 + 0.65)
+    info_board(r, XS1 + 1.1, WF - 0.45, LOW)                                    # the board, on the lower level just past the stairs
+    for (bx, by) in ((XS1 + 0.15, WF - 0.35), (XS1 + 2.2, WF - 0.35), (LX / 2 - 0.4, -LY / 2 + 0.5)):
+        bush(r, rnd, bx, by, LOW - 0.05, 0.7)
     for (bx, by, bs) in ((TX - 1.2, TY - TR - 0.3, 1.2), (TX + 0.6, TY - TR - 0.5, 1.0), (TX - TR - 0.2, TY + 0.4, 1.1)):
         bush(r, rnd, bx, by, BASE + 0.4, bs)                                    # bushes at the foot of the tower
-    # stairs down at the right end, in front of the landing, then a small side jetty with a mooring post
-    for k in range(4): painted_box('step', (0.44, 1.6, 0.22), (LX / 2 + 0.23 + k * 0.42, -1.2, TOP - 0.22 - k * 0.2), (0, 0, rnd.uniform(-2, 2)), color=rnd.choice(('stone_a', 'stone_b')), parent=r, bevel=0.03, along='top', band=0.1, rough=2.0)
-    JX0, JX1, JZ = LX / 2 + 1.68, LX / 2 + 5.4, 0.12
+    # a step down from the lower level at the right end, to a small side jetty with a mooring post
+    for k in range(2): painted_box('step', (0.44, 1.6, 0.2), (LX / 2 + 0.23 + k * 0.42, -1.2, LOW - 0.2 - k * 0.12), (0, 0, rnd.uniform(-2, 2)), color=rnd.choice(('stone_a', 'stone_b')), parent=r, bevel=0.03, along='top', band=0.1, rough=2.0)
+    JX0, JX1, JZ = LX / 2 + 0.9, LX / 2 + 4.6, 0.12
     for i in range(int((JX1 - JX0) / 0.3)):
         plank('jetty_plank', (1.6, 0.28, 0.06), (JX0 + 0.15 + i * 0.3, -1.2, JZ), (0, 0, 90 + rnd.uniform(-1.5, 1.5)), 'plank' if i % 3 else 'plank_d', r, bevel=0.012)
     for jx in (JX0 + 0.3, JX0 + 1.9, JX1 - 0.2):

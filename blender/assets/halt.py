@@ -318,6 +318,12 @@ def ruin_wall(r, rnd, x0, x1, yc, T, H, openings):
         for b in blocks:
             if round(b[1], 3) == zr:
                 for o in b[3]: o.location.x += 0.3
+    def stretch(b, left=0.0, right=0.0):                                       # widen (+) or trim (-) a block at either end
+        w = tops[round(b[0], 2)][2]; k = (w + left + right) / w
+        for o in b[3]: o.scale.x *= k; o.location.x += (right - left) / 2
+    row = lambda i: [b for b in blocks if round(b[1], 3) == zs[-i]]           # row i, counted from the top
+    stretch(min(row(3), key=lambda b: b[0]), left=0.1)                        # row 3 reaches 0.1 further left
+    stretch(max(row(6), key=lambda b: b[0]), right=-0.1)                      # row 6 is 0.1 shorter on the right
     xs = x0 + 1.8                                                              # (the ledge along the top is gone too: made and
     while xs < x1 - 0.05:                                                      # taken away, so what follows stays put)
         l = min(rnd.uniform(0.8, 1.3), x1 - xs)

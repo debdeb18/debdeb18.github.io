@@ -302,12 +302,21 @@ def ruin_wall(r, rnd, x0, x1, yc, T, H, openings):
         painted_box('sill', (1.0, T + 0.12, 0.09), (ox, yc, sill - 0.09), color='stone_c', parent=r, bevel=0.02, along='x', rough=1.5)
         pts = [(ox + 0.43 * math.cos(math.pi * i / 10), yc - T / 2 - 0.015, head - 0.4 + 0.43 * math.sin(math.pi * i / 10)) for i in range(11)]
         tube('arch', [(pts[0][0], pts[0][1], sill)] + pts + [(pts[-1][0], pts[-1][1], sill)], 0.045, 'stone_c', r)
-    xs = x0 + 1.8                                                              # the ledge along the full-height top
-    while xs < x1 - 0.05:
+    # More of the broken end is gone (after the sketch): the leftmost block of every course but the top two, and two from
+    # the bottom one. Built and then taken away, so the dice fall as before and the rest of the wall stays as it was.
+    rows = {}
+    for b in blocks: rows.setdefault(round(b[1], 3), []).append(b)
+    zs = sorted(rows)
+    for i, zr in enumerate(zs[:-2]):
+        for b in sorted(rows[zr], key=lambda b: b[0])[:2 if i == 0 else 1]:
+            for o in b[3]: bpy.data.objects.remove(o)
+            blocks.remove(b)
+    xs = x0 + 1.8                                                              # (the ledge along the top is gone too: made and
+    while xs < x1 - 0.05:                                                      # taken away, so what follows stays put)
         l = min(rnd.uniform(0.8, 1.3), x1 - xs)
-        if l > 0.2: painted_box('ledge', (l - 0.03, T + 0.3, 0.2), (xs + l / 2, yc, TOP + H), (0, 0, rnd.uniform(-1, 1)), color='stone_c', parent=r, bevel=0.03, along='top', rough=1.8)
+        if l > 0.2: bpy.data.objects.remove(painted_box('ledge', (l - 0.03, T + 0.3, 0.2), (xs + l / 2, yc, TOP + H), (0, 0, rnd.uniform(-1, 1)), color='stone_c', parent=r, bevel=0.03, along='top', rough=1.8))
         xs += l
-    for _ in range(6): grass_cap(r, rnd, rnd.uniform(x0 + 2.4, x1 - 0.5), yc, TOP + H + 0.17, rnd.uniform(0.6, 1.2), T + 0.2, 0)
+    for _ in range(6): grass_cap(r, rnd, rnd.uniform(x0 + 2.4, x1 - 0.5), yc, TOP + H - 0.03, rnd.uniform(0.6, 1.2), T + 0.2, 0)
     for xx in (x0 + 2.4, x0 + 4.3, x1 - 1.0):                                   # ivy down the front
         ivy(r, rnd, xx, yc - T / 2, TOP + H + 0.1, 0, -1, rnd.uniform(1.5, 2.6))
     import random; rb = random.Random(7)                                       # and down the back (its own dice, so the stones stay put)
@@ -526,7 +535,8 @@ def build():
     ruin_tower(r, rnd)
     for (x, y, nx_, ny_, ln) in ((-3.2, -LY / 2 - 0.12, 0, -1, 1.2), (2.4, LY / 2 + 0.12, 0, 1, 1.4)):
         ivy(r, rnd, x, y, TOP - 0.05, nx_, ny_, ln)                          # a little ivy over the pier's edge
-    ruin_wall(r, rnd, wx0, wx1, WY, WT, WH, ())                              # no windows in the wall (the tower keeps its own)
+    WSH = 0.9                                                                  # the wall moved left, so with its broken end worn back
+    ruin_wall(r, rnd, wx0 - WSH, wx1 - WSH, WY, WT, WH, ())                  # the gap to the tower stays the same; no windows in it
     for lx in (-0.4, 3.6): lantern(r, lx, WF, TOP + 1.95)
     seat_row(r, -0.9, WF - 0.45, 4)                                             # the waiting spot, on the upper front
     crossing_signal(r, LX / 2 + 0.7, -LY / 2 + 0.4, BASE)                       # in the water, just past the front right end

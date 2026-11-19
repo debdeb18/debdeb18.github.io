@@ -459,7 +459,7 @@ export function buildTerminal() {
     return Math.max(isletTop(bx, by), -0.3);                                       // on an islet, or wading
   };
   const S = (bx, by, sx, sy) => w.solid(bx, -by, sx, sy);
-  S(PX + 1.2, PY + 0.39, 8.3, 0.75);                                               // the tall wall
+  S(PX + 0.75, PY + 0.39, 7.4, 0.75);                                               // the tall wall
   S(PX - 0.9, PY - 0.41, 2.6, 0.55);                                               // the seats
   S(PX + 3.55, PY + 4.6, 0.6, 0.3);                                                // the mooring post
 

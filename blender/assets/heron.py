@@ -32,6 +32,7 @@ def blade(name, pts, color, parent, t=0.005, up=False):
     a = [bm.verts.new(p) for p in pts]; b = [bm.verts.new((x, y, z + t) if up else (x, y + t, z)) for (x, y, z) in pts]
     bm.faces.new(a); bm.faces.new(b[::-1])
     for i in range(n): bm.faces.new((a[i], a[(i + 1) % n], b[(i + 1) % n], b[i]))
+    bmesh.ops.triangulate(bm, faces=bm.faces[:], quad_method='BEAUTY', ngon_method='EAR_CLIP')   # (concave outlines too)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
     for p in me.polygons: p.use_smooth = False

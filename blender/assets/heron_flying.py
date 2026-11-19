@@ -23,15 +23,14 @@ def build():
         for a in (-20, 0, 20):
             d = Vector((math.cos(math.radians(a)), math.sin(math.radians(a)) * 0.5, -0.1)).normalized()
             loft('toe', [(0.62, sy * 0.03, -0.07), tuple(Vector((0.62, sy * 0.03, -0.07)) + d * 0.08)], [0.005, 0.003], LEG, r, sides=4)
-    for sy, nm in ((-1, 'heron_wing_l'), (1, 'heron_wing_r')):               # broad wings, spread
-        w = root(nm); w.location = (-0.06, sy * 0.07, 0.03); w.parent = r
-        span = [(0.0, 0), (0.05, 0.3), (0.06, 0.55), (0.12, 0.72), (0.24, 0.62), (0.26, 0.3), (0.22, 0.0)]   # (back, out)
-        blade('wing', [(x, sy * o, 0) for (x, o) in span[:3]] + [(0.13, sy * 0.66, 0)] + [(x, sy * o, 0) for (x, o) in span[4:]], WING, w, t=0.012, up=True)
-        for k in range(5):                                                     # dark flight feathers fanned at the tip
-            o0 = 0.42 + k * 0.06
-            blade('primary', [(0.05 + k * 0.025, sy * o0, 0.013), (0.06 + k * 0.03, sy * (o0 + 0.22 - k * 0.03), 0.013), (0.11 + k * 0.03, sy * (o0 + 0.2 - k * 0.03), 0.013), (0.12 + k * 0.025, sy * o0, 0.013)], TIP, w, t=0.004, up=True)
-        for k in range(4):                                                     # dark trailing edge
-            blade('secondary', [(0.2, sy * (0.05 + k * 0.1), 0.013), (0.27, sy * (0.07 + k * 0.1), 0.013), (0.27, sy * (0.15 + k * 0.1), 0.013), (0.2, sy * (0.14 + k * 0.1), 0.013)], 0x8D96A2, w, t=0.004, up=True)
+    for sy, nm in ((-1, 'heron_wing_l'), (1, 'heron_wing_r')):               # broad rounded wings, bowed down
+        w = root(nm); w.location = (-0.06, sy * 0.07, 0.03); w.parent = r       # towards the tips, fingers at the tip
+        bow = lambda o: -0.14 * (o / 0.85) ** 2
+        lead = [(0.0, 0.0), (-0.04, 0.18), (-0.05, 0.35), (-0.02, 0.5)]            # (back, out): leading edge to the wrist
+        fingers = [(0.0, 0.86), (0.035, 0.7), (0.06, 0.84), (0.09, 0.68), (0.12, 0.79), (0.15, 0.64), (0.18, 0.72)]   # long fingers
+        trail = [(0.24, 0.6), (0.28, 0.45), (0.3, 0.3), (0.29, 0.15), (0.26, 0.0)]  # the trailing edge back to the body
+        blade('wing', [(x, sy * o, bow(o)) for (x, o) in lead + fingers + trail], WING, w, t=0.012, up=True)
+        blade('wing_tip', [(x, sy * o, bow(o) + 0.004) for (x, o) in [(-0.03, 0.6)] + fingers + [(0.22, 0.6)]], TIP, w, t=0.012, up=True)
     for k in range(3):
         blade('tail', [(0.27, (k - 1) * 0.03, 0.0), (0.38, (k - 1) * 0.045, 0.0), (0.37, (k - 1) * 0.045 + 0.02, 0.0), (0.27, (k - 1) * 0.03 + 0.012, 0.0)], 0xA9B1BB, r, up=True)
     return r

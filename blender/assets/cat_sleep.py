@@ -1,45 +1,45 @@
-"""A low-poly cat curled up asleep, after the user's reference: a round body made of many small flat triangles, a big
-head with pointed ears resting on its front paws, eyes shut, the tail wrapped round along the front. Origin under its
-middle; it faces -Y. The porch puts it in the tower nook as 'cat_sleep'."""
+"""A low-poly cat curled up asleep, after the user's reference: sculpted as one continuous shape (body, head on its
+paws, the tail wrapped round the front, all flowing into each other), then cut down into flat triangles like folded
+paper. Big pointed ears, eyes shut. Origin under its middle; it faces -Y. The porch puts it in the tower nook."""
 import math, bmesh
+from mathutils import Vector
 from lib import *
-VIEW = dict(angle=-20, lift=0.35, res=(900, 640), samples=32)
-FUR = 0xE39C5A
-
-def tri(name, rr, loc, scale, parent, rot=(0, 0, 0), sub=2, color=FUR):
-    """An icosphere of flat triangles, squashed into shape."""
-    bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=sub, radius=rr)
-    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
-    for p in me.polygons: p.use_smooth = False
-    o = bpy.data.objects.new(name, me); bpy.context.scene.collection.objects.link(o)
-    o.location = loc; o.scale = scale; o.rotation_euler = [math.radians(a) for a in rot]
-    o.data.materials.append(mat(color)); o.parent = parent
-    return o
-
-def ear(name, loc, rot, parent):
-    bm = bmesh.new()
-    v = [bm.verts.new(p) for p in ((-0.035, -0.02, 0), (0.035, -0.02, 0), (0, 0.025, 0), (0.005, -0.005, 0.085))]
-    for f in ((0, 1, 3), (1, 2, 3), (2, 0, 3), (0, 2, 1)): bm.faces.new([v[i] for i in f])
-    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
-    o = bpy.data.objects.new(name, me); bpy.context.scene.collection.objects.link(o)
-    o.location = loc; o.rotation_euler = [math.radians(a) for a in rot]; o.data.materials.append(mat(FUR)); o.parent = parent
-    return o
+VIEW = dict(angle=-25, lift=0.4, res=(900, 640), samples=32)
+FUR, DARK = 0xE39C5A, 0x6A3E22
 
 def build(parent=None, name='cat_sleep'):
     c = root(name)
     if parent: c.parent = parent
-    tri('body', 0.2, (0.05, 0.03, 0.11), (1.25, 1.0, 0.62), c, rot=(0, 0, 8))          # the round curled back
-    tri('haunch', 0.13, (0.17, 0.05, 0.11), (1.0, 1.0, 0.85), c)
-    tri('chest', 0.11, (-0.11, -0.05, 0.08), (1.1, 1.0, 0.7), c)
-    for sx, dx in ((-1, 0.0), (1, 0.06)): tri('paw', 0.045, (-0.18 + dx, -0.17 + sx * 0.0, 0.035), (1.7, 0.9, 0.7), c, rot=(0, 0, 25), sub=1)
-    tri('head', 0.115, (-0.2, -0.11, 0.12), (1.0, 1.05, 0.85), c, rot=(0, 0, 25))
-    tri('cheeks', 0.07, (-0.23, -0.15, 0.095), (1.25, 1.0, 0.75), c, rot=(0, 0, 25), sub=1)
-    tri('muzzle', 0.035, (-0.25, -0.2, 0.085), (1.0, 1.1, 0.8), c, sub=1)
-    e1 = ear('ear', (-0.25, -0.06, 0.19), (8, -18, 25), c); e2 = ear('ear', (-0.14, -0.1, 0.2), (8, 15, 25), c)
-    for e in (e1, e2): e.scale = (1.35, 1.35, 1.35)
-    for (x, y) in ((-0.265, -0.17), (-0.21, -0.2)): box('eye', (0.03, 0.005, 0.006), (x, y - 0.03, 0.125), (0, 0, 25), 0x6A3E22, c, bevel=0)   # shut
-    pts = [(0.27, 0.03, 0.05), (0.29, -0.05, 0.047), (0.27, -0.12, 0.044), (0.21, -0.18, 0.04), (0.13, -0.22, 0.04), (0.04, -0.24, 0.04), (-0.05, -0.25, 0.043), (-0.11, -0.24, 0.047)]
-    for i in range(len(pts) - 1):                                              # the tail round the front, in faceted pieces
-        (ax, ay, az), (bx, by, bz) = pts[i], pts[i + 1]; ln = math.hypot(bx - ax, by - ay)
-        tri('tail', 0.04, ((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2), (ln / 0.045, 0.85, 0.8), c, rot=(0, 0, math.degrees(math.atan2(by - ay, bx - ax))), sub=1)
+    mb = bpy.data.metaballs.new('cat_shape'); mb.resolution = 0.012; mb.threshold = 0.6
+    def blob(p, rr, stiff=2.0):
+        e = mb.elements.new(); e.co = p; e.radius = rr; e.stiffness = stiff
+    for p, rr in (((0.02, 0.04, 0.11), 0.24), ((0.14, 0.06, 0.1), 0.2), ((-0.09, 0.0, 0.09), 0.18), ((0.08, -0.05, 0.08), 0.17)):
+        blob(p, rr)                                                            # the round curled body
+    blob((-0.23, -0.17, 0.13), 0.17)                                           # the head, resting forward
+    blob((-0.26, -0.23, 0.105), 0.06, 1.5)                                        # the muzzle
+    for p in ((-0.2, -0.24, 0.05), (-0.12, -0.25, 0.045)): blob(p, 0.09, 1.6)  # front paws under the chin
+    pts = [(0.27, 0.06), (0.3, -0.04), (0.27, -0.14), (0.2, -0.22), (0.11, -0.28), (0.02, -0.31), (-0.05, -0.33)]
+    for i in range(len(pts) - 1):                                              # the tail, a smooth run round the front
+        for t in (0.0, 0.33, 0.66):
+            x = pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t; y = pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t
+            blob((x, y, 0.045), 0.065, 2.2)
+    ob = bpy.data.objects.new('cat_mb', mb); bpy.context.scene.collection.objects.link(ob)
+    dg = bpy.context.evaluated_depsgraph_get(); me = bpy.data.meshes.new_from_object(ob.evaluated_get(dg)); bpy.data.objects.remove(ob)
+    body = bpy.data.objects.new('cat_body', me); bpy.context.scene.collection.objects.link(body)
+    d = body.modifiers.new('facets', 'DECIMATE'); d.ratio = 0.035                # into big flat triangles
+    dg = bpy.context.evaluated_depsgraph_get(); me2 = bpy.data.meshes.new_from_object(body.evaluated_get(dg))
+    body.modifiers.clear(); body.data = me2
+    for p in me2.polygons: p.use_smooth = False
+    body.data.materials.append(mat(FUR)); body.parent = c
+    face = Vector((-0.35, -0.94, 0)).normalized(); side = Vector((0.94, -0.35, 0)); hc = Vector((-0.23, -0.17, 0.13))
+    for sx in (-1, 1):                                                         # big pointed ears, a little apart
+        bm = bmesh.new(); base = hc + side * (sx * 0.075) + face * 0.01 + Vector((0, 0, 0.1))
+        tip = base + Vector((0, 0, 0.12)) + side * (sx * 0.035) - face * 0.015
+        v = [bm.verts.new(base + side * 0.05), bm.verts.new(base - side * 0.05), bm.verts.new(base - face * 0.055), bm.verts.new(tip)]
+        for f in ((0, 1, 3), (1, 2, 3), (2, 0, 3), (0, 2, 1)): bm.faces.new([v[i] for i in f])
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:]); em = bpy.data.meshes.new('ear'); bm.to_mesh(em); bm.free()
+        for p in em.polygons: p.use_smooth = False
+        eo = bpy.data.objects.new('cat_ear', em); bpy.context.scene.collection.objects.link(eo); eo.data.materials.append(mat(FUR)); eo.parent = c
+        e0 = hc + face * 0.135 + side * (sx * 0.045) + Vector((0, 0, 0.02))        # a closed eye: a short dark curve on the face
+        tube('cat_eye', [tuple(e0 - side * 0.018), tuple(e0 + Vector((0, 0, -0.006))), tuple(e0 + side * 0.018)], 0.004, DARK, c)
     return c

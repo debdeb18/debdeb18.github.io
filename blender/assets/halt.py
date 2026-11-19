@@ -310,6 +310,9 @@ def ruin_wall(r, rnd, x0, x1, yc, T, H, openings):
     for _ in range(6): grass_cap(r, rnd, rnd.uniform(x0 + 2.4, x1 - 0.5), yc, TOP + H + 0.17, rnd.uniform(0.6, 1.2), T + 0.2, 0)
     for xx in (x0 + 2.4, x0 + 4.3, x1 - 1.0):                                   # ivy down the front
         ivy(r, rnd, xx, yc - T / 2, TOP + H + 0.1, 0, -1, rnd.uniform(1.5, 2.6))
+    import random; rb = random.Random(7)                                       # and down the back (its own dice, so the stones stay put)
+    for xx in (x0 + 1.4, x0 + 3.6, x1 - 2.2, x1 - 0.6):
+        ivy(r, rb, xx, yc + T / 2, TOP + H + 0.1, 0, 1, rb.uniform(1.6, 2.6))
     return blocks
 
 def bush(r, rnd, x, y, z, s=1.0):

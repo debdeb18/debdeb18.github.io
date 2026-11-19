@@ -158,14 +158,10 @@ function makeWater(U) {
         vec2 cp = bp * 1.1 + (vec2(wNoise(bp * 1.6 + 3.1), wNoise(bp * 1.6 + 7.7)) - 0.5) * 0.35;
         float lines = 1.0 - step(0.018 + 0.03 * stir, cellEdge(cp, uTime * 0.25));        // thin lines, small cells,
         lines *= step(0.66 - 0.3 * stir, wNoise(bp * 0.09 + uTime * 0.012));             // only in patches here and there
-        // the thin shore foam, a dark inked line just outside it, and a second ring that pulses in and out
-        float fl = 1.0 - step(0.09, shore + wob * 0.5);
-        float ink = (1.0 - step(0.15, shore + wob * 0.5)) * (1.0 - fl);
-        float ring = 1.0 - step(0.035, abs(shore - (0.32 + 0.06 * sin(uTime * 0.9)) + wob * 0.4));
         // sparkles that blink, in the sun
         float spark = (1.0 - step(0.035, cellDot(bp * 2.2, uTime * 0.6))) * step(0.62, wNoise(bp * 0.5 + uTime * 0.35)) * uSun;
-        float white = clamp(max(max(lines * 0.85, max(fl, ring * 0.8)), max(spark, foam)), 0.0, 1.0) * step(0.0, shore);
-        diffuseColor.rgb = mix(diffuseColor.rgb, uDeep * 0.6, ink * 0.6 * step(0.0, shore));
+        float white = clamp(max(lines * 0.85, max(spark, foam)), 0.0, 1.0) * step(0.0, shore);   // (no foam line or ring round the
+                                                                                   // stone: it outlined the ruin in white)
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.91, 0.98, 1.0), white);
         diffuseColor.a = max(diffuseColor.a, white * 0.95);`)
       .replace('#include <opaque_fragment>', `float fres = pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 4.0);
@@ -396,14 +392,14 @@ export function buildTerminal() {
   for (let i = 0; i < 26; i++) CLOUDS.push([Math.random() * 6.283, 110 + Math.random() * 190, 25 + Math.random() * 55, 14 + Math.random() * 26]);
   CLOUDS.forEach(([a, r, y, wd], i) => {
     const c = cumulus(s, cm, 55 + Math.cos(a) * r, y, Math.sin(a) * r, wd, i + 1);
-    c.userData.bob = Math.random() * 6.28; clouds.push(c);
+    c.userData.bob = Math.random() * 6.28; c.userData.wd = wd; clouds.push(c);
   });
   // the heavy layer: big low clouds right overhead, which only gather when the weather turns cloudy
   const heavy = [];
   for (let i = 0; i < 14; i++) {                                                  // about as many as the smooth Blender dusk render
     const a = (i / 14) * 6.283 + Math.random() * 0.35, r = 130 + Math.random() * 130;
-    const c = cumulus(s, cm, 30 + Math.cos(a) * r, -4 + Math.random() * 14, Math.sin(a) * r, 80 + Math.random() * 70, 100 + i);
-    c.userData.bob = Math.random() * 6.28; c.userData.k = Math.random(); c.visible = false; clouds.push(c); heavy.push(c);
+    const wd = 80 + Math.random() * 70, c = cumulus(s, cm, 30 + Math.cos(a) * r, -4 + Math.random() * 14, Math.sin(a) * r, wd, 100 + i);
+    c.userData.bob = Math.random() * 6.28; c.userData.k = Math.random(); c.userData.wd = wd; c.visible = false; clouds.push(c); heavy.push(c);
   }
   let cloudy = weatherNow();
 
@@ -471,13 +467,7 @@ export function buildTerminal() {
   w.hot(SEAT.x, -SEAT.y, 'Sit down and wait for the train', 'sit', { y: 1.7, r: 1.6 });
   w.hot(PX + 2.78, -(PY + 0.01), 'Read the timetable', 'welcome', { y: 1.9, r: 1.3 });
   w.hot(PX + 3.85, -(PY + 0.01), 'Read the notices', 'contact', { y: 1.8, r: 1.2 });
-  // The markers show only as you come near (from afar their soft glow reads as white spots on the stone).
-  w.ticks.push(() => {
-    for (const h of w.hots) {
-      const k = THREE.MathUtils.clamp(1 - (Math.hypot(uPlayer.value.x - h.x, uPlayer.value.z - h.z) - h.r) / 2.0, 0, 1);
-      h.mark.material.opacity = 0.75 * k; h.mark.visible = k > 0.01;
-    }
-  });
+  for (const h of w.hots) { h.mark.visible = false; h.mark.removeFromParent(); }   // no floating markers here
 
   w.seat = { pos: B(SEAT.x, SEAT.y, PZ), yaw: 0 };
   w.standSpot = B(SEAT.x, SEAT.y - 0.7, PZ);
@@ -654,6 +644,9 @@ export function buildTerminal() {
     for (const c of clouds) {                                                      // drift; wrap around the far side
       c.position.addScaledVector(WIND, dt * gust); c.position.y += Math.sin(t * 0.1 + c.userData.bob) * dt * 0.15;
       water0.set(c.position.x - 55, 0, c.position.z);
+      // a low cloud is steered round the island, never through it (it would swallow the porch and the camera)
+      const clear = 45 + c.userData.wd * 0.7, hd = Math.hypot(c.position.x, c.position.z);
+      if (c.position.y < 45 + c.userData.wd * 0.3 && hd < clear) { const k = clear / Math.max(hd, 0.01); c.position.x *= k; c.position.z *= k; }
       if (water0.length() > 300) c.position.set(55 - WIND.x * 280 / WIND.length() + (Math.random() - 0.5) * 160, c.position.y, -WIND.z * 280 / WIND.length() + (Math.random() - 0.5) * 160);
     }
     for (const { o, ph } of trees) { o.rotation.z = Math.sin(t * 0.9 + ph) * 0.012; o.rotation.x = Math.sin(t * 0.7 + ph * 1.3) * 0.01; }

@@ -84,12 +84,13 @@ const SETTINGS = {
  */
 export function leafify(model, kind, isCanopy, ramp, { clumps = false } = {}) {
   model.updateMatrixWorld(true);
+  const toModel = model.matrixWorld.clone().invert();                          // the cards are added to the model: work in its space
   const all = [], v = new THREE.Vector3(), blobs = [];
   model.traverse((o) => {
     if (!o.isMesh || !isCanopy(o.material)) return;
     blobs.push(o);
     const p = o.geometry.attributes.position, step = Math.max(1, Math.floor(p.count / (clumps ? 4000 : 900)));
-    for (let i = 0; i < p.count; i += step) all.push(v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld).clone());
+    for (let i = 0; i < p.count; i += step) all.push(v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld).applyMatrix4(toModel).clone());
   });
   if (!all.length) return null;
   for (const o of blobs) { o.material = o.material.clone(); o.material.color.multiplyScalar(0.62); o.castShadow = true; }   // the dark heart

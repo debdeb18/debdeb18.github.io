@@ -439,7 +439,6 @@ def build():
     ruin_wall(r, rnd, wx0, wx1, WY, WT, WH, ())                              # no windows in the wall (the tower keeps its own)
     for lx in (-0.4, 3.6): lantern(r, lx, WF, TOP + 1.95)
     seat_row(r, -0.9, WF - 0.45, 4)                                             # the waiting spot, on the upper front
-    trash_can(r, -0.9 - 4 * 0.62 / 2 - 0.45, WF - 0.45)
     crossing_signal(r, LX / 2 - 0.8, -LY / 2 + 0.65)                            # front right, on the lower level
     info_board(r, XS1 + 1.1, WF - 0.45, LOW)                                    # the board, on the lower level just past the stairs
     for (bx, by) in ((XS1 + 2.2, WF - 0.35), (XS1 + 2.9, WF - 0.45)):

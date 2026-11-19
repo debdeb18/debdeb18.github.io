@@ -40,7 +40,8 @@ def build():
         blade('coverts', [(lambda X, Z: (X, sy * o, Z))(*lift(x, o)) for (x, o) in arm], WING, w, t=0.012, up=True)
         for k in range(8):                                                     # secondaries along the trailing edge, overlapping
             o0 = 0.02 + k * 0.055
-            feather('secondary', w, sy, (0.08, o0), (0.3 + 0.02 * math.sin(k), o0 + 0.03), 0.075, 0xB1B9C3 if k % 2 else 0xA4ADB8)
+            feather('secondary', w, sy, (0.08, o0), (0.3 + 0.13 * (k / 7) ** 1.5 + 0.01 * math.sin(k), o0 + 0.03 + 0.03 * k / 7), 0.075,   # longer towards the dark feathers
+                    0xB1B9C3 if k % 2 else 0xA4ADB8)
         hand = [(-0.05, 0.38), (0.0, 0.64), (0.2, 0.62), (0.24, 0.4)]           # the hand coverts over the primaries' bases
         blade('hand', [(lambda X, Z: (X, sy * o, Z))(*lift(x, o)) for (x, o) in hand], WING, w, t=0.014, up=True)
         for k in range(9):                                                     # primaries: a wide fan of long tapered fingers

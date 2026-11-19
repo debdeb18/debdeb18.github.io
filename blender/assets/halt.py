@@ -313,8 +313,8 @@ def posters(r, rnd, x, y, z):
     for (dx, dz, rr) in ((-0.15, -0.05, 0.09), (0.08, 0.04, 0.06), (0.2, -0.1, 0.045)):
         cyl('map_island', rr, rr, 0.012, (dx, -0.012, dz), (90, 0, 0), 0x7DB85A, m, bevel=0, verts=14)
     box('map_line', (0.56, 0.012, 0.018), (0, -0.014, -0.17), (0, 4, 0), 0xB8403A, m, bevel=0)
-    paper(x + 0.02, z - 0.32, 0.4, 0.4, rnd.uniform(-6, 6), 0xF2C46A, lines=3, curl=1.0)                 # a notice
-    paper(x + 0.62, z + 0.05, 0.36, 0.5, rnd.uniform(-5, 5), 0xE8A0A0, lines=4, pins=3)                   # another
+    paper(x + 0.02, z - 0.32, 0.4, 0.4, rnd.uniform(-6, 6), 0xE8D6A4, lines=3, curl=1.0)                 # a notice
+    paper(x + 0.62, z + 0.05, 0.36, 0.5, rnd.uniform(-5, 5), 0xE2C4B8, lines=4, pins=3)                   # another
     paper(x + 0.6, z - 0.45, 0.3, 0.22, rnd.uniform(-10, 10), 0xD8CFB8, lines=2, pins=1, torn=True)                  # old, faded, half gone
     paper(x - 0.25, z + 0.68, 0.3, 0.2, rnd.uniform(-8, 8), 0xE2D9C2, lines=2, pins=2)
 

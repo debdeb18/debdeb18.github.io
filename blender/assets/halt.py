@@ -56,18 +56,21 @@ def stone_face(r, rnd, along, fixed, axis):
         z += h; row += 1
 
 def sleeping_cat(r, x, y, z, yaw):
-    """A ginger tabby curled up asleep, nose tucked into its tail. Its own named part ('cat_sleep'), so the world can
-    hide it when it rains."""
+    """A slim black cat curled up asleep in the nook, big ears up, its long tail wrapped round its paws, eyes shut.
+    Its own named part ('cat_sleep'), so the world can hide it when it rains."""
     c = root('cat_sleep'); c.location = (x, y, z); c.rotation_euler = (0, 0, math.radians(yaw)); c.parent = r
-    ginger, dark, cream = 0xE39A55, 0xC9783A, 0xF6E2C4
-    ball('cat_body', 0.2, (0, 0, 0.1), (1.35, 1.0, 0.62), ginger, c)
-    for k in range(4): ball('cat_stripe', 0.05, (-0.12 + k * 0.08, 0.0, 0.2), (0.35, 1.6, 0.25), dark, c)
-    ball('cat_head', 0.11, (-0.2, -0.13, 0.12), (1.05, 1.0, 0.85), ginger, c)
-    ball('cat_muzzle', 0.05, (-0.25, -0.2, 0.1), (1, 0.8, 0.7), cream, c)
-    for sx in (-1, 1): cyl('cat_ear', 0.04, 0.003, 0.07, (-0.2 + sx * 0.07, -0.1, 0.2), (sx * 15, -20, 0), ginger, c, bevel=0, verts=6)
-    for sx in (-1, 1): box('cat_eye', (0.03, 0.006, 0.006), (-0.24 + sx * 0.04, -0.215, 0.135), (0, sx * 12, 0), 0x3B2A20, c, bevel=0)   # closed
-    tube('cat_tail', [(0.24, 0.05, 0.06), (0.25, -0.12, 0.05), (0.08, -0.24, 0.05), (-0.12, -0.25, 0.06), (-0.26, -0.22, 0.08)], [0.04, 0.038, 0.034, 0.03, 0.026], dark, c)
-    for sx in (-1, 1): ball('cat_paw', 0.04, (-0.1 + sx * 0.06, -0.2, 0.03), (1.2, 1, 0.6), cream, c)
+    black, sheen, inner = 0x25242B, 0x3A3944, 0x4A4550
+    ball('cat_body', 0.17, (0.02, 0, 0.09), (1.5, 0.9, 0.55), black, c)
+    ball('cat_back', 0.12, (0.06, 0.04, 0.13), (1.6, 0.6, 0.35), sheen, c)          # a soft sheen along the back
+    ball('cat_haunch', 0.1, (0.15, 0.03, 0.08), (1.1, 1.1, 0.8), black, c)
+    ball('cat_head', 0.085, (-0.2, -0.08, 0.1), (1.05, 1.0, 0.92), black, c)
+    ball('cat_cheek', 0.045, (-0.25, -0.13, 0.085), (1.1, 0.9, 0.8), black, c)
+    for sx in (-1, 1):                                                         # big upright ears
+        cyl('cat_ear', 0.042, 0.004, 0.11, (-0.2 + sx * 0.05, -0.06, 0.16), (sx * 12, -12, 0), black, c, bevel=0, verts=6)
+        cyl('cat_ear_in', 0.026, 0.003, 0.08, (-0.205 + sx * 0.05, -0.075, 0.165), (sx * 12, -12, 0), inner, c, bevel=0, verts=6)
+        box('cat_eye', (0.034, 0.006, 0.006), (-0.25 + sx * 0.035, -0.162, 0.115), (0, sx * 10, 0), 0x8A8794, c, bevel=0)   # shut
+    tube('cat_tail', [(0.27, 0.0, 0.06), (0.26, -0.13, 0.04), (0.1, -0.2, 0.035), (-0.08, -0.2, 0.04), (-0.18, -0.17, 0.05)], [0.026, 0.024, 0.022, 0.02, 0.016], black, c)
+    for sx in (-1, 1): ball('cat_paw', 0.03, (-0.12 + sx * 0.05, -0.16, 0.025), (1.3, 1, 0.6), black, c)
     return c
 
 def moss_tuft(r, rnd, x, y, z, s=1.0):

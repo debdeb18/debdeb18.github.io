@@ -29,8 +29,9 @@ def build():
     for v in bm.verts: v.co.x *= LEN + 0.6; v.co.y *= 3.2                                # with real depth, one bump per pebble
     me = bpy.data.meshes.new('bed'); bm.to_mesh(me); bm.free()
     bed = bpy.data.objects.new('bed', me); bpy.context.scene.collection.objects.link(bed); bed.data.materials.append(mat(BED)); bed.parent = r
-    tex = bpy.data.textures.new('pebbles', 'VORONOI'); tex.noise_scale = 0.07; tex.distance_metric = 'DISTANCE'
-    d = bed.modifiers.new('pebbles', 'DISPLACE'); d.texture = tex; d.texture_coords = 'GLOBAL'; d.strength = -0.05; d.mid_level = 0.0
+    tex = bpy.data.textures.new('pebbles', 'VORONOI'); tex.noise_scale = 0.13; tex.distance_metric = 'DISTANCE'
+    d = bed.modifiers.new('pebbles', 'DISPLACE'); d.texture = tex; d.texture_coords = 'GLOBAL'; d.strength = -0.06; d.mid_level = 0.0
+    sm = bed.modifiers.new('round', 'SMOOTH'); sm.factor = 0.9; sm.iterations = 6     # rounded pebbles, not points
     for i in range(70):                                                          # a few bigger stones among them
         x, y = rnd.uniform(-LEN / 2, LEN / 2), rnd.uniform(-1.5, 1.5)
         rock('pebble', rnd.uniform(0.06, 0.12), (x, y, -0.03), (1.3, 1.0, 0.5), (0, 0, rnd.uniform(0, 360)),

@@ -259,15 +259,16 @@ const PAINTERS = {
   // A pebbly sea floor, after the rail reference: small rounded pebbles packed close, blue-grey, pale grey and sand,
   // each lit on top with a soft shadow under it and a bright glint, dark gaps between them.
   pebbles(g, r) {
-    g.fillStyle = '#4c5a66'; g.fillRect(0, 0, SIZE, SIZE);
-    const tones = ['#7f93a3', '#93a6b4', '#a9b8c2', '#c3ccd1', '#b9ad93', '#8d8f8c', '#d7dde0'];
-    for (let pass = 0; pass < 2; pass++) for (let i = 0; i < (pass ? 2600 : 1800); i++) {
-      const x = r() * SIZE, y = r() * SIZE, rr = (pass ? 2.5 : 4) + r() * (pass ? 4 : 6), c = pick(tones, r()), a = r() * 3;
-      wrap(x, y, rr + 3, (X, Y) => {
-        dab(g, X + 0.8, Y + 1.6, rr * 1.05, rr * 0.8, a, '#2a333c', 0.55);                       // shadow under it
-        dab(g, X, Y, rr, rr * 0.78, a, c, 1);                                                   // the pebble
-        dab(g, X - rr * 0.25, Y - rr * 0.28, rr * 0.55, rr * 0.38, a, '#eef3f5', 0.35);          // lit top
-        if (r() < 0.3) dab(g, X - rr * 0.35, Y - rr * 0.35, rr * 0.18, rr * 0.12, 0, '#ffffff', 0.8);   // a glint
+    g.fillStyle = '#5b6873'; g.fillRect(0, 0, SIZE, SIZE);
+    const tones = ['#7f93a3', '#93a6b4', '#a9b8c2', '#c3ccd1', '#b9ad93', '#9a9c98', '#d3d9dc'];
+    for (let pass = 0; pass < 2; pass++) for (let i = 0; i < (pass ? 700 : 420); i++) {
+      const x = r() * SIZE, y = r() * SIZE, rr = (pass ? 6 : 9) + r() * (pass ? 6 : 9), c = pick(tones, r()), a = r() * 3;
+      wrap(x, y, rr + 6, (X, Y) => {
+        dab(g, X + 1.5, Y + 2.5, rr * 1.12, rr * 0.88, a, '#36414b', 0.25);                    // a soft shadow under it
+        dab(g, X + 0.8, Y + 1.4, rr * 1.04, rr * 0.82, a, '#36414b', 0.25);
+        dab(g, X, Y, rr, rr * 0.8, a, c, 1);                                                   // the pebble
+        dab(g, X - rr * 0.18, Y - rr * 0.22, rr * 0.7, rr * 0.52, a, '#eef3f5', 0.18);          // a gentle lit top
+        dab(g, X - rr * 0.26, Y - rr * 0.3, rr * 0.4, rr * 0.28, a, '#f6f9fa', 0.18);
       });
     }
   },
@@ -277,7 +278,7 @@ const KINDS = { grass: { scale: 1 / 3.2, mode: 'replace' }, sand: { scale: 1 / 4
   gravel: { scale: 1 / 2, mode: 'replace' }, ballast: { scale: 1 / 1.6, mode: 'replace' }, wood: { scale: 1 / 2.2, mode: 'tint' }, stone: { scale: 1 / 2.5, mode: 'tint' },
   bark: { scale: 1 / 1.6, mode: 'tint' }, plaster: { scale: 1 / 3, mode: 'tint' }, roof: { scale: 1 / 2.4, mode: 'tint' }, paint: { scale: 1 / 1.6, mode: 'tint' },
   seatwood: { scale: 1 / 0.7, mode: 'replace' }, seatiron: { scale: 1 / 1.6, mode: 'replace' },
-  brick: { scale: 1 / 1.4, mode: 'tint' }, moss: { scale: 1 / 0.6, mode: 'replace' }, paper: { scale: 1 / 0.7, mode: 'tint' }, pebbles: { scale: 1 / 1.1, mode: 'replace' }, paving: { scale: 1 / 1.5, mode: 'tint' } };
+  brick: { scale: 1 / 1.4, mode: 'tint' }, moss: { scale: 1 / 0.6, mode: 'replace' }, paper: { scale: 1 / 0.7, mode: 'tint' }, pebbles: { scale: 1 / 1.8, mode: 'replace' }, paving: { scale: 1 / 1.5, mode: 'tint' } };
 
 const textures = {};
 export function paintedTexture(kind) {

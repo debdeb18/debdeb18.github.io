@@ -223,7 +223,7 @@ def plank(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='wood', parent=None, b
     return o
 
 def painted_box(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='stone', parent=None, bevel=0.02, jitter=0.0, along='x',
-                band=0.18, paint=None, sculpt=True, face=0, rough=1.0, clip=None, moss=0.0, **mk):
+                band=0.18, paint=None, sculpt=True, face=0, rough=1.0, clip=None, moss=0.0, chisel=0.0, **mk):
     """A box with hand-painted light and shade on its vertices, like a painted stone or tile: a light band along the
     top and the left, a darker, stained band along the bottom and the right. `along` is the face's horizontal axis
     ('x' or 'y'); a flat tile (along='top') gets a light rim all round its top. The colour multiplies `color`.
@@ -246,6 +246,25 @@ def painted_box(name, size, loc=(0, 0, 0), rot=(0, 0, 0), color='stone', parent=
     if clip:                                                                  # cut along a crack and close the cut
         bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=clip[0], plane_no=clip[1], clear_outer=True)
         bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary], sides=0)
+    if chisel:                                                                # hand-cut: corners knocked off at an angle (seen
+        a1, a2 = [j for j in range(3) if j != nax]                            # on the face) and a chunk off a face edge
+        def knock(co, no):
+            bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=co, plane_no=no, clear_outer=True)
+            bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary], sides=0)
+        for g1 in (-1, 1):
+            for g2 in (-1, 1):
+                if random.random() > 0.55 * chisel: continue
+                d1 = random.uniform(0.04, 0.13) / size[a1]; d2 = random.uniform(0.03, 0.1) / size[a2]
+                co = [0, 0, 0]; co[a1] = g1 * (0.5 - d1); co[a2] = g2 * 0.5
+                no = [0, 0, 0]; no[a1] = g1 * d2; no[a2] = g2 * d1
+                knock(tuple(co), tuple(no))
+        sides = (1,) if along == 'top' else ((face,) if face else (1, -1))
+        for sf in sides:
+            if random.random() > 0.45 * chisel: continue
+            ea = random.choice((a1, a2)); ge = random.choice((-1, 1)); w = random.uniform(0.03, 0.07); t = math.radians(random.uniform(35, 55))
+            co = [0, 0, 0]; co[nax] = sf * 0.5; co[ea] = ge * (0.5 - w / size[ea])
+            no = [0, 0, 0]; no[nax] = sf * math.cos(t) * size[nax]; no[ea] = ge * math.sin(t) * size[ea]
+            knock(tuple(co), tuple(no))
     R = random.uniform
     bumps = [(R(-0.5, 0.5), R(-0.5, 0.5), R(0.15, 0.4), R(-1, 1)) for _ in range(5)]          # swells and dips in the face
     chips = [(random.choice((-0.5, 0.5)), R(-0.5, 0.5), R(0.04, 0.1)) for _ in range(random.randint(0, 1 + int(rough * 1.5)))]   # bites out of an edge

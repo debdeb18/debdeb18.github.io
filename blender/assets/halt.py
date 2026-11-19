@@ -130,7 +130,7 @@ def floor_slabs(r, rnd, joints, rect=None, top=TOP, skip=lambda x, y: False):
             if row > 0 and rnd.random() < 0.06: joints.append((x0 + 0.05, y, 1, 0, x1 - x0 - 0.1))
         y += d; row += 1
 
-TX, TY, TR, TW = -LX / 2 - 1.5, 0.5, 2.45, 0.6                                  # the ruined tower (centre, outer radius, wall): it overlaps the end of the pier
+TX, TY, TR, TW = -LX / 2 - 1.5, -0.8, 2.45, 0.6                                  # the ruined tower (centre, outer radius, wall): it overlaps the end of the pier
 WINDOWS = ((250, TOP + 2.6, TOP + 3.7), (238, TOP + 0.5, TOP + 1.6), (290, TOP + 0.5, TOP + 1.6))   # (angle, sill, head), on its front
 DOOR = None
 
@@ -446,8 +446,26 @@ def build():
     for (bx, by, bs) in ((TX - 1.2, TY - TR - 0.3, 1.2), (TX + 0.6, TY - TR - 0.5, 1.0), (TX - TR - 0.2, TY + 0.4, 1.1)):
         bush(r, rnd, bx, by, BASE + 0.4, bs)                                    # bushes at the foot of the tower
     # behind: stone stairs down from the back porch beside the tower, and a wooden deck out towards the boat
-    for k in range(4):
-        painted_box('back_step', (1.3, 0.42, 0.2), (wx0 - 0.1, LY / 2 + 0.21 + k * 0.4, TOP - 0.2 - k * 0.22), (0, 0, rnd.uniform(-2, 2)), color=rnd.choice(('stone_a', 'stone_b')), parent=r, bevel=0.03, along='top', band=0.1, rough=2.0)
+    sh = TOP / 4; xt = -LX / 2 - 0.05                                          # back stairs: three stacked courses of stone blocks,
+    yt = TY + math.sqrt(max(0.0, TR ** 2 - (xt - TX) ** 2)) - 0.3               # each smaller than the one below, wrapping the
+    for k in range(3):                                                         # porch's back corner in an L, up to the tower
+        z0 = -0.3 if k == 0 else k * sh; z1 = (k + 1) * sh
+        width, depth = 2.4 - k * 0.55, 1.2 - k * 0.4
+        kw = dict(parent=r, bevel=0.03, jitter=0.006, along='top', band=0.1, rough=2.2, moss=0.5 if k == 0 else 0.0)
+        xa = xt                                                                 # along the back edge
+        while xa < xt + width - 0.05:
+            l = min(rnd.uniform(0.5, 0.75), xt + width - xa)
+            if xt + width - (xa + l) < 0.25: l = xt + width - xa
+            painted_box('back_step', (l - 0.03, depth, z1 - z0 - 0.02), (xa + l / 2, LY / 2 + depth / 2, z0), (0, 0, rnd.uniform(-1.5, 1.5)),
+                        color=rnd.choice(('stone_a', 'stone_b', 'stone_c', 'stone_d')), **kw)
+            xa += l
+        ya = yt                                                                 # and round the end, towards the tower
+        while ya < LY / 2 + depth - 0.05:
+            l = min(rnd.uniform(0.5, 0.75), LY / 2 + depth - ya)
+            if LY / 2 + depth - (ya + l) < 0.25: l = LY / 2 + depth - ya
+            painted_box('back_step', (depth, l - 0.03, z1 - z0 - 0.02), (xt - depth / 2, ya + l / 2, z0), (0, 0, rnd.uniform(-1.5, 1.5)),
+                        color=rnd.choice(('stone_a', 'stone_b', 'stone_c', 'stone_d')), **kw)
+            ya += l
     DX0, DX1, DY0, DY1, DZ = LX / 2 - 2.4, LX / 2 - 0.9, LY / 2 - 0.05, LY / 2 + 2.6, TOP - 0.06
     yy = DY0
     while yy < DY1:

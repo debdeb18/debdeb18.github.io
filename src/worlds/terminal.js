@@ -471,6 +471,13 @@ export function buildTerminal() {
   w.hot(SEAT.x, -SEAT.y, 'Sit down and wait for the train', 'sit', { y: 1.7, r: 1.6 });
   w.hot(PX + 2.78, -(PY + 0.01), 'Read the timetable', 'welcome', { y: 1.9, r: 1.3 });
   w.hot(PX + 3.85, -(PY + 0.01), 'Read the notices', 'contact', { y: 1.8, r: 1.2 });
+  // The markers show only as you come near (from afar their soft glow reads as white spots on the stone).
+  w.ticks.push(() => {
+    for (const h of w.hots) {
+      const k = THREE.MathUtils.clamp(1 - (Math.hypot(uPlayer.value.x - h.x, uPlayer.value.z - h.z) - h.r) / 2.0, 0, 1);
+      h.mark.material.opacity = 0.75 * k; h.mark.visible = k > 0.01;
+    }
+  });
 
   w.seat = { pos: B(SEAT.x, SEAT.y, PZ), yaw: 0 };
   w.standSpot = B(SEAT.x, SEAT.y - 0.7, PZ);
@@ -524,7 +531,7 @@ export function buildTerminal() {
     cm.uniforms.lit.value.copy(p.cLit); cm.uniforms.shade.value.copy(p.cShade); cm.uniforms.edge.value.copy(p.cEdge); cm.uniforms.sun.value.copy(sd); cm.uniforms.haze.value.copy(p.mid);
     starField.material.opacity = p.stars;
     for (const l of lamps) l.intensity = p.lamps * 2.2;
-    for (const m of w.glowMats) m.emissiveIntensity = m.userData.glow * (0.25 + 0.75 * Math.max(p.lamps, 0.2));
+    for (const m of w.glowMats) m.emissiveIntensity = m.userData.glow * (0.04 + 0.96 * p.lamps);   // lights glow only as it gets dark (by day a lit lantern reads as a white spot)
     w.bloom = p.bloom;
     RIM.value = 0.22 * (0.2 + 0.8 * THREE.MathUtils.clamp((p.sunI - 0.45) / 2.0, 0, 1));   // the rim light fades at night
     const day = THREE.MathUtils.clamp((p.sunI - 0.45) / 2.55, 0, 1);              // 0 at night .. 1 at noon

@@ -41,13 +41,13 @@ def build():
         for k in range(8):                                                     # secondaries along the trailing edge, overlapping
             o0 = 0.02 + k * 0.055
             feather('secondary', w, sy, (0.08, o0), (0.3 + 0.02 * math.sin(k), o0 + 0.03), 0.075, 0xB1B9C3 if k % 2 else 0xA4ADB8)
-        hand = [(-0.05, 0.4), (0.0, 0.62), (0.12, 0.6), (0.17, 0.42)]           # the hand coverts over the primaries' bases
+        hand = [(-0.05, 0.38), (0.0, 0.64), (0.2, 0.62), (0.24, 0.4)]           # the hand coverts over the primaries' bases
         blade('hand', [(lambda X, Z: (X, sy * o, Z))(*lift(x, o)) for (x, o) in hand], WING, w, t=0.014, up=True)
         for k in range(9):                                                     # primaries: a wide fan of long tapered fingers
-            a_ = math.radians(-8 + k * 11); o0 = 0.5 + 0.01 * k; x0 = 0.0 + k * 0.022
-            L = 0.36 - abs(k - 2.5) * 0.022
+            a_ = math.radians(-8 + k * 11); o0 = 0.44 + 0.005 * k; x0 = 0.0 + k * 0.025   # rooted under the hand coverts
+            L = 0.42 - abs(k - 2.5) * 0.022
             tip = (x0 + math.sin(a_) * L, o0 + math.cos(a_) * L)
-            feather('primary', w, sy, (x0, o0), tip, 0.055, TIP if k < 6 else 0x8D96A2, t=0.005)
+            feather('primary', w, sy, (x0, o0), tip, 0.065, TIP if k < 6 else 0x8D96A2, t=0.005)
     for k in range(3):
         blade('tail', [(0.27, (k - 1) * 0.03, 0.0), (0.38, (k - 1) * 0.045, 0.0), (0.37, (k - 1) * 0.045 + 0.02, 0.0), (0.27, (k - 1) * 0.03 + 0.012, 0.0)], 0xA9B1BB, r, up=True)
     return r

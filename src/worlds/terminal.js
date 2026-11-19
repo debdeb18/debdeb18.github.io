@@ -642,11 +642,13 @@ export function buildTerminal() {
     }
     const gust = 1 + cloudy * 1.2;                                                 // windier when it is cloudy
     for (const c of clouds) {                                                      // drift; wrap around the far side
-      c.position.addScaledVector(WIND, dt * gust); c.position.y += Math.sin(t * 0.1 + c.userData.bob) * dt * 0.15;
+      c.position.addScaledVector(WIND, dt * gust);
       water0.set(c.position.x - 55, 0, c.position.z);
-      // a low cloud is steered round the island, never through it (it would swallow the porch and the camera)
-      const clear = 45 + c.userData.wd * 0.7, hd = Math.hypot(c.position.x, c.position.z);
-      if (c.position.y < 45 + c.userData.wd * 0.3 && hd < clear) { const k = clear / Math.max(hd, 0.01); c.position.x *= k; c.position.z *= k; }
+      // clouds are high: one low on the horizon rises as it comes over, so it passes far overhead, never through the
+      // porch and the camera (walking through cloud would be fog, a weather of its own)
+      if (c.userData.y0 === undefined) c.userData.y0 = c.position.y;
+      const hd = Math.hypot(c.position.x, c.position.z), over = 1 - THREE.MathUtils.smoothstep(hd, 90, 220);
+      c.position.y = Math.max(c.userData.y0 + Math.sin(t * 0.1 + c.userData.bob) * 1.5, (40 + c.userData.wd * 0.4) * over);
       if (water0.length() > 300) c.position.set(55 - WIND.x * 280 / WIND.length() + (Math.random() - 0.5) * 160, c.position.y, -WIND.z * 280 / WIND.length() + (Math.random() - 0.5) * 160);
     }
     for (const { o, ph } of trees) { o.rotation.z = Math.sin(t * 0.9 + ph) * 0.012; o.rotation.x = Math.sin(t * 0.7 + ph * 1.3) * 0.01; }

@@ -314,6 +314,10 @@ def ruin_wall(r, rnd, x0, x1, yc, T, H, openings):
         for b in sorted(rows[zr], key=lambda b: b[0])[:2 if i == 0 else 1]:
             for o in b[3]: bpy.data.objects.remove(o)
             blocks.remove(b)
+    for zr in zs[1:3]:                                                         # rows 6 and 7 from the top sit 0.3 further right
+        for b in blocks:
+            if round(b[1], 3) == zr:
+                for o in b[3]: o.location.x += 0.3
     xs = x0 + 1.8                                                              # (the ledge along the top is gone too: made and
     while xs < x1 - 0.05:                                                      # taken away, so what follows stays put)
         l = min(rnd.uniform(0.8, 1.3), x1 - xs)

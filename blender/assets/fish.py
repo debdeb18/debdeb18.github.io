@@ -1,5 +1,5 @@
 """A small low-poly orange fish for the water by the back stairs, after the user's reference: a faceted body, a big
-dorsal fin, a broad tail, little fins underneath and a round eye. Flat shaded. Origin at its middle; it faces -X."""
+dorsal fin, a broad tail, little fins underneath and a round eye. Flat shaded. Origin under its belly fins; it faces -X."""
 import bmesh
 from lib import *
 VIEW = dict(angle=30, lift=0.35, res=(700, 500), samples=24)
@@ -21,6 +21,8 @@ def fin(name, pts, color, parent):                          # a flat fin with a 
 
 def build():
     r = root('fish')
+    body = root('fish_body'); body.location = (0, 0, 0.125); body.parent = r     # lifted, so the belly fins sit at the origin
+    r_, r = r, body
     bm = bmesh.new(); bmesh.ops.create_uvsphere(bm, u_segments=8, v_segments=6, radius=1.0)
     for v in bm.verts:                                       # a plump body: blunt head, tapering to the tail
         x = v.co.x; k = 1.0 - max(0.0, x) * 0.55
@@ -35,4 +37,4 @@ def build():
     for sy in (-1, 1):
         ball('eye', 0.016, (-0.12, sy * 0.05, 0.025), (1, 0.4, 1), 0xFFFFFF, r)
         ball('pupil', 0.009, (-0.123, sy * 0.056, 0.025), (1, 0.4, 1), 0x1E2228, r)
-    return r
+    return r_

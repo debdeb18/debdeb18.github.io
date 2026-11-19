@@ -36,9 +36,10 @@ Porch v2 (on the ruin), assets in `blender/assets/halt.py`, `heron.py`, `fish.py
 - [x] Mooring post: twin posts with a rope figure-of-eight (option E)
 - [ ] Revisit the stone blocks at the end of the phase
 - [ ] Put the porch into the world (simplify the model on export)
-- [x] Low-poly cat asleep in the tower nook ('cat_sleep' in the porch model)
+- [x] Low-poly cat asleep in the tower nook (`cat_sleep.py`, placed in the porch model as 'cat_sleep')
 - [ ] Hide the cat when it rains or the weather is bad
-- [ ] Heron on the rocks in the shallows by the tower (the 'heron_spot' empty), only when sunny: flies off when a train passes, comes back while it stays sunny
+- [x] Low-poly heron standing (`heron.py`) and flying (`heron_flying.py`, wings flap)
+- [ ] Heron on the rocks in the shallows by the tower (the 'heron_spot' empty), only when sunny; swap to the flying model to take off: flies off when a train passes, comes back while it stays sunny
 - [ ] Low-poly orange fish (`fish.py`) by the back stairs; in rain only one or two, under the deck
 
 Build in the website

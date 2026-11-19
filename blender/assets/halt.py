@@ -377,12 +377,12 @@ def seat_row(r, cx, cy, n):
             plank('seat_back', (P - 0.1, 0.092, 0.042), (x, yy, zz + 0.046), (80 - 8 * t, 0, 0), 'seat_wood', r, bevel=0.014)
         box('seat_back_post', (0.04, 0.04, 0.32), (x, cy + 0.2, z + 0.4), (-12, 0, 0), 'seat_frame', r, bevel=0.008)
 
-def crossing_signal(r, x, y):
+def crossing_signal(r, x, y, z0=TOP):
     """A railway-crossing signal: a yellow-and-black striped mast, a crossbuck, two red lamps on a bar, a small
     direction box and a bell on top."""
-    z = TOP; H = 3.4
+    z = z0; H = TOP + 3.4 - z0                                                 # the top stays where it was, the foot can go lower
     rock('signal_foot', 0.28, (x, y, z + 0.03), (1.0, 0.95, 0.5), (0, 0, 35), 'stone_b', r, flat=0.55)
-    n = 12
+    n = max(12, round(H / 0.28))
     for i in range(n):
         cyl('mast', 0.075, 0.075, H / n, (x, y, z + 0.18 + i * (H - 0.18) / n), color='stripe_y' if i % 2 == 0 else 'stripe_k', parent=r, bevel=0.002, verts=14)
     # the crossbuck: two striped boards in an X
@@ -439,7 +439,7 @@ def build():
     ruin_wall(r, rnd, wx0, wx1, WY, WT, WH, ())                              # no windows in the wall (the tower keeps its own)
     for lx in (-0.4, 3.6): lantern(r, lx, WF, TOP + 1.95)
     seat_row(r, -0.9, WF - 0.45, 4)                                             # the waiting spot, on the upper front
-    crossing_signal(r, LX / 2 - 0.8, -LY / 2 + 0.65)                            # front right, on the lower level
+    crossing_signal(r, LX / 2 + 0.7, -LY / 2 + 0.4, BASE)                       # in the water, just past the front right end
     info_board(r, XS1 + 1.1, WF - 0.45, LOW)                                    # the board, on the lower level just past the stairs
     for (bx, by) in ((XS1 + 2.2, WF - 0.35), (XS1 + 2.9, WF - 0.45)):
         bush(r, rnd, bx, by, LOW - 0.05, 0.7)
@@ -448,9 +448,10 @@ def build():
     # behind: stone stairs down from the back porch beside the tower, and a wooden deck out towards the boat
     sh = TOP / 4; xt = -LX / 2 - 0.05                                          # back stairs: three stacked courses of stone blocks,
     yt = TY + math.sqrt(max(0.0, TR ** 2 - (xt - TX) ** 2)) - 0.3               # each smaller than the one below, wrapping the
-    for k in range(3):                                                         # porch's back corner in an L, up to the tower
-        z0 = -0.3 if k == 0 else k * sh; z1 = (k + 1) * sh
-        width, depth = 2.4 - k * 0.55, 1.2 - k * 0.4
+    ch = (TOP - 0.3) / 2                                                       # the porch's courses: two, then the floor course
+    for k in range(2):                                                         # porch's back corner in an L, up to the tower:
+        z0 = -0.3 if k == 0 else ch; z1 = (k + 1) * ch                          # its bottom two courses stick out, the lower further
+        width, depth = 2.2 - k * 0.6, 0.9 - k * 0.45
         kw = dict(parent=r, bevel=0.03, jitter=0.006, along='top', band=0.1, rough=2.2, moss=0.5 if k == 0 else 0.0)
         xa = xt                                                                 # along the back edge
         while xa < xt + width - 0.05:

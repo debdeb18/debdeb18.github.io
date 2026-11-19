@@ -292,6 +292,30 @@ def fence(r, p0, p1):
         t = i / m; x, y = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
         box('baluster', (0.06, 0.06, 0.72), (x, y, z + 0.18), (0, 0, ang), 'rail_w', r, bevel=0.009)   # square, with rounded edges
 
+def posters(r, rnd, x, y, z):
+    """Papers pinned and pasted straight onto the wall, like wanted posters but with the station's information: the
+    timetable, a map of the islands, notices, an old faded one half torn away. Each a little crooked, pinned at its
+    corners. (x, z) is the centre of the cluster on the wall face at y; they face -Y."""
+    def paper(px, pz, w, h, roll, col, lines=0, head=None, pins=4, curl=0.0):
+        e = root('poster'); e.location = (px, y - 0.012, pz); e.rotation_euler = (0, math.radians(roll), 0); e.parent = r
+        box('paper', (w, 0.012, h), (0, 0, -h / 2), color=col, parent=e, bevel=0.003, jitter=0.004)
+        if curl: box('curl', (w * 0.22, 0.012, h * 0.16), (w / 2 - w * 0.11, -0.02, -h / 2), (8, 0, -20), col, e, bevel=0.003)   # a lifted corner
+        if head: box('head', (w * 0.9, 0.012, h * 0.13), (0, -0.006, h / 2 - h * 0.18), color=head, parent=e, bevel=0.002)
+        for i in range(lines):
+            box('ink', (w * rnd.uniform(0.5, 0.8), 0.012, 0.022), (rnd.uniform(-0.04, 0.04) * w, -0.008, h / 2 - h * 0.3 - i * (h * 0.6 / max(1, lines - 1)) - 0.011), color='iron_d', parent=e, bevel=0)
+        for (sx, sz) in ((-1, 1), (1, 1), (-1, -1), (1, -1))[:pins]:
+            ball('pin', 0.018, (sx * (w / 2 - 0.035), -0.014, sz * (h / 2 - 0.035)), (1, 0.6, 1), 0x8A5236, e)
+        return e
+    paper(x - 0.72, z + 0.12, 0.62, 0.86, rnd.uniform(-2, 2), 'board', lines=8, head=0x2F6F9A)          # the timetable
+    m = paper(x + 0.05, z + 0.28, 0.66, 0.5, rnd.uniform(-4, 4), 0xE8F1F2, pins=2)                        # the map
+    for (dx, dz, rr) in ((-0.15, -0.05, 0.09), (0.08, 0.04, 0.06), (0.2, -0.1, 0.045)):
+        cyl('map_island', rr, rr, 0.012, (dx, -0.012, dz), (90, 0, 0), 0x7DB85A, m, bevel=0, verts=14)
+    box('map_line', (0.56, 0.012, 0.018), (0, -0.014, -0.17), (0, 4, 0), 0xB8403A, m, bevel=0)
+    paper(x + 0.02, z - 0.32, 0.4, 0.4, rnd.uniform(-6, 6), 0xF2C46A, lines=3, curl=1.0)                 # a notice
+    paper(x + 0.62, z + 0.05, 0.36, 0.5, rnd.uniform(-5, 5), 0xE8A0A0, lines=4, pins=3)                   # another
+    paper(x + 0.6, z - 0.45, 0.3, 0.22, rnd.uniform(-10, 10), 0xD8CFB8, lines=2, pins=1)                  # old, faded, half gone
+    paper(x - 0.25, z + 0.68, 0.3, 0.2, rnd.uniform(-8, 8), 0xE2D9C2, lines=2, pins=2)
+
 def info_board(r, x, y, z0=TOP):
     """The board along the back fence: train times on the left, station notices and a map of the islands on the
     right, under a little tiled hood, on two timber legs. Faces the track (-Y)."""
@@ -451,7 +475,7 @@ def build():
     for lx in (-0.4, 3.6): lantern(r, lx, WF, TOP + 1.95)
     seat_row(r, -0.9, WF - 0.45, 4)                                             # the waiting spot, on the upper front
     crossing_signal(r, LX / 2 + 0.7, -LY / 2 + 0.4, BASE)                       # in the water, just past the front right end
-    info_board(r, XS1 + 1.1, WF - 0.45, LOW)                                    # the board, on the lower level just past the stairs
+    posters(r, rnd, XS1 + 1.4, WF - 0.03, LOW + 1.35)                           # the station's information, pinned to the wall                                    # the board, on the lower level just past the stairs
     for (bx, by) in ((XS1 + 2.2, WF - 0.35), (XS1 + 2.9, WF - 0.45)):
         bush(r, rnd, bx, by, LOW - 0.05, 0.7)
     for (bx, by, bs) in ((TX - 1.2, TY - TR - 0.3, 1.2), (TX + 0.6, TY - TR - 0.5, 1.0), (TX - TR - 0.2, TY + 0.4, 1.1)):

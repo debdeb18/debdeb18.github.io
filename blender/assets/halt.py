@@ -319,11 +319,22 @@ def ruin_wall(r, rnd, x0, x1, yc, T, H, openings):
             if round(b[1], 3) == zr:
                 for o in b[3]: o.location.x += 0.3
     def stretch(b, left=0.0, right=0.0):                                       # widen (+) or trim (-) a block at either end
-        w = tops[round(b[0], 2)][2]; k = (w + left + right) / w
+        w = tops[round(b[0], 2)][2] * b[3][-1].scale.x; k = (w + left + right) / w   # (its width as it stands now)
         for o in b[3]: o.scale.x *= k; o.location.x += (right - left) / 2
     row = lambda i: [b for b in blocks if round(b[1], 3) == zs[-i]]           # row i, counted from the top
     stretch(min(row(3), key=lambda b: b[0]), left=0.1)                        # row 3 reaches 0.1 further left
     stretch(max(row(6), key=lambda b: b[0]), right=-0.1)                      # row 6 is 0.1 shorter on the right
+    # Every row 0.3 longer on the right (the wall moved 0.3 left, so its right end stays where it was): the end block
+    # stretched, or where it would grow too long, a small 0.3 block added after it (its own dice).
+    rk = random.Random(13)
+    def right_edge(b):
+        return max((o.matrix_basis @ v.co).x for o in b[3] if o.name.startswith('ruin') for v in o.data.vertices)
+    for zr in zs:
+        b = max([b for b in blocks if round(b[1], 3) == zr], key=right_edge); w = tops[round(b[0], 2)][2]
+        if w * b[3][-1].scale.x + 0.3 <= 1.2: stretch(b, right=0.3)
+        else:
+            e = right_edge(b) + 0.015; c, z_, h_ = e + 0.15, b[1], b[2]
+            blocks.append((c, z_, h_, ruin_block(r, rk, (0.27, T, h_ - 0.03), (c, yc + rk.uniform(-0.015, 0.015), z_), (rk.uniform(-1, 1), rk.uniform(-1, 1), rk.uniform(-0.8, 0.8)), 'x', 0, crack=0.0, backing=True)))
     xs = x0 + 1.8                                                              # (the ledge along the top is gone too: made and
     while xs < x1 - 0.05:                                                      # taken away, so what follows stays put)
         l = min(rnd.uniform(0.8, 1.3), x1 - xs)
@@ -332,7 +343,7 @@ def ruin_wall(r, rnd, x0, x1, yc, T, H, openings):
     for _ in range(6): grass_cap(r, rnd, rnd.uniform(x0 + 2.4, x1 - 0.5), yc, wtop - 0.03, rnd.uniform(0.6, 1.2), T + 0.2, 0)
     for xx in (x0 + 2.4, x0 + 4.3, x1 - 1.0):                                   # ivy down the front
         ivy(r, rnd, xx, yc - T / 2, wtop + 0.1, 0, -1, rnd.uniform(1.5, 2.6))
-    import random; rb = random.Random(7)                                       # and down the back (its own dice, so the stones stay put)
+    rb = random.Random(7)                                                      # and down the back (its own dice, so the stones stay put)
     for xx in (x0 + 1.4, x0 + 3.6, x1 - 2.2, x1 - 0.6):
         ivy(r, rb, xx, yc + T / 2, wtop + 0.1, 0, 1, rb.uniform(1.6, 2.6))
     return blocks
@@ -548,7 +559,7 @@ def build():
     ruin_tower(r, rnd)
     for (x, y, nx_, ny_, ln) in ((-3.2, -LY / 2 - 0.12, 0, -1, 1.2), (2.4, LY / 2 + 0.12, 0, 1, 1.4)):
         ivy(r, rnd, x, y, TOP - 0.05, nx_, ny_, ln)                          # a little ivy over the pier's edge
-    WSH = 0.9                                                                  # the wall moved left, so with its broken end worn back
+    WSH = 1.2                                                                  # the wall moved left, so with its broken end worn back
     ruin_wall(r, rnd, wx0 - WSH, wx1 - WSH, WY, WT, WH, ())                  # the gap to the tower stays the same; no windows in it
     for lx in (-0.4, 3.6): lantern(r, lx, WF, TOP + 1.95)
     seat_row(r, -0.9, WF - 0.45, 4)                                             # the waiting spot, on the upper front

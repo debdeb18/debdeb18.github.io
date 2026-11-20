@@ -16,7 +16,7 @@ export function makeBlob() {
   const eyeMat = M(0x1e1e24);
   const eyes = [-1, 1].map((s) => {                             // the dot eyes (drawn here so they can blink)
     const e = new THREE.Mesh(new THREE.SphereGeometry(0.032, 16, 12), eyeMat);
-    e.position.set(s * 0.085, 0.66, 0.426); e.scale.set(1, 1.15, 0.55); squash.add(e); return e;
+    e.position.set(s * 0.072, 0.66, 0.32); e.scale.set(1, 1.15, 0.55); squash.add(e); return e;
   });
 
   const L = THREE.MathUtils.lerp;

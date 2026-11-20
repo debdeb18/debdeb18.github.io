@@ -11,7 +11,7 @@ def profile(z):
     """The body's radius at height z (0..H): a flat, softly rounded base, widest at the bottom and tapering gently up to
     a round dome, like a soft gumdrop."""
     t = z / H
-    side = 0.56 - 0.10 * min(t, 0.45) / 0.45                                     # widest at the base
+    side = 0.43 - 0.08 * min(t, 0.45) / 0.45                                     # widest at the base (slim: less round)
     dome = math.sqrt(max(0.0, 1 - max(0.0, (t - 0.45) / 0.55) ** 2.2))
     foot = math.sqrt(max(0.0, 1 - ((0.06 - t) / 0.06) ** 2)) if t < 0.06 else 1.0  # the rounded foot
     return side * dome * (0.9 + 0.1 * foot) if t >= 0.06 else side * (0.86 + 0.14 * foot)
@@ -42,7 +42,7 @@ def build():
     ez = 0.60 * H                                                              # the eyes: two small dots, low on the face
     er = profile(ez)
     for sx in (-1, 1):
-        x = sx * 0.085; y = -math.sqrt(er * er - x * x) + 0.012
+        x = sx * 0.072; y = -math.sqrt(er * er - x * x) + 0.012
         ball('_eye', 0.032, (x, y, ez), (1.0, 0.55, 1.15), EYE, r, rough=0.35)   # rendered, not exported: the website draws its own, to blink
     # the headphones: a band over the top, a padded cup on each side
     cz = 0.66 * H; cr = profile(cz)

@@ -24,33 +24,34 @@ def rail_bar(name, y, parent):
     return o
 
 def pebble_bed(r, rnd):
-    """A light scatter of real 3D stones where the rails meet the ground, the rest of the bed being the painted gravel
-    below: smooth, flattened river stones (under 100 faces each), sunk halfway in so only their rounded tops show
-    between the sleepers, in the bed's own stone tones so they blend into it from afar."""
-    tones = [Vector(((h >> 16 & 255) / 255, (h >> 8 & 255) / 255, (h & 255) / 255)) for h in (0x648791, 0x648791, 0x7A9BA4, 0x9EBBC0, 0x55747E)]
+    """Real 3D pebbles, all in one mesh: two overlapping layers of small rounded stones, each lit on top and darker
+    underneath, thinning out unevenly at the sides so the edge is ragged, piled up around the sleepers."""
+    tones = [Vector(((h >> 16 & 255) / 255, (h >> 8 & 255) / 255, (h & 255) / 255)) for h in (0x698493, 0x76919F, 0x88A0AA, 0x9AADB3, 0x96967F, 0x808B88, 0xAFBFC2, 0x5B727D)]
     bm = bmesh.new(); col = bm.verts.layers.color.new('Col')
-    for _ in range(240):
-        y = rnd.uniform(-1.3, 1.3)
-        if abs(y) > 0.95 and rnd.random() < 0.6: continue                         # fewer out at the sides
-        x = rnd.uniform(-LEN / 2, LEN / 2); rr = rnd.uniform(0.045, 0.085)
-        sq = (rnd.uniform(1.0, 1.4), rnd.uniform(0.8, 1.05), rnd.uniform(0.45, 0.6))   # flattened: a river stone
-        m = Matrix.Translation((x, y, 0.0)) @ Matrix.Rotation(rnd.uniform(0, 6.3), 4, 'Z') @ Matrix.Diagonal((sq[0] * rr, sq[1] * rr, sq[2] * rr, 1))
-        res = bmesh.ops.create_icosphere(bm, subdivisions=2, radius=1.0, matrix=m)   # 80 faces, smooth shaded; its centre on the
-        base = rnd.choice(tones)                                                        # ground, so half of it is sunk in
-        for v in res['verts']:
-            t = max(0.0, min(1.0, v.co.z / (rr * sq[2])))
-            c = base * (0.8 + 0.35 * t)                                               # lighter on top
-            v[col] = (min(1, c.x), min(1, c.y), min(1, c.z), 1.0)
+    for layer, (n, rmin, rmax, z0) in enumerate(((1100, 0.08, 0.13, -0.03), (1100, 0.06, 0.1, 0.03))):
+        for _ in range(n):
+            y = rnd.uniform(-1.75, 1.75)
+            edge = (abs(y) - 1.25) / 0.5                                          # thin out unevenly past 1.25 m from the middle
+            if edge > 0 and rnd.random() < edge: continue
+            x = rnd.uniform(-LEN / 2, LEN / 2); rr = rnd.uniform(rmin, rmax)
+            sq = (rnd.uniform(1.0, 1.4), rnd.uniform(0.8, 1.1), rnd.uniform(0.55, 0.75))
+            m = Matrix.Translation((x, y, z0 + rr * sq[2] * 0.4)) @ Matrix.Rotation(rnd.uniform(0, 6.3), 4, 'Z') @ Matrix.Diagonal((sq[0] * rr, sq[1] * rr, sq[2] * rr, 1))
+            res = bmesh.ops.create_icosphere(bm, subdivisions=1, radius=1.0, matrix=m)
+            base = rnd.choice(tones)
+            for v in res['verts']:
+                t = max(0.0, min(1.0, (v.co.z - (z0 - 0.02)) / (rr * 1.2)))
+                c = base * (0.55 + 0.5 * t)                                       # darker underneath, lit on top
+                v[col] = (min(1, c.x), min(1, c.y), min(1, c.z), 1.0)
     me = bpy.data.meshes.new('pebbles'); bm.to_mesh(me); bm.free()
     for p in me.polygons: p.use_smooth = True
     o = bpy.data.objects.new('pebbles', me); bpy.context.scene.collection.objects.link(o)
-    o.data.materials.append(mat_vc(0xFFFFFF, rough=0.6)); o.parent = r
+    o.data.materials.append(mat_vc(0xFFFFFF)); o.parent = r
     return o
 
 def build():
     r = root('rail'); rnd = random.Random(4)
-    bm = bmesh.new(); bmesh.ops.create_grid(bm, x_segments=1, y_segments=1, size=0.5)   # the track bed: painted gravel
-    for v in bm.verts: v.co.x *= LEN; v.co.y *= 2.8; v.co.z = 0.0                          # (src/paint.js, 'pebbles')
+    bm = bmesh.new(); bmesh.ops.create_grid(bm, x_segments=1, y_segments=1, size=0.5)   # a hidden underlayer, painted with
+    for v in bm.verts: v.co.x *= LEN; v.co.y *= 2.5; v.co.z = 0.0                          # pebbles, so gaps read as pebbles
     me = bpy.data.meshes.new('underlayer'); bm.to_mesh(me); bm.free()
     ul = bpy.data.objects.new('underlayer', me); bpy.context.scene.collection.objects.link(ul); ul.data.materials.append(mat(BED)); ul.parent = r
     pebble_bed(r, rnd)

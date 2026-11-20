@@ -280,6 +280,13 @@ export function buildTerminal() {
     sh.fragmentShader = 'varying vec3 vFW;\n' + WATER_GLSL.split('// distance to the nearest cell edge')[0] + `
 float fbm4(vec2 p) { float a = 0.0, w = 0.5; for (int i = 0; i < 4; i++) { a += w * wNoise(p); p = p * 2.03 + 7.1; w *= 0.65; } return a / 1.27; }
 float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.4; }
+// the algae: a high-detail noise, slightly distorted, so its edges are leafy and mossy like gouache
+float algae(vec2 p) {
+  vec2 q = p * 0.9 + (vec2(wNoise(p * 0.7 + 2.0), wNoise(p * 0.7 + 8.0)) - 0.5) * 0.4 * 2.2;
+  float a = 0.0, w = 0.5, t = 0.0;
+  for (int i = 0; i < 8; i++) { a += w * wNoise(q); t += w; q = q * 2.07 + 3.1; w *= 0.75; }
+  return a / t;
+}
 ` + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       vec2 fp = vec2(vFW.x, -vFW.z); float dep = -vFW.y;
       // 1. the height mask (a map range): 1 on top of the raised path, 0 on the lower floor; feathered by noise
@@ -291,6 +298,15 @@ float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.
       float pn = fbm4(fp * 0.08);
       vec3 low = mix(vec3(0.003, 0.070, 0.178), vec3(0.006, 0.205, 0.366), smoothstep(0.36, 0.44, pn));
       low = mix(low, vec3(0.012, 0.392, 0.337), smoothstep(0.56, 0.64, pn));
+      // algae and rock patches over the lower floor: a tight ramp from Deep Seaweed Teal (shadows) through Emerald Kelp
+      // (moss) to Cerulean Tide (open gaps); the darkest, densest growth hugs the foot of the sand ridge
+      float al = algae(fp);
+      float hug = smoothstep(0.0, 0.25, hm) * (1.0 - smoothstep(0.25, 0.5, hm)) + smoothstep(0.0, 0.15, hm) * 0.6;   // the ridge's foot
+      float an = al + hug * 0.12;
+      vec3 alg = mix(vec3(0.006, 0.205, 0.366), vec3(0.006, 0.156, 0.147), smoothstep(0.47, 0.51, an));
+      alg = mix(alg, vec3(0.002, 0.044, 0.100), smoothstep(0.56, 0.6, an));
+      float algK = smoothstep(0.45, 0.5, an);                                       // gaps keep the patchy floor below
+      low = mix(low, alg, algK * 0.9);
       // 4. combined by height
       vec3 c = mix(low, path, smoothstep(0.0, 0.45, hm));
       c *= 0.95 + 0.1 * grain(fp);
@@ -298,12 +314,42 @@ float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.
       {
         float e = 0.01, g0 = grain(fp);                                            // a faint grain: matte gouache, not rough
         vec2 g = vec2(grain(fp + vec2(e, 0.0)) - g0, grain(fp + vec2(0.0, e)) - g0) / e * 0.012;
+        float a0 = algae(fp), ea = 0.03;                                            // the algae raised and fluffy (not on the path)
+        vec2 ga = vec2(algae(fp + vec2(ea, 0.0)) - a0, algae(fp + vec2(0.0, ea)) - a0) / ea;
+        g += ga * 0.25 * smoothstep(0.45, 0.5, a0) * (1.0 - clamp((1.7 - dep) / 1.25, 0.0, 1.0));
         normal = normalize(normal + (viewMatrix * vec4(-g.x, 0.0, g.y, 0.0)).xyz);
       }`);
   };
   floorMat.customProgramCacheKey = () => 'seafloor';
   const deepFloor = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x06242e }));
   deepFloor.position.set(55, -FLOOR_BOTTOM, 0); deepFloor.userData.noShadow = true; s.add(deepFloor);
+  // A few low-poly rocks and kelp clumps, flattened and smooth, along the foot of the sand ridge on both sides (where the
+  // darkest growth hugs the bright path, as in the film): Deep Seaweed Teal and Emerald Kelp.
+  function seabedAccents() {
+    let seed = 11; const rr = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const rockMats = [0x073b59, 0x0a4a5c, 0x116e6b].map((c) => new THREE.MeshToonMaterial({ color: c, gradientMap: gradient() }));
+    const kelpMat = new THREE.MeshToonMaterial({ color: 0x116e6b, gradientMap: gradient() });
+    const rockGeo = new THREE.IcosahedronGeometry(1, 1), kelpGeo = new THREE.IcosahedronGeometry(1, 1);
+    let rocks = 0, kelp = 0;
+    for (let t = 0; t < 4000 && (rocks < 70 || kelp < 40); t++) {
+      const bx = -40 + rr() * 80, by = -16 + rr() * 34, d = seaDepth(bx, by, []);
+      if (d < 0.9 || d > 1.9) continue;                                           // the foot of the ridge's slope
+      if (rocks < 70 && rr() < 0.6) {
+        const m = new THREE.Mesh(rockGeo, rockMats[Math.floor(rr() * 3)]), sz = 0.25 + rr() * 0.55;
+        m.scale.set(sz * (1 + rr() * 0.5), sz * (0.35 + rr() * 0.2), sz * (0.8 + rr() * 0.4));
+        m.position.set(bx, -d + m.scale.y * 0.3, -by); m.rotation.y = rr() * 6.3; m.userData.noShadow = true;
+        s.add(m); rocks++;
+      } else if (kelp < 40) {
+        const g = new THREE.Group();
+        for (let k = 0; k < 4 + Math.floor(rr() * 4); k++) {                      // a clump of soft, rounded blobs
+          const b = new THREE.Mesh(kelpGeo, kelpMat), sz = 0.12 + rr() * 0.2;
+          b.scale.set(sz, sz * (1.2 + rr() * 0.8), sz); b.position.set((rr() - 0.5) * 0.6, sz * 0.8, (rr() - 0.5) * 0.6);
+          g.add(b);
+        }
+        g.position.set(bx, -d, -by); s.add(g); kelp++;
+      }
+    }
+  }
   function buildSeabed(islets) {
     const g = new THREE.PlaneGeometry(220, 124, 160, 90).rotateX(-Math.PI / 2), p = g.attributes.position;
     for (let i = 0; i < p.count; i++) { const bx = p.getX(i) + 55, by = -p.getZ(i); p.setY(i, -seaDepth(bx, by, islets)); }
@@ -328,6 +374,7 @@ float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.
       'halt', 'fish', 'heron', 'heron_flying', 'rail', 'station_sign', ...V1_SCENERY]).then((r) => {   // the v1 station and scenery are gone: the porch (below)
     placed = r.placed; w.glowMats.push(...r.glow); w.loaded = true;
     buildSeabed([]);                                                               // (no islets for now: built from zero)
+    seabedAccents();
   });
   // The train: "Spirited Away Train" by judpro (CC BY 4.0), prepared by blender/scenes/import_train.py. Its cab is at y = 0,
   // it runs along +y, so turned to run along +x it leads with the cab toward -x, the way it travels here.

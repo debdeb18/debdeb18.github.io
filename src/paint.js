@@ -271,34 +271,21 @@ const PAINTERS = {
       wrap(x, y, s * 1.6, (X, Y) => { leaf(X + 2, Y + 3, s, a, '#1f3d22', 0.35); leaf(X, Y, s, a, c, 1); });
     }
   },
-  // The track bed's gravel: a smooth Voronoi (F1) pattern through a three-stone ramp, Deep Slate Teal in the crevices,
-  // Muted River Blue for the wet pebbles, Pale Sea Gravel on the tops of the lighter stones; each stone shaded as if
-  // rounded (a fake bump: lit towards the top left). Tileable.
+  // A pebbly sea floor, after the rail reference: small rounded pebbles packed close, blue-grey, pale grey and sand,
+  // each lit on top with a soft shadow under it and a bright glint, dark gaps between them.
   pebbles(g, r) {
-    const N = 26, pts = [];
-    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) pts.push([(i + 0.15 + 0.7 * r()) / N, (j + 0.15 + 0.7 * r()) / N, r()]);
-    const img = g.createImageData(SIZE, SIZE), d = img.data;
-    const ramp = [[0x36, 0x58, 0x63], [0x64, 0x87, 0x91], [0x9e, 0xbb, 0xc0]];
-    const mix = (a, b, t) => a.map((v, k) => v + (b[k] - v) * t);
-    for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
-      const u = x / SIZE, v = y / SIZE, ci = Math.floor(u * N), cj = Math.floor(v * N);
-      let f1 = 9, f2 = 9, best = null, acc = 0, wsum = 0;
-      for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) {
-        const ii = (ci + di + N) % N, jj = (cj + dj + N) % N, p = pts[jj * N + ii];
-        const px = (ci + di) / N + (p[0] - ii / N), py = (cj + dj) / N + (p[1] - jj / N);
-        const dd = Math.hypot(u - px, v - py) * N;
-        const w = Math.exp(-dd / 0.3 * 3); acc += dd * w; wsum += w;                   // smooth F1 (smoothness 0.3)
-        if (dd < f1) { f2 = f1; f1 = dd; best = [p, u - px, v - py]; } else if (dd < f2) f2 = dd;
-      }
-      const sf1 = acc / wsum, edge = f2 - f1;
-      const [p, ox, oy] = best;
-      const top = Math.max(0, Math.min(1, 1 - sf1 / 0.62)) * (0.75 + 0.5 * p[2]);      // 1 in a stone's middle
-      let c = top < 0.3 ? mix(ramp[0], ramp[1], top / 0.3) : mix(ramp[1], ramp[2], Math.min(1, (top - 0.3) / 0.7) * (0.4 + 0.6 * p[2]));
-      c = mix(ramp[0], c, Math.min(1, edge / 0.12));                                   // dark crevices between stones
-      const lit = 1 + 0.22 * Math.max(-1, Math.min(1, (-ox - oy) * N * 1.6)) * top;     // the fake bump: rounded, lit from top left
-      const o = (y * SIZE + x) * 4; d[o] = Math.min(255, c[0] * lit); d[o + 1] = Math.min(255, c[1] * lit); d[o + 2] = Math.min(255, c[2] * lit); d[o + 3] = 255;
+    g.fillStyle = '#576c76'; g.fillRect(0, 0, SIZE, SIZE);
+    const tones = ['#7792a0', '#88a3af', '#9cb3bc', '#b3c4c9', '#aaa992', '#8e9a97', '#c1d0d2'];   // stone, a tad sea-green blue
+    for (let pass = 0; pass < 2; pass++) for (let i = 0; i < (pass ? 700 : 420); i++) {
+      const x = r() * SIZE, y = r() * SIZE, rr = (pass ? 6 : 9) + r() * (pass ? 6 : 9), c = pick(tones, r()), a = r() * 3;
+      wrap(x, y, rr + 6, (X, Y) => {
+        dab(g, X + 1.5, Y + 2.5, rr * 1.12, rr * 0.88, a, '#36414b', 0.25);                    // a soft shadow under it
+        dab(g, X + 0.8, Y + 1.4, rr * 1.04, rr * 0.82, a, '#36414b', 0.25);
+        dab(g, X, Y, rr, rr * 0.8, a, c, 1);                                                   // the pebble
+        dab(g, X - rr * 0.18, Y - rr * 0.22, rr * 0.7, rr * 0.52, a, '#eef3f5', 0.18);          // a gentle lit top
+        dab(g, X - rr * 0.26, Y - rr * 0.3, rr * 0.4, rr * 0.28, a, '#f6f9fa', 0.18);
+      });
     }
-    g.putImageData(img, 0, 0);
   },
 };
 // How each kind is applied: `replace` uses the painted colours as they are; `tint` multiplies them with the part's own colour.
@@ -306,7 +293,7 @@ const KINDS = { grass: { scale: 1 / 3.2, mode: 'replace' }, sand: { scale: 1 / 4
   gravel: { scale: 1 / 2, mode: 'replace' }, ballast: { scale: 1 / 1.6, mode: 'replace' }, wood: { scale: 1 / 2.2, mode: 'tint' }, stone: { scale: 1 / 2.5, mode: 'tint' },
   bark: { scale: 1 / 1.6, mode: 'tint' }, plaster: { scale: 1 / 3, mode: 'tint' }, roof: { scale: 1 / 2.4, mode: 'tint' }, paint: { scale: 1 / 1.6, mode: 'tint' },
   seatwood: { scale: 1 / 0.7, mode: 'replace' }, seatiron: { scale: 1 / 1.6, mode: 'replace' },
-  brick: { scale: 1 / 1.4, mode: 'tint' }, moss: { scale: 1 / 0.6, mode: 'replace' }, paper: { scale: 1 / 0.7, mode: 'tint' }, pebbles: { scale: 1 / 1.5, mode: 'replace' }, leaves: { scale: 1 / 0.9, mode: 'replace' }, paving: { scale: 1 / 1.5, mode: 'tint' } };
+  brick: { scale: 1 / 1.4, mode: 'tint' }, moss: { scale: 1 / 0.6, mode: 'replace' }, paper: { scale: 1 / 0.7, mode: 'tint' }, pebbles: { scale: 1 / 1.8, mode: 'replace' }, leaves: { scale: 1 / 0.9, mode: 'replace' }, paving: { scale: 1 / 1.5, mode: 'tint' } };
 
 const textures = {};
 export function paintedTexture(kind) {

@@ -43,7 +43,7 @@ def build():
     er = profile(ez)
     for sx in (-1, 1):
         x = sx * 0.085; y = -math.sqrt(er * er - x * x) + 0.012
-        ball('eye', 0.032, (x, y, ez), (1.0, 0.55, 1.15), EYE, r, rough=0.35)
+        ball('_eye', 0.032, (x, y, ez), (1.0, 0.55, 1.15), EYE, r, rough=0.35)   # rendered, not exported: the website draws its own, to blink
     # the headphones: a band over the top, a padded cup on each side
     cz = 0.66 * H; cr = profile(cz)
     pts = []                                                                    # the band: a smooth arc that hugs the head

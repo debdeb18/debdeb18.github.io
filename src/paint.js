@@ -275,7 +275,7 @@ const PAINTERS = {
   // each lit on top with a soft shadow under it and a bright glint, dark gaps between them.
   pebbles(g, r) {
     g.fillStyle = '#5b6873'; g.fillRect(0, 0, SIZE, SIZE);
-    const tones = ['#7f93a3', '#93a6b4', '#a9b8c2', '#c3ccd1', '#b9ad93', '#9a9c98', '#d3d9dc'];
+    const tones = ['#7f93a3', '#93a6b4', '#a9b8c2', '#c3ccd1', '#8fa0ad', '#93a0a8', '#d3d9dc'];
     for (let pass = 0; pass < 2; pass++) for (let i = 0; i < (pass ? 700 : 420); i++) {
       const x = r() * SIZE, y = r() * SIZE, rr = (pass ? 6 : 9) + r() * (pass ? 6 : 9), c = pick(tones, r()), a = r() * 3;
       wrap(x, y, rr + 6, (X, Y) => {

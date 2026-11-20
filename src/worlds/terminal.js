@@ -145,7 +145,7 @@ function makeWater(U) {
         float dep = seaDepth(bp), shore = shoreDist(bp);
         float wob = (wNoise(bp * 3.0 + uTime * 0.2) - 0.5) * 0.12;                // edges that wobble, as if drawn by hand
         // the colour bands: a light rim along every shore, then by depth; hard steps, like paint
-        vec3 rim = mix(uShallow, vec3(1.0), 0.28), mid = mix(uShallow, uDeep, 0.55);
+        vec3 rim = mix(uShallow, vec3(0.75, 0.92, 1.0), 0.1), mid = mix(uShallow, uDeep, 0.55);   // all blue: no pale, sandy rim
         vec3 col = uDeep; float alpha = 1.0;
         if (dep < 2.2 + wob * 4.0) { col = mid; alpha = 0.9; }
         if (dep < 0.9 + wob * 2.0) { col = uShallow; alpha = 0.55; }                // over the line and the banks: see-through
@@ -184,8 +184,8 @@ function makeWater(U) {
 }
 
 // v1's water (before the Ghibli water): a glassy sea that mirrors the scene, clear in the shallows and darkening
-// smoothly with depth, lace round the shores. The default again; ?water=ghibli shows the painted Ghibli water instead.
-const WATER_MODE = new URLSearchParams(location.search).get('water') === 'ghibli' ? 'ghibli' : 'v1';
+// smoothly with depth, lace round the shores. Kept to compare: ?water=v1 shows it instead of the painted Ghibli water.
+const WATER_MODE = new URLSearchParams(location.search).get('water') === 'v1' ? 'v1' : 'ghibli';
 function makeWaterV1(U) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.14, metalness: 0, transparent: true, depthWrite: false });
   m.onBeforeCompile = (sh) => {

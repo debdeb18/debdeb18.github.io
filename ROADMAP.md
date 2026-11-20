@@ -46,10 +46,9 @@ Porch v2 (on the ruin), assets in `blender/assets/halt.py`, `heron.py`, `fish.py
 - [ ] Low-poly orange fish (`fish.py`) by the back stairs; in rain only one or two, under the deck
 
 Sea (v2)
-- [ ] Choose the sea floor (`?floor=v3` is the favourite so far) and make it the default
-- [ ] Choose the water (Ghibli painted, or `?water=v0` clear) and make it the default
+- [x] Sea floor chosen (flat strip under the rail, gentle uneven floor both sides)
+- [x] Water chosen: the Ghibli painted water, with living foam and tides by the moon
 - [ ] Sea floor details: more shaped slopes, moss, sea grass, rocks and the like
-- [ ] Water v0: train wake, wading ripples and caustics (the Ghibli water has them)
 
 Build in the website
 - [x] Assemble the station, with walkable areas and collisions
@@ -62,15 +61,16 @@ Build in the website
 - [x] Hotspots: chair, timetable, vending machine, station sign, cat
 - [ ] Extra details pass
 
-## 2. Character (after the foam; take it slow, aim high)
-References in `docs/refs/character/`: a chibi girl in a coat (big head, soft rounded forms, big glossy eyes, chunky
-scarf and boots), a soft blob with headphones (simple, matte, very rounded), a block-headed guy (one bold shape, few
-details). What they share: smooth, rounded, toy-like shapes, soft matte materials, gentle light, small dot or big
-expressive eyes, few but well-placed details. Built step by step, each step shown for approval before the next.
-- [ ] Settle the style and proportions from the references (sketch sheet first)
-- [ ] Design in Blender: face, hair, red cardigan, proportions
-- [ ] Skeleton and animations: idle, walk, run, sit, stand up, look around
-- [ ] Replace the current code-built character
+## 2. Character (take it slow, aim high; easiest first)
+References in `docs/refs/character/`: a soft blob with headphones (simple, matte, very rounded), a block-headed guy
+(one bold shape, few details), a chibi girl in a coat (big head, soft rounded forms, big glossy eyes, chunky scarf and
+boots). What they share: smooth, rounded, toy-like shapes, soft matte materials, gentle light, small dot or big
+expressive eyes, few but well-placed details. The red-cardigan girl is dropped. Start with the easiest, the soft blob,
+and work up; each step shown for approval before the next.
+- [ ] The soft blob: shape, dot eyes, headphones; soft matte look (sketch, then Blender)
+- [ ] Move and animate it: idle bob, walk (a waddle or hop), sit, look around
+- [ ] Replace the current code-built character with it
+- [ ] Later, if wanted: the block-headed guy, then the chibi girl in the coat
 - [ ] Extra details pass (expressions, small gestures, accessories)
 
 ## 3. Home in space

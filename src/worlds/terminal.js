@@ -221,103 +221,6 @@ function makeWater(U) {
   return m;
 }
 
-// Water 'beach' (?water=beach), after the beach reference: vivid, saturated blue in the deep, turquoise over the
-// slope, clear and glassy over the shallows; white surf lace round the stone and along the edge of the shallows,
-// breathing in and out; bright glints of sun; the train's wake and the wader's rings as in the painted water.
-function makeWaterBeach(U) {
-  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0, transparent: true, depthWrite: false });
-  m.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, U);
-    sh.vertexShader = 'varying vec3 vW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime, uSun, uTide;\nuniform vec3 uShallow, uDeep, uSky, uTrain, uPlayer;\nuniform float uStir;\n' + DEPTH_GLSL + WATER_GLSL + '\n' + sh.fragmentShader
-      .replace('#include <color_fragment>', `#include <color_fragment>
-        if (inBoat(vW)) discard;
-        vec2 bp = vec2(vW.x, -vW.z);
-        float dep = seaDepth(bp) + uTide, shore = shoreDist(bp);
-        float day = 0.3 + 0.7 * clamp(uSun * 1.6, 0.0, 1.0);                       // the vivid colours dim at night
-        // the colour: clear with a cyan tint in the shallows, turquoise over the slope, saturated blue in the deep
-        float dn = dep + (wNoise(bp * 0.3) - 0.5) * 0.4;
-        vec3 col = mix(vec3(0.30, 0.78, 0.80), vec3(0.02, 0.55, 0.66), smoothstep(0.5, 1.3, dn));
-        col = mix(col, vec3(0.01, 0.16, 0.62), smoothstep(1.2, 2.8, dn));
-        col = mix(col, vec3(0.005, 0.06, 0.36), smoothstep(2.8, 4.2, dn));
-        float alpha = mix(0.18, 0.97, smoothstep(0.45, 2.2, dn));
-        diffuseColor.rgb = col * day; diffuseColor.a = alpha;
-        // the train pushes a bow wave and leaves a wake; both grow with its speed (uTrain = front x, speed 0..1, length)
-        float along = bp.x - uTrain.x, side = abs(bp.y - (${TRACK.toFixed(1)}));
-        float bow = smoothstep(-1.6, -0.2, along) * (1.0 - smoothstep(-0.2, 0.6, along)) * (1.0 - smoothstep(1.4, 2.6 + uTrain.y * 2.0, side));
-        float body = step(0.0, along) * (1.0 - smoothstep(uTrain.z, uTrain.z + 4.0 + uTrain.y * 40.0, along));
-        float spread = 1.45 + 0.35 + max(along, 0.0) * 0.05 * uTrain.y;
-        float wake = body * smoothstep(1.3, 1.45, side) * (1.0 - smoothstep(spread - 0.3, spread + 0.4, side));
-        float ripple = 0.55 + 0.45 * sin(bp.x * 6.0 + uTime * 9.0) * sin(bp.y * 9.0 - uTime * 6.0);
-        float foam = uTrain.y * clamp(bow * 1.4 + wake * ripple, 0.0, 1.0);
-        float pd = length(bp - vec2(uPlayer.x, -uPlayer.z));                     // rings spreading from legs in the water
-        float wet = 1.0 - smoothstep(0.05, 0.25, uPlayer.y - uTide);
-        for (int k = 0; k < 2; k++) { float rr = 0.35 + fract(uTime * 0.7 + float(k) * 0.5) * 1.3; foam += wet * (1.0 - smoothstep(0.0, 0.07, abs(pd - rr))) * (1.0 - (rr - 0.35) / 1.3) * 0.8; }
-        // how stirred-up the water is: along the train and its wake, and round a wader who is moving
-        float trainStir = min(1.0, uTrain.y * 3.0) * clamp(bow * 1.5 + body * (1.0 - smoothstep(1.4, 7.0 + uTrain.y * 6.0, side)) * (1.0 - smoothstep(0.0, uTrain.z + 30.0 * uTrain.y, along) * 0.7), 0.0, 1.0);
-        float stir = clamp(trainStir + wet * uStir * (1.0 - smoothstep(0.3, 4.0, pd)), 0.0, 1.0);
-        // surf: a band of white lace along the edge of the shallows, washing in and out, and lace round the stone
-        float wash = sin(uTime * 0.55 + bp.x * 0.08) * 0.12;
-        float band = 1.0 - smoothstep(0.0, 0.22, abs(dep - 0.72 - wash + (wNoise(bp * 0.8 + uTime * 0.1) - 0.5) * 0.25));
-        float near = 1.0 - smoothstep(0.15, 0.9 + (wNoise(bp * 1.3 + uTime * 0.15) - 0.5) * 0.6, shore);
-        vec2 lp = bp * 2.6 + (vec2(wNoise(bp * 1.1 + uTime * 0.2), wNoise(bp * 1.1 + 4.0 - uTime * 0.2)) - 0.5) * 0.8;
-        float lace = 1.0 - smoothstep(0.03, 0.09, cellEdge(lp, uTime * 0.5));       // a web of thin foam lines
-        float blobs = smoothstep(0.62, 0.72, wNoise(bp * 3.5 + uTime * 0.3));          // and denser patches
-        float surf = max(band * 0.8, near) * clamp(lace * 0.9 + blobs * 0.8, 0.0, 1.0);
-        surf = max(surf, near * smoothstep(0.55, 0.8, wNoise(bp * 2.2 - uTime * 0.25)) * 0.9);
-        // sun glints: small bright specks that blink, mostly over the shallows and the slope
-        float glint = (1.0 - step(0.04, cellDot(bp * 3.2, uTime * 0.9))) * step(0.55, wNoise(bp * 0.7 + uTime * 0.4)) * uSun * (1.0 - smoothstep(2.0, 4.0, dep));
-        float white = clamp(max(max(surf, foam), glint), 0.0, 1.0) * step(0.0, shore);
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.98, 1.0) * mix(0.45, 1.0, day), white);
-        diffuseColor.a = max(diffuseColor.a, white * 0.92);`)
-      .replace('#include <opaque_fragment>', `float fres = pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 4.0);
-        outgoingLight = mix(diffuseColor.rgb, outgoingLight, 0.25);                   // bright, flat colour, a hint of shade
-        outgoingLight = mix(outgoingLight, uSky, fres * 0.3);
-        #include <opaque_fragment>`);
-  };
-  return m;
-}
-
-// Water version 0 (?water=v0), after the clear-water recipe: a clear surface that mirrors a bright sky by the Fresnel
-// effect (IOR 1.333, smooth), with long anime wave streaks running along the line (stretched noise as a bump); under
-// it a soft volume: Lagoon Turquoise glow in the shallows, absorbed towards Cerulean Tide and Deep Cobalt with depth,
-// so the track and its pebbles stay sharp while the deeper sides go rich blue.
-const PLAIN_FLOOR = new URLSearchParams(location.search).get('seabed') === 'plain';   // to try: the floor all one light colour
-const WATER = { v0: 'v0', beach: 'beach' }[new URLSearchParams(location.search).get('water')] || 'ghibli';
-function makeWaterV0(U) {
-  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.06, metalness: 0, transparent: true, depthWrite: false });
-  m.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, U);
-    sh.vertexShader = 'varying vec3 vW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime, uSun, uTide;\nuniform vec3 uSky;\n' + DEPTH_GLSL + WATER_GLSL.split('// distance to the nearest cell edge')[0] + `
-float streak(vec2 b) {                                              // waves stretched along the line, drifting slowly
-  vec2 q = vec2(b.x * 0.22, b.y * 2.6) + vec2(uTime * 0.05, uTime * 0.22);
-  return wNoise(q) * 0.6 + wNoise(q * 2.1 + 5.3) * 0.3 + wNoise(q * 4.3 + 1.7) * 0.1;
-}
-` + sh.fragmentShader
-      .replace('#include <color_fragment>', `#include <color_fragment>
-        if (inBoat(vW)) discard;
-        vec2 bp = vec2(vW.x, -vW.z);
-        float dep = max(seaDepth(bp) + uTide, 0.0);
-        // the volume: clear and faintly turquoise in the shallows, deepening to cerulean, then cobalt
-        vec3 col = mix(vec3(0.012, 0.392, 0.337), vec3(0.006, 0.205, 0.366), smoothstep(0.4, 2.0, dep));
-        col = mix(col, vec3(0.003, 0.070, 0.178), smoothstep(1.6, 4.2, dep));
-        diffuseColor.rgb = col;
-        diffuseColor.a = clamp(1.0 - exp(-dep * 0.55), 0.14, 0.9);`)
-      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-        vec2 sb = vec2(vW.x, -vW.z); float s0 = streak(sb), e = 0.04;
-        vec2 sg = vec2(streak(sb + vec2(e, 0.0)) - s0, streak(sb + vec2(0.0, e)) - s0) / e;
-        normal = normalize(normal + (viewMatrix * vec4(-sg.x * 0.06, 0.0, sg.y * 0.06, 0.0)).xyz);`)
-      .replace('#include <opaque_fragment>', `float cosV = saturate(dot(normalize(vViewPosition), normal));
-        float fres = 0.02 + 0.98 * pow(1.0 - cosV, 5.0);                              // Schlick, water (IOR 1.333)
-        vec3 skyC = mix(uSky * 0.6, vec3(0.139, 0.546, 0.831), clamp(uSun * 1.5, 0.0, 1.0));   // the bright sky blue by day
-        outgoingLight = mix(outgoingLight, skyC, clamp(fres * 1.6, 0.0, 0.85));
-        diffuseColor.a = max(diffuseColor.a, clamp(fres * 1.6, 0.0, 0.85));
-        #include <opaque_fragment>`);
-  };
-  return m;
-}
-
 export function buildTerminal() {
   const w = makeWorld('terminal', 'The Terminal');
   const s = w.scene;
@@ -340,7 +243,7 @@ export function buildTerminal() {
   const U = { uTime: { value: 0 }, uIslets: { value: Array.from({ length: 16 }, () => new THREE.Vector3(1e4, 1e4, 0)) },
     uShallow: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uSky: { value: new THREE.Color() }, uTrain: { value: new THREE.Vector3(1e4, 0, 25) }, uPlayer, uStir: { value: 0 }, uSun: { value: 1 }, uTide: { value: tideNow() },
     uPorch: { value: new THREE.Vector4(...PORCH) }, uTower: { value: new THREE.Vector3(...TOWER) }, uBoat: { value: new THREE.Vector3(1e4, 1e4, 0) } };
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), WATER === 'v0' ? makeWaterV0(U) : WATER === 'beach' ? makeWaterBeach(U) : makeWater(U));
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), makeWater(U));
   water.position.set(55, 0, 0); water.receiveShadow = true; water.renderOrder = 1; water.userData.noShadow = true;
   s.add(water);
   const hideInMirror = [];                                                          // (the old mirror water's list; kept for the grass and spray)
@@ -456,7 +359,6 @@ float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.
         c = mix(c, mix(dc, c, 0.35), dab * (0.6 - 0.12 * float(L)));
       }
       c *= 0.9 + 0.2 * spg;                                                          // the sponge's grain over everything
-      ${PLAIN_FLOOR ? 'c = vec3(0.479, 0.672, 0.515) * (0.94 + 0.12 * spg);' : ''}          // ?seabed=plain: all one colour, Sunlit Sand Path
       diffuseColor.rgb = c * diffuse;`).replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
       {
         float e = 0.01, g0 = grain(fp);                                            // a faint grain: matte gouache, not rough

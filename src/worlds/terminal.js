@@ -85,9 +85,7 @@ function seaDepthAlt(bx, by) {
     const w = Math.sin(bx * 0.29 + 0.7) * 0.9 + Math.sin(bx * 0.41 + by * 0.3) * 0.45;
     const k = Math.min(smooth01((dr - 1.8 + w) / 9.5), smooth01((ds - 1.0 + w) / 9.5));
     const X = bx * 0.5, Y = by * 0.5, n = Math.sin(X * 0.37 + Math.sin(Y * 0.29) * 1.7) * Math.sin(Y * 0.41 + Math.sin(X * 0.23) * 1.3) * 0.9 + 0.3 * Math.sin(X * 0.91 + Y * 0.67 + 1.0) * Math.sin(Y * 1.13 - X * 0.41);
-    const fade = smooth01((Math.hypot(bx - PX, (by - PY) * 1.6) - 45) / 40);          // far out, the bank sinks away
-    const d0 = 0.42 + k * (0.9 + 3.0 * (0.5 + 0.5 * Math.max(-1, Math.min(1, n))));
-    return d0 + (4.3 - d0) * fade;
+    return 0.42 + k * (0.9 + 3.0 * (0.5 + 0.5 * Math.max(-1, Math.min(1, n))));
   }
   if (FLOOR === 'beach' || FLOOR === 'v3') {
     const w = Math.sin(bx * 0.19 + 0.5) * Math.sin(by * 0.23 + 1.1) * 1.2 + Math.sin(bx * 0.47 + by * 0.31) * 0.4;
@@ -133,8 +131,7 @@ float seaDepthAlt(vec2 b) {
     float w = sin(b.x * 0.29 + 0.7) * 0.9 + sin(b.x * 0.41 + b.y * 0.3) * 0.45;
     float k = min(smoothstep(0.0, 1.0, (dr - 1.8 + w) / 9.5), smoothstep(0.0, 1.0, (ds - 1.0 + w) / 9.5));
     vec2 c = b * 0.5; float n = sin(c.x * 0.37 + sin(c.y * 0.29) * 1.7) * sin(c.y * 0.41 + sin(c.x * 0.23) * 1.3) * 0.9 + 0.3 * sin(c.x * 0.91 + c.y * 0.67 + 1.0) * sin(c.y * 1.13 - c.x * 0.41);
-    float fade = smoothstep(0.0, 1.0, (length(vec2(b.x - ${PX.toFixed(1)}, (b.y - ${PY.toFixed(1)}) * 1.6)) - 45.0) / 40.0);
-    return mix(0.42 + k * (0.9 + 3.0 * (0.5 + 0.5 * clamp(n, -1.0, 1.0))), 4.3, fade);
+    return 0.42 + k * (0.9 + 3.0 * (0.5 + 0.5 * clamp(n, -1.0, 1.0)));
   }` : ''}
   ${FLOOR === 'beach' || FLOOR === 'v3' ? `
   float w = sin(b.x * 0.19 + 0.5) * sin(b.y * 0.23 + 1.1) * 1.2 + sin(b.x * 0.47 + b.y * 0.31) * 0.4;
@@ -338,8 +335,8 @@ float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.
       low = mix(low, vec3(0.012, 0.392, 0.337), step(0.6, pn));
       // 4. combined by height
       vec3 c = mix(low, path, smoothstep(0.0, 0.45, hm));
-      float farK = smoothstep(55.0, 95.0, length(vec2(fp.x - ${PX.toFixed(1)}, (fp.y - ${PY.toFixed(1)}) * 1.6)) + (spg - 0.5) * 6.0);
-      c = mix(c, vec3(0.002, 0.018, 0.027), farK);                                   // fading out into the sea's dark base (#06242E)
+      float farK = smoothstep(38.0, 70.0, length(vec2(fp.x - ${PX.toFixed(1)}, (fp.y - ${PY.toFixed(1)}) * 1.6)) + (spg - 0.5) * 6.0);
+      c = mix(c, vec3(0.002, 0.018, 0.027), farK);                                   // far out, the floor's own colours fade straight into the sea's dark base (#06242E)
       // the sponge dabs: each pressed on with a sponge, solid in the middle, full of little holes, breaking into loose
       // specks at its edge; tones from the floor's own palette (sand and jade on the path, the blues below)
       for (int L = 0; L < 3; L++) {

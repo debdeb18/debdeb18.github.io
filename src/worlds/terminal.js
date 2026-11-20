@@ -282,18 +282,37 @@ float fbm4(vec2 p) { float a = 0.0, w = 0.5; for (int i = 0; i < 4; i++) { a += 
 float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.4; }
 ` + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       vec2 fp = vec2(vFW.x, -vFW.z); float dep = -vFW.y;
+      float spg = wNoise(fp * 9.0) * 0.5 + wNoise(fp * 21.0 + 3.3) * 0.32 + wNoise(fp * 47.0 + 8.1) * 0.18;   // sponge pores
+      float spg2 = wNoise(fp * 13.0 + 40.0) * 0.55 + wNoise(fp * 33.0 + 12.0) * 0.45;
       // 1. the height mask (a map range): 1 on top of the raised path, 0 on the lower floor; feathered by noise
       float feather = (wNoise(fp * 0.45) * 0.6 + wNoise(fp * 1.6 + 3.0) * 0.4 - 0.5) * 0.5;
-      float hm = clamp((1.7 - dep) / (1.7 - 0.45) + feather, 0.0, 1.0);
+      float hm = clamp((1.7 - dep) / (1.7 - 0.45) + feather + (spg - 0.5) * 0.25, 0.0, 1.0);   // its edge sponged
       // 2. the raised path: Shallow Jade at the foot of the slope up to Sunlit Sand Path on top
       vec3 path = mix(vec3(0.080, 0.584, 0.352), vec3(0.479, 0.672, 0.515), smoothstep(0.45, 0.95, hm));
       // 3. the lower floor: patchy paint (a noise through a three-colour ramp)
       float pn = fbm4(fp * 0.08);
-      vec3 low = mix(vec3(0.003, 0.070, 0.178), vec3(0.006, 0.205, 0.366), smoothstep(0.36, 0.44, pn));
-      low = mix(low, vec3(0.012, 0.392, 0.337), smoothstep(0.56, 0.64, pn));
+      pn += (spg - 0.5) * 0.12;                                                    // stippled, not a clean line
+      vec3 low = mix(vec3(0.003, 0.070, 0.178), vec3(0.006, 0.205, 0.366), step(0.4, pn));
+      low = mix(low, vec3(0.012, 0.392, 0.337), step(0.6, pn));
       // 4. combined by height
       vec3 c = mix(low, path, smoothstep(0.0, 0.45, hm));
-      c *= 0.95 + 0.1 * grain(fp);
+      // the sponge dabs: each pressed on with a sponge, solid in the middle, full of little holes, breaking into loose
+      // specks at its edge; tones from the floor's own palette (sand and jade on the path, the blues below)
+      for (int L = 0; L < 3; L++) {
+        float sc = 1.2 + float(L) * 1.5;
+        vec2 q = fp * sc + vec2(wNoise(fp * sc * 0.6 + float(L) * 5.0), wNoise(fp * sc * 0.6 + float(L) * 9.0)) * 1.1;
+        vec2 qi = floor(q), qf = fract(q); vec2 hh = wHash(qi + float(L) * 31.0);
+        float dd = length((qf - (0.25 + 0.5 * hh)) * vec2(1.0, 0.6 + 0.6 * hh.y));
+        float r = 0.26 + 0.2 * hh.y;
+        float body = clamp(1.0 - (dd + (wNoise(q * 2.5) - 0.5) * 0.18) / r, 0.0, 1.0);
+        float dab = step(L == 1 ? spg2 : spg, body * 1.6 - 0.15) * step(0.001, body);
+        float tone = hh.x * 0.6 + wNoise(fp * 0.3 + 7.0 + float(L)) * 0.7 - 0.15;
+        vec3 dLow = tone < 0.38 ? vec3(0.003, 0.070, 0.178) : (tone < 0.7 ? vec3(0.006, 0.205, 0.366) : vec3(0.012, 0.392, 0.337));
+        vec3 dPath = tone < 0.5 ? vec3(0.080, 0.584, 0.352) : vec3(0.479, 0.672, 0.515);
+        vec3 dc = mix(dLow, dPath, smoothstep(0.3, 0.6, hm));
+        c = mix(c, mix(dc, c, 0.35), dab * (0.6 - 0.12 * float(L)));
+      }
+      c *= 0.9 + 0.2 * spg;                                                          // the sponge's grain over everything
       diffuseColor.rgb = c * diffuse;`).replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
       {
         float e = 0.01, g0 = grain(fp);                                            // a faint grain: matte gouache, not rough

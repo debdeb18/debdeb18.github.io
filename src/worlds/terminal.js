@@ -69,10 +69,10 @@ function bankEdge(bx, by) {
 //         average, 20 at its steepest) down to 7 m, so the deep water starts far out, about 27 m from the shore
 //  reef   after Spirited Away: the rail runs along a shallow, light strip with soft, ragged edges; off it the floor
 //         is uneven, in patches deeper and shallower, so the sea is mottled light and dark
-//  v3     both: the beach on the porch's side of the rail, the reef on the far side: patches from about 1.3 to 4.3 m
-//         deep, but wide and gentle, so the floor never rises or falls more than 0.8 m in a metre
+//  v3     a flat, shallow strip under the rail and round the porch and tower; off it, on both sides, the floor lies
+//         lower and gently uneven (1.3 to 4.3 m), never rising or falling more than 0.8 m in a metre
 const FLOOR = { beach: 'beach', reef: 'reef', v3: 'v3' }[new URLSearchParams(location.search).get('floor')] || 'bank';
-const FLOOR_BOTTOM = { bank: 4.3, beach: 7.6, reef: 4.9, v3: 7.6 }[FLOOR];                // the plain dark base under the floor
+const FLOOR_BOTTOM = { bank: 4.3, beach: 7.6, reef: 4.9, v3: 4.6 }[FLOOR];                // the plain dark base under the floor
 function shoreSD(bx, by) {                                                       // metres from the porch's and tower's stone
   const qx = Math.max(Math.abs(bx - PX) - 5.5, 0), qy = Math.max(Math.abs(by - PY) - 2.3, 0);
   return Math.min(Math.hypot(qx, qy), Math.hypot(bx - (PX - 7.0), by - (PY - 0.55)) - 2.45);
@@ -81,9 +81,9 @@ const FLOOR_LIGHT = 1.0;                                                        
 const smooth01 = (t) => { t = Math.min(1, Math.max(0, t)); return t * t * (3 - 2 * t); };
 function seaDepthAlt(bx, by) {
   const dr = Math.abs(by - TRACK), ds = shoreSD(bx, by);
-  if (FLOOR === 'v3' && by < TRACK) {                                            // the far side: a gentle reef
+  if (FLOOR === 'v3') {                                            // the far side: a gentle reef
     const w = Math.sin(bx * 0.29 + 0.7) * 0.9 + Math.sin(bx * 0.41 + by * 0.3) * 0.45;
-    const k = smooth01((dr - 1.8 + w) / 9.5);
+    const k = Math.min(smooth01((dr - 1.8 + w) / 9.5), smooth01((ds - 1.0 + w) / 9.5));
     const X = bx * 0.5, Y = by * 0.5, n = Math.sin(X * 0.37 + Math.sin(Y * 0.29) * 1.7) * Math.sin(Y * 0.41 + Math.sin(X * 0.23) * 1.3) * 0.9 + 0.3 * Math.sin(X * 0.91 + Y * 0.67 + 1.0) * Math.sin(Y * 1.13 - X * 0.41);
     return 0.42 + k * (0.9 + 3.0 * (0.5 + 0.5 * Math.max(-1, Math.min(1, n))));
   }
@@ -127,9 +127,9 @@ float shoreSD(vec2 b) {
 float seaDepthAlt(vec2 b) {
   float dr = abs(b.y - (${TRACK.toFixed(1)})), ds = shoreSD(b);
   ${FLOOR === 'v3' ? `
-  if (b.y < ${TRACK.toFixed(1)}) {
+  {
     float w = sin(b.x * 0.29 + 0.7) * 0.9 + sin(b.x * 0.41 + b.y * 0.3) * 0.45;
-    float k = smoothstep(0.0, 1.0, (dr - 1.8 + w) / 9.5);
+    float k = min(smoothstep(0.0, 1.0, (dr - 1.8 + w) / 9.5), smoothstep(0.0, 1.0, (ds - 1.0 + w) / 9.5));
     vec2 c = b * 0.5; float n = sin(c.x * 0.37 + sin(c.y * 0.29) * 1.7) * sin(c.y * 0.41 + sin(c.x * 0.23) * 1.3) * 0.9 + 0.3 * sin(c.x * 0.91 + c.y * 0.67 + 1.0) * sin(c.y * 1.13 - c.x * 0.41);
     return 0.42 + k * (0.9 + 3.0 * (0.5 + 0.5 * clamp(n, -1.0, 1.0)));
   }` : ''}
@@ -271,39 +271,33 @@ export function buildTerminal() {
   s.add(water);
   const hideInMirror = [];                                                          // (the old mirror water's list; kept for the grass and spray)
   const floorMat = new THREE.MeshToonMaterial({ color: 0xffffff }), floorTint = new THREE.Color();
-  // The floor: sand above, rock below, blended by height. Sand (Seafoam Jade) on the higher, flatter shallows where the
-  // light is strongest, fine and smooth; lower down, rock (Deep Pine) with moss and algae (Forest Emerald) in sponged
-  // patches and Abyssal Navy in the cracks and the lowest hollows. The rock gets a coarse, craggy bump, the sand only a
-  // faint, fine one; no shine (the water above gives the underwater look).
+  // The floor, coloured by its height: the raised path the rail runs on (and round the porch and tower) shades from
+  // Shallow Jade at the foot of its slopes up to Sunlit Sand Path on top, its edge feathered by noise; the lower floor
+  // is patchy paint in Deep Cobalt, Cerulean Tide and Lagoon Turquoise. Matte, with only a fine grain for bump.
   floorMat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, { uTime: U.uTime });
     sh.vertexShader = 'varying vec3 vFW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvFW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = 'varying vec3 vFW;\n' + WATER_GLSL.split('// distance to the nearest cell edge')[0] + `
-float rockH(vec2 p) { return wNoise(p * 1.1) * 0.5 + wNoise(p * 2.7 + 5.0) * 0.3 + wNoise(p * 6.1 + 9.0) * 0.2; }   // craggy stone
-float sandH(vec2 p) { return wNoise(p * 26.0) * 0.6 + wNoise(p * 61.0 + 3.0) * 0.4; }                          // fine sand
+float fbm4(vec2 p) { float a = 0.0, w = 0.5; for (int i = 0; i < 4; i++) { a += w * wNoise(p); p = p * 2.03 + 7.1; w *= 0.65; } return a / 1.27; }
+float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.4; }
 ` + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       vec2 fp = vec2(vFW.x, -vFW.z); float dep = -vFW.y;
-      float spg = wNoise(fp * 9.0) * 0.5 + wNoise(fp * 21.0 + 3.3) * 0.32 + wNoise(fp * 47.0 + 8.1) * 0.18;   // sponge pores
-      float f1 = wNoise(fp * 0.09) * 0.55 + wNoise(fp * 0.23 + 3.7) * 0.3 + wNoise(fp * 0.71 + 9.1) * 0.15;
-      // the height blend (a map range on depth): sand above about 0.7 m, rock below about 1.7 m, a broken edge between
-      float rockK = smoothstep(0.7, 1.7, dep + (f1 - 0.5) * 0.7 + (spg - 0.5) * 0.3);
-      float rh = rockH(fp);
-      vec3 sand = vec3(0.027, 0.305, 0.227) * (0.94 + 0.12 * sandH(fp));
-      vec3 rock = vec3(0.004, 0.047, 0.054) * (0.7 + 0.6 * rh);                   // craggy: lit tops, shaded dips
-      float moss = wNoise(fp * 0.35 + 17.0) * 0.6 + wNoise(fp * 0.9 + 5.0) * 0.4;                          // moss on the tops
-      rock = mix(rock, vec3(0.011, 0.147, 0.102), step(spg, (moss - 0.48) * 3.0 + (rh - 0.5) * 1.2) * 0.9);                      //  of the stones, sponged
-      float crev = (1.0 - smoothstep(0.0, 0.018, abs(wNoise(fp * 1.3 + 11.0) - 0.5))) * step(0.6, wNoise(fp * 0.9 + 2.0));   // short cracks
-      rock = mix(rock, vec3(0.002, 0.018, 0.027), max(crev * 0.85, (1.0 - smoothstep(0.22, 0.32, rh)) * 0.8));                   // and the hollows
-      rock = mix(rock, vec3(0.002, 0.018, 0.027), smoothstep(2.6, 3.8, dep) * 0.6);                                                // darker in the deep
-      vec3 c = mix(sand, rock, rockK);
-      c *= 0.92 + 0.16 * spg;
+      // 1. the height mask (a map range): 1 on top of the raised path, 0 on the lower floor; feathered by noise
+      float feather = (wNoise(fp * 0.45) * 0.6 + wNoise(fp * 1.6 + 3.0) * 0.4 - 0.5) * 0.5;
+      float hm = clamp((1.7 - dep) / (1.7 - 0.45) + feather, 0.0, 1.0);
+      // 2. the raised path: Shallow Jade at the foot of the slope up to Sunlit Sand Path on top
+      vec3 path = mix(vec3(0.080, 0.584, 0.352), vec3(0.479, 0.672, 0.515), smoothstep(0.45, 0.95, hm));
+      // 3. the lower floor: patchy paint (a noise through a three-colour ramp)
+      float pn = fbm4(fp * 0.08);
+      vec3 low = mix(vec3(0.003, 0.070, 0.178), vec3(0.006, 0.205, 0.366), smoothstep(0.36, 0.44, pn));
+      low = mix(low, vec3(0.012, 0.392, 0.337), smoothstep(0.56, 0.64, pn));
+      // 4. combined by height
+      vec3 c = mix(low, path, smoothstep(0.0, 0.45, hm));
+      c *= 0.95 + 0.1 * grain(fp);
       diffuseColor.rgb = c * diffuse;`).replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
       {
-        float e = 0.03;                                                             // bump: craggy on rock, faint on sand
-        float hr0 = rockH(fp), hs0 = sandH(fp);
-        vec2 gr = vec2(rockH(fp + vec2(e, 0.0)) - hr0, rockH(fp + vec2(0.0, e)) - hr0) / e;
-        vec2 gs = vec2(sandH(fp + vec2(0.006, 0.0)) - hs0, sandH(fp + vec2(0.0, 0.006)) - hs0) / 0.006;
-        vec2 g = gr * 0.5 * rockK + gs * 0.008 * (1.0 - rockK);
+        float e = 0.01, g0 = grain(fp);                                            // a faint grain: matte gouache, not rough
+        vec2 g = vec2(grain(fp + vec2(e, 0.0)) - g0, grain(fp + vec2(0.0, e)) - g0) / e * 0.012;
         normal = normalize(normal + (viewMatrix * vec4(-g.x, 0.0, g.y, 0.0)).xyz);
       }`);
   };

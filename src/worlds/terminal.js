@@ -53,6 +53,21 @@ const weatherNow = () => {
   const h = Date.now() / 3.6e6, n = 0.5 + 0.28 * Math.sin(h * 6.283 / 7.3) + 0.22 * Math.sin(h * 6.283 / 3.1 + 1.7);
   return THREE.MathUtils.smoothstep(n, 0.58, 0.8);                               // cloudy roughly a third of the time
 };
+// ---------- the tide, by the real moon ----------
+// Two high and two low tides a lunar day (12 h 25 min apart): high when the moon is overhead (or underfoot), low between.
+// The moon crosses the sky about 50 minutes later each day, so the tide does too; the tides are bigger round new and
+// full moon (springs) and smaller at the half moons (neaps). ?tide=high | low | -1..1 pins it.
+const tideParam = new URLSearchParams(location.search).get('tide');
+function tideNow() {
+  const d = new Date(); if (!isNaN(forced)) d.setHours(Math.floor(forced), (forced % 1) * 60, 0, 0);
+  const age = (((d.getTime() - Date.UTC(2000, 0, 6, 18, 14)) / 864e5) % 29.530589 + 29.530589) % 29.530589;   // days since new moon
+  const amp = 0.11 + 0.05 * Math.cos(4 * Math.PI * age / 29.530589);              // springs 0.16 m, neaps 0.06 m
+  if (tideParam === 'high') return 0.16; if (tideParam === 'low') return -0.16;
+  if (tideParam && !isNaN(+tideParam)) return 0.16 * Math.max(-1, Math.min(1, +tideParam));
+  const transit = 12 + age * 24 / 29.530589;                                       // the moon's crossing, local hours
+  const hours = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
+  return amp * Math.cos(2 * Math.PI * (hours - transit) / 12.42);
+}
 const hourNow = () => { if (!isNaN(forced)) return ((forced % 24) + 24) % 24; const d = new Date(); return d.getHours() + d.getMinutes() / 60; };
 
 // ---------- the sea floor: shallow banks under the line, the station and the islets, deep water beyond ----------
@@ -141,11 +156,11 @@ function makeWater(U) {
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = 'varying vec3 vW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime, uSun;\nuniform vec3 uShallow, uDeep, uSky, uTrain, uPlayer;\nuniform float uStir;\n' + DEPTH_GLSL + WATER_GLSL + '\n' + sh.fragmentShader
+    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime, uSun, uTide;\nuniform vec3 uShallow, uDeep, uSky, uTrain, uPlayer;\nuniform float uStir;\n' + DEPTH_GLSL + WATER_GLSL + '\n' + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
         if (inBoat(vW)) discard;
         vec2 bp = vec2(vW.x, -vW.z);
-        float dep = seaDepth(bp), shore = shoreDist(bp);
+        float dep = seaDepth(bp) + uTide, shore = shoreDist(bp);
         float wob = (wNoise(bp * 3.0 + uTime * 0.2) - 0.5) * 0.12;                // edges that wobble, as if drawn by hand
         // the colour: lighter and clear in the shallows, shading smoothly into the deep blue (soft, a little uneven, like
         // a wash of paint), a touch lighter still right along the stone
@@ -164,7 +179,7 @@ function makeWater(U) {
         float ripple = 0.55 + 0.45 * sin(bp.x * 6.0 + uTime * 9.0) * sin(bp.y * 9.0 - uTime * 6.0);
         float foam = uTrain.y * clamp(bow * 1.4 + wake * ripple, 0.0, 1.0);
         float pd = length(bp - vec2(uPlayer.x, -uPlayer.z));                     // rings spreading from legs in the water
-        float wet = 1.0 - smoothstep(0.05, 0.25, uPlayer.y);
+        float wet = 1.0 - smoothstep(0.05, 0.25, uPlayer.y - uTide);
         for (int k = 0; k < 2; k++) { float rr = 0.35 + fract(uTime * 0.7 + float(k) * 0.5) * 1.3; foam += wet * (1.0 - smoothstep(0.0, 0.07, abs(pd - rr))) * (1.0 - (rr - 0.35) / 1.3) * 0.8; }
         // how stirred-up the water is: along the train and its wake, and round a wader who is moving
         float trainStir = min(1.0, uTrain.y * 3.0) * clamp(bow * 1.5 + body * (1.0 - smoothstep(1.4, 7.0 + uTrain.y * 6.0, side)) * (1.0 - smoothstep(0.0, uTrain.z + 30.0 * uTrain.y, along) * 0.7), 0.0, 1.0);
@@ -214,11 +229,11 @@ function makeWaterBeach(U) {
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = 'varying vec3 vW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime, uSun;\nuniform vec3 uShallow, uDeep, uSky, uTrain, uPlayer;\nuniform float uStir;\n' + DEPTH_GLSL + WATER_GLSL + '\n' + sh.fragmentShader
+    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime, uSun, uTide;\nuniform vec3 uShallow, uDeep, uSky, uTrain, uPlayer;\nuniform float uStir;\n' + DEPTH_GLSL + WATER_GLSL + '\n' + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
         if (inBoat(vW)) discard;
         vec2 bp = vec2(vW.x, -vW.z);
-        float dep = seaDepth(bp), shore = shoreDist(bp);
+        float dep = seaDepth(bp) + uTide, shore = shoreDist(bp);
         float day = 0.3 + 0.7 * clamp(uSun * 1.6, 0.0, 1.0);                       // the vivid colours dim at night
         // the colour: clear with a cyan tint in the shallows, turquoise over the slope, saturated blue in the deep
         float dn = dep + (wNoise(bp * 0.3) - 0.5) * 0.4;
@@ -236,7 +251,7 @@ function makeWaterBeach(U) {
         float ripple = 0.55 + 0.45 * sin(bp.x * 6.0 + uTime * 9.0) * sin(bp.y * 9.0 - uTime * 6.0);
         float foam = uTrain.y * clamp(bow * 1.4 + wake * ripple, 0.0, 1.0);
         float pd = length(bp - vec2(uPlayer.x, -uPlayer.z));                     // rings spreading from legs in the water
-        float wet = 1.0 - smoothstep(0.05, 0.25, uPlayer.y);
+        float wet = 1.0 - smoothstep(0.05, 0.25, uPlayer.y - uTide);
         for (int k = 0; k < 2; k++) { float rr = 0.35 + fract(uTime * 0.7 + float(k) * 0.5) * 1.3; foam += wet * (1.0 - smoothstep(0.0, 0.07, abs(pd - rr))) * (1.0 - (rr - 0.35) / 1.3) * 0.8; }
         // how stirred-up the water is: along the train and its wake, and round a wader who is moving
         float trainStir = min(1.0, uTrain.y * 3.0) * clamp(bow * 1.5 + body * (1.0 - smoothstep(1.4, 7.0 + uTrain.y * 6.0, side)) * (1.0 - smoothstep(0.0, uTrain.z + 30.0 * uTrain.y, along) * 0.7), 0.0, 1.0);
@@ -274,7 +289,7 @@ function makeWaterV0(U) {
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = 'varying vec3 vW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime, uSun;\nuniform vec3 uSky;\n' + DEPTH_GLSL + WATER_GLSL.split('// distance to the nearest cell edge')[0] + `
+    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime, uSun, uTide;\nuniform vec3 uSky;\n' + DEPTH_GLSL + WATER_GLSL.split('// distance to the nearest cell edge')[0] + `
 float streak(vec2 b) {                                              // waves stretched along the line, drifting slowly
   vec2 q = vec2(b.x * 0.22, b.y * 2.6) + vec2(uTime * 0.05, uTime * 0.22);
   return wNoise(q) * 0.6 + wNoise(q * 2.1 + 5.3) * 0.3 + wNoise(q * 4.3 + 1.7) * 0.1;
@@ -283,7 +298,7 @@ float streak(vec2 b) {                                              // waves str
       .replace('#include <color_fragment>', `#include <color_fragment>
         if (inBoat(vW)) discard;
         vec2 bp = vec2(vW.x, -vW.z);
-        float dep = max(seaDepth(bp), 0.0);
+        float dep = max(seaDepth(bp) + uTide, 0.0);
         // the volume: clear and faintly turquoise in the shallows, deepening to cerulean, then cobalt
         vec3 col = mix(vec3(0.012, 0.392, 0.337), vec3(0.006, 0.205, 0.366), smoothstep(0.4, 2.0, dep));
         col = mix(col, vec3(0.003, 0.070, 0.178), smoothstep(1.6, 4.2, dep));
@@ -323,7 +338,7 @@ export function buildTerminal() {
 
   // ---------- water and sea floor ----------
   const U = { uTime: { value: 0 }, uIslets: { value: Array.from({ length: 16 }, () => new THREE.Vector3(1e4, 1e4, 0)) },
-    uShallow: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uSky: { value: new THREE.Color() }, uTrain: { value: new THREE.Vector3(1e4, 0, 25) }, uPlayer, uStir: { value: 0 }, uSun: { value: 1 },
+    uShallow: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uSky: { value: new THREE.Color() }, uTrain: { value: new THREE.Vector3(1e4, 0, 25) }, uPlayer, uStir: { value: 0 }, uSun: { value: 1 }, uTide: { value: tideNow() },
     uPorch: { value: new THREE.Vector4(...PORCH) }, uTower: { value: new THREE.Vector3(...TOWER) }, uBoat: { value: new THREE.Vector3(1e4, 1e4, 0) } };
   const water = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), WATER === 'v0' ? makeWaterV0(U) : WATER === 'beach' ? makeWaterBeach(U) : makeWater(U));
   water.position.set(55, 0, 0); water.receiveShadow = true; water.renderOrder = 1; water.userData.noShadow = true;
@@ -359,7 +374,7 @@ export function buildTerminal() {
       const k = f.sz * f.spot[2] * grow * pop * calm * (1 + 0.12 * Math.sin(t * 3 + i));
       for (let b = 0; b < PER; b++) {                                              // the cluster's bubbles, each its own size
         const j = i * PER + b, o = bub[j], kb = k * o[2] * (1 + 0.15 * Math.sin(t * 4 + j));
-        fP.set(f.spot[0] + f.dx * u + o[0] * f.sz * 6, 0.01 + kb * 0.25 + Math.sin(t * 1.7 + i) * 0.01, -(f.spot[1] + f.dz * u + o[1] * f.sz * 6));
+        fP.set(f.spot[0] + f.dx * u + o[0] * f.sz * 6, U.uTide.value + 0.01 + kb * 0.25 + Math.sin(t * 1.7 + i) * 0.01, -(f.spot[1] + f.dz * u + o[1] * f.sz * 6));
         fS.set(kb, kb * 0.7, kb);
         fM.compose(fP, fQ, fS); foam3.setMatrixAt(j, fM);
       }
@@ -665,7 +680,7 @@ float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.
   const wading = (bx, by) => {
     const [lx, ly] = L_(bx, by);
     if (by < PY - 0.6 || Math.abs(lx) < 5.5 && Math.abs(ly) < 2.3 || Math.hypot(lx + 7.0, ly + 0.55) < 2.6) return false;
-    return bx > -22 && bx < 46 && by < 19 && seaDepth(bx, by, ISL) < 0.62;
+    return bx > -22 && bx < 46 && by < 19 && seaDepth(bx, by, ISL) + U.uTide.value < 0.62;
   };
   w.inside = (x, z) => {
     const bx = x, by = -z, [lx, ly] = L_(bx, by);
@@ -817,7 +832,7 @@ float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.
   const FLY = new THREE.Vector3(14, 9, -24), fpos = new THREE.Vector3(), fprev = new THREE.Vector3();
   const FISH_AT = B(PX - 4.0, PY + 4.2, 0), FISH_RAIN = B(PX + 3.85, PY + 3.6, 0);
   function animals(t, dt) {
-    if (boat) { boat.position.y = -0.12 + Math.sin(t * 0.8) * 0.025; boat.rotation.z = Math.sin(t * 0.6) * 0.02; boat.rotation.x = Math.sin(t * 0.7 + 1) * 0.015; }
+    if (boat) { boat.position.y = -0.12 + U.uTide.value + Math.sin(t * 0.8) * 0.025; boat.rotation.z = Math.sin(t * 0.6) * 0.02; boat.rotation.x = Math.sin(t * 0.7 + 1) * 0.015; }
     const rain = cloudy > 0.6;
     fishes.forEach((f, i) => {
       const here = rain ? FISH_RAIN : FISH_AT, r = rain ? 0.35 + i * 0.1 : f.r;
@@ -852,6 +867,8 @@ float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.
   w.ticks.push((t) => updateFoam(t));
   w.ticks.push((t, dt) => {
     U.uTime.value = t;
+    if (Math.floor(t) !== Math.floor(t - 0.02)) U.uTide.value = tideNow();          // the tide moves slowly: once a second is plenty
+    water.position.y = U.uTide.value;
     const v = dt > 0 ? lastP.distanceTo(uPlayer.value) / dt : 0; lastP.copy(uPlayer.value);
     const want = v > 0.3 && v < 20 ? Math.min(1, v / 3) : 0;                       // walking through water stirs it up...
     stir += (want - stir) * Math.min(1, dt * (want > stir ? 4 : 0.6));              // ...and it settles over a few seconds

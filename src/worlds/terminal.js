@@ -1,7 +1,6 @@
 // The terminal: a little country station on a railway that runs just under the sea.
 // The station itself is built in Blender (models/terminal); this file adds what moves: water, sky, clouds, the train, the cutscene.
 import * as THREE from 'three';
-import { Reflector } from 'three/addons/objects/Reflector.js';
 import { makeWorld, sky, stars, softDot, makeCrack, sign, uPlayer } from '../kit.js';
 import { blob } from '../nature.js';
 import { loadLayout, loadModel, gradient, RIM } from '../models.js';
@@ -144,12 +143,13 @@ function makeWater(U) {
         vec2 bp = vec2(vW.x, -vW.z);
         float dep = seaDepth(bp), shore = shoreDist(bp);
         float wob = (wNoise(bp * 3.0 + uTime * 0.2) - 0.5) * 0.12;                // edges that wobble, as if drawn by hand
-        // the colour bands: a light rim along every shore, then by depth; hard steps, like paint
-        vec3 rim = mix(uShallow, vec3(0.75, 0.92, 1.0), 0.1), mid = mix(uShallow, uDeep, 0.55);   // all blue: no pale, sandy rim
-        vec3 col = uDeep; float alpha = 1.0;
-        if (dep < 2.2 + wob * 4.0) { col = mid; alpha = 0.9; }
-        if (dep < 0.9 + wob * 2.0) { col = uShallow; alpha = 0.55; }                // over the line and the banks: see-through
-        if (shore < 0.55 + wob * 3.0 + (wNoise(bp * 0.7) - 0.5) * 0.5) { col = rim; alpha = 0.38; }                         // the shallows at the shore: clearest
+        // the colour: lighter and clear in the shallows, shading smoothly into the deep blue (soft, a little uneven, like
+        // a wash of paint), a touch lighter still right along the stone
+        float deepK = smoothstep(0.45, 3.3, dep + (wNoise(bp * 0.35) - 0.5) * 0.5);
+        vec3 col = mix(uShallow, uDeep, deepK);
+        float alpha = mix(0.5, 1.0, smoothstep(0.1, 0.8, deepK));
+        float edge = 1.0 - smoothstep(0.0, 0.9, shore + wob * 2.0);
+        col = mix(col, mix(uShallow, vec3(0.75, 0.92, 1.0), 0.12), edge * 0.6); alpha = mix(alpha, 0.4, edge * 0.6);
         diffuseColor.rgb = col; diffuseColor.a = alpha;
         // the train pushes a bow wave and leaves a wake; both grow with its speed (uTrain = front x, speed 0..1, length)
         float along = bp.x - uTrain.x, side = abs(bp.y - (${TRACK.toFixed(1)}));
@@ -165,76 +165,21 @@ function makeWater(U) {
         // how stirred-up the water is: along the train and its wake, and round a wader who is moving
         float trainStir = min(1.0, uTrain.y * 3.0) * clamp(bow * 1.5 + body * (1.0 - smoothstep(1.4, 7.0 + uTrain.y * 6.0, side)) * (1.0 - smoothstep(0.0, uTrain.z + 30.0 * uTrain.y, along) * 0.7), 0.0, 1.0);
         float stir = clamp(trainStir + wet * uStir * (1.0 - smoothstep(0.3, 4.0, pd)), 0.0, 1.0);
-        // wobbly cell-like highlight lines, here and there (more where the water is stirred)
+        // wobbly cell-like lines where the light catches (caustics): crisp and bright over the shallows, softer and
+        // fainter as the water deepens, gone in the deep; livelier where the water is stirred
         vec2 cp = bp * 1.1 + (vec2(wNoise(bp * 1.6 + 3.1), wNoise(bp * 1.6 + 7.7)) - 0.5) * 0.35;
-        float lines = 1.0 - step(0.018 + 0.03 * stir, cellEdge(cp, uTime * 0.25));        // thin lines, small cells,
-        lines *= step(0.66 - 0.3 * stir, wNoise(bp * 0.09 + uTime * 0.012));             // only in patches here and there
+        float shallowK = 1.0 - smoothstep(0.5, 2.8, dep);
+        float lw = 0.011 + 0.03 * stir, blur = mix(0.06, 0.004, shallowK);
+        float lines = (1.0 - smoothstep(lw, lw + blur, cellEdge(cp, uTime * 0.25))) * clamp(shallowK * 1.1 + stir * 0.5, 0.0, 1.0);
         // sparkles that blink, in the sun
         float spark = (1.0 - step(0.035, cellDot(bp * 2.2, uTime * 0.6))) * step(0.62, wNoise(bp * 0.5 + uTime * 0.35)) * uSun;
-        float white = clamp(max(lines * 0.85, max(spark, foam)), 0.0, 1.0) * step(0.0, shore);   // (no foam line or ring round the
+        float white = clamp(max(lines * 0.7, max(spark, foam)), 0.0, 1.0) * step(0.0, shore);   // (no foam line or ring round the
                                                                                    // stone: it outlined the ruin in white)
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.91, 0.98, 1.0), white);
         diffuseColor.a = max(diffuseColor.a, white * 0.95);`)
       .replace('#include <opaque_fragment>', `float fres = pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 4.0);
         outgoingLight = mix(diffuseColor.rgb, outgoingLight, 0.3);                    // flat painted colour, with a hint of shadow
         outgoingLight = mix(outgoingLight, uSky, fres * 0.35);                          // and the sky toward the horizon
-        #include <opaque_fragment>`);
-  };
-  return m;
-}
-
-// v1's water (before the Ghibli water): a glassy sea that mirrors the scene, clear in the shallows and darkening
-// smoothly with depth, lace round the shores. Kept to compare: ?water=v1 shows it instead of the painted Ghibli water.
-const WATER_MODE = new URLSearchParams(location.search).get('water') === 'v1' ? 'v1' : 'ghibli';
-function makeWaterV1(U) {
-  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.14, metalness: 0, transparent: true, depthWrite: false });
-  m.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, U);
-    sh.vertexShader = 'varying vec3 vW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime;\nuniform vec3 uShallow, uDeep, uSky, uTrain, uPlayer;\nuniform float uStir;\nuniform sampler2D uRefl;\nuniform mat4 uReflMat;\n' + DEPTH_GLSL + '\n' + sh.fragmentShader
-      .replace('#include <color_fragment>', `#include <color_fragment>
-        if (inBoat(vW)) discard;
-        vec2 bp = vec2(vW.x, -vW.z);
-        float dep = seaDepth(bp);
-        float murk = 1.0 - exp(-dep * 0.85);                     // the deeper, the darker and less see-through
-        diffuseColor.rgb = mix(uShallow, uDeep, murk);
-        diffuseColor.a = mix(0.36, 1.0, smoothstep(0.0, 0.95, murk));
-        // the train pushes a bow wave and leaves a wake; both grow with its speed (uTrain = front x, speed 0..1, length)
-        float along = bp.x - uTrain.x, side = abs(bp.y - (${TRACK.toFixed(1)}));
-        float bow = smoothstep(-1.6, -0.2, along) * (1.0 - smoothstep(-0.2, 0.6, along)) * (1.0 - smoothstep(1.4, 2.6 + uTrain.y * 2.0, side));
-        float body = step(0.0, along) * (1.0 - smoothstep(uTrain.z, uTrain.z + 4.0 + uTrain.y * 40.0, along));
-        float spread = 1.45 + 0.35 + max(along, 0.0) * 0.05 * uTrain.y;
-        float wake = body * smoothstep(1.3, 1.45, side) * (1.0 - smoothstep(spread - 0.3, spread + 0.4, side));
-        float ripple = 0.55 + 0.45 * sin(bp.x * 6.0 + uTime * 9.0) * sin(bp.y * 9.0 - uTime * 6.0);
-        float foam = uTrain.y * clamp(bow * 1.4 + wake * ripple, 0.0, 1.0);
-        foam += smoothstep(0.6, 0.44, dep) * (0.35 + 0.25 * sin(uTime * 1.4 + bp.x * 2.7 + bp.y * 1.9));   // lace around the shores
-        float pd = length(bp - vec2(uPlayer.x, -uPlayer.z));                     // rings spreading from legs in the water
-        float wet = 1.0 - smoothstep(0.05, 0.25, uPlayer.y);
-        for (int k = 0; k < 2; k++) { float rr = 0.35 + fract(uTime * 0.7 + float(k) * 0.5) * 1.3; foam += wet * (1.0 - smoothstep(0.0, 0.07, abs(pd - rr))) * (1.0 - (rr - 0.35) / 1.3) * 0.8; }
-        foam += wet * (1.0 - smoothstep(0.2, 0.4, pd)) * 0.5;
-        foam = clamp(foam, 0.0, 1.0);
-        // how stirred-up the water is here: along the train and its wake (fading out behind it), and around a wader who
-        // is moving (uStir fades back to calm a few seconds after they stop)
-        float trainStir = min(1.0, uTrain.y * 3.0) * clamp(bow * 1.5 + body * (1.0 - smoothstep(1.4, 7.0 + uTrain.y * 6.0, side)) * (1.0 - smoothstep(0.0, uTrain.z + 30.0 * uTrain.y, along) * 0.7), 0.0, 1.0);
-        float walkStir = wet * uStir * (1.0 - smoothstep(0.3, 4.0, pd));
-        float stir = clamp(trainStir + walkStir, 0.0, 1.0);
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0), foam * 0.85);
-        diffuseColor.a = max(diffuseColor.a, foam * 0.9);`)
-      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-        vec2 q = vec2(vW.x, -vW.z) * 0.9;
-        float h1 = sin(q.x * 1.7 + uTime * 1.1 + sin(q.y * 1.3 + uTime * 0.4) * 2.0), h2 = sin(q.y * 2.3 - uTime * 0.9 + q.x * 0.5);
-        vec3 tilt = vec3(h1 * 0.022 + h2 * 0.012, 0.0, h2 * 0.022 - h1 * 0.01);         // a calm, glassy sea
-        float c1 = sin(q.x * 5.0 - uTime * 6.0 + sin(q.y * 4.0) * 1.5), c2 = sin(q.y * 6.0 + uTime * 5.0 + q.x * 1.3);
-        tilt += vec3(c1 * 0.09 + c2 * 0.05, 0.0, c2 * 0.09 - c1 * 0.04) * stir;         // choppier where something passes
-        normal = normalize(normal + (viewMatrix * vec4(tilt, 0.0)).xyz);`)
-      .replace('#include <opaque_fragment>', `float fres = pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 3.0);
-        // the mirror: the scene rendered upside down, nudged by the ripples. Shallows stay see-through; deep water is a mirror.
-        vec4 rp = uReflMat * vec4(vW, 1.0);
-        vec2 ruv = rp.xy / rp.w + tilt.xz * (0.08 + 0.3 * stir);                        // only a gentle waver
-        vec3 refl = texture2D(uRefl, ruv).rgb * mix(vec3(1.0), uDeep * 2.2 + 0.35, 0.35 * murk);   // the mirror takes on the sea's blue
-        float reflK = mix(0.3, 0.9, murk) * mix(0.75, 1.0, fres) * (1.0 - foam);       // deep water: almost a perfect mirror
-        outgoingLight = mix(outgoingLight, refl, reflK);
-        diffuseColor.a = max(diffuseColor.a, reflK);
         #include <opaque_fragment>`);
   };
   return m;
@@ -261,32 +206,11 @@ export function buildTerminal() {
   // ---------- water and sea floor ----------
   const U = { uTime: { value: 0 }, uIslets: { value: Array.from({ length: 16 }, () => new THREE.Vector3(1e4, 1e4, 0)) },
     uShallow: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uSky: { value: new THREE.Color() }, uTrain: { value: new THREE.Vector3(1e4, 0, 25) }, uPlayer, uStir: { value: 0 }, uSun: { value: 1 },
-    uPorch: { value: new THREE.Vector4(...PORCH) }, uTower: { value: new THREE.Vector3(...TOWER) }, uBoat: { value: new THREE.Vector3(1e4, 1e4, 0) }, uRefl: { value: null }, uReflMat: { value: new THREE.Matrix4() } };
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), WATER_MODE === 'v1' ? makeWaterV1(U) : makeWater(U));
+    uPorch: { value: new THREE.Vector4(...PORCH) }, uTower: { value: new THREE.Vector3(...TOWER) }, uBoat: { value: new THREE.Vector3(1e4, 1e4, 0) } };
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), makeWater(U));
   water.position.set(55, 0, 0); water.receiveShadow = true; water.renderOrder = 1; water.userData.noShadow = true;
   s.add(water);
-  const hideInMirror = [];                                                          // left out of the reflection: grass, spray, light shafts
-  if (WATER_MODE === 'v1') {
-    // The reflection: three.js's Reflector renders the scene mirrored in the water plane into a texture each frame. It draws
-    // nothing itself; the water samples its texture. Half resolution (about a third on phones).
-    const coarse = matchMedia('(pointer: coarse)').matches;
-    const rs = (coarse ? 0.35 : 0.5) * Math.min(devicePixelRatio, 2);
-    const mirror = new Reflector(new THREE.PlaneGeometry(900, 900), { textureWidth: Math.round(innerWidth * rs), textureHeight: Math.round(innerHeight * rs), clipBias: 0.003, multisample: 0 });
-    mirror.rotation.x = -Math.PI / 2; mirror.position.set(55, 0.001, 0);
-    mirror.material.colorWrite = false; mirror.material.depthWrite = false; mirror.renderOrder = -1; mirror.userData.noShadow = true;
-    s.add(mirror);
-    const reflMat = mirror.material.uniforms.textureMatrix.value, mirrorInv = new THREE.Matrix4();
-    U.uRefl.value = mirror.getRenderTarget().texture;
-    const mirrorDraw = mirror.onBeforeRender;
-    mirror.onBeforeRender = (renderer, scene, camera) => {
-      if (camera.isReflectionCamera) return;
-      water.visible = false; for (const o of hideInMirror) o.visible = false;
-      mirrorDraw.call(mirror, renderer, scene, camera);
-      water.visible = true; for (const o of hideInMirror) o.visible = true;
-      mirror.updateMatrixWorld(); mirrorInv.copy(mirror.matrixWorld).invert();
-      U.uReflMat.value.copy(reflMat).multiply(mirrorInv);                          // world position -> reflection texture
-    };
-  }
+  const hideInMirror = [];                                                          // (the old mirror water's list; kept for the grass and spray)
   // No sand showing through: like the sea in Spirited Away, the floor is a blue-green the water barely lightens, so
   // the shallows read as a slightly lighter shade of the same blue and things look to float on one wide sea.
   const floorMat = new THREE.MeshToonMaterial({ color: 0x2f6f96 }), floorTint = new THREE.Color();

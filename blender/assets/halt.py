@@ -343,6 +343,9 @@ def ruin_wall(r, rnd, x0, x1, yc, T, H, openings):
     for _ in range(6): grass_cap(r, rnd, rnd.uniform(x0 + 2.4, x1 - 0.5), yc, wtop - 0.03, rnd.uniform(0.6, 1.2), T + 0.2, 0)
     for xx in (x0 + 2.4, x0 + 4.3, x1 - 1.0):                                   # ivy down the front
         ivy(r, rnd, xx, yc - T / 2, wtop + 0.1, 0, -1, rnd.uniform(1.5, 2.6))
+    for b in [b for b in blocks if round(b[1], 3) == zs[-1]]:                  # the top course has no course above: keep its
+        for o in b[3]:                                                         # mortar below the top, out of sight
+            if o.name.startswith('mortar'): o.scale.z = (b[2] - 0.12) / (b[2] + 0.01)
     rb = random.Random(7)                                                      # and down the back (its own dice, so the stones stay put)
     for xx in (x0 + 1.4, x0 + 3.6, x1 - 2.2, x1 - 0.6):
         ivy(r, rb, xx, yc + T / 2, wtop + 0.1, 0, 1, rb.uniform(1.6, 2.6))
@@ -629,6 +632,12 @@ def build():
     ex, ey = pts[-1][0], pts[-1][1]
     pts += [(ex + 0.15, ey - 0.12, DZ + 0.026), (ex + 0.32, ey - 0.08, DZ + 0.026), (ex + 0.42, ey - 0.22, DZ + 0.026)]
     tube('rope', pts, 0.025, 0xD9C08E, r)
+    rk = random.Random(17)                                                     # the top course of the face under the wall, over
+    xa = XS0                                                                   # the lower level (its own dice: the rest stays put)
+    while xa < LX / 2 - 0.05:
+        l = min(rk.uniform(0.7, 1.4), LX / 2 - xa); c = xa + l / 2; xa += l
+        if l < 0.15: continue
+        ruin_block(r, rk, (l - 0.035, 0.3, 0.32 - 0.035), (c, WF + rk.uniform(-0.02, 0.005) + 0.12, TOP - 0.32), (0, rk.uniform(-0.6, 0.6), rk.uniform(-0.5, 0.5)), 'x', -1)
     bake_cuts()
     return r
 

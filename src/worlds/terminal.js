@@ -56,25 +56,105 @@ const weatherNow = () => {
 const hourNow = () => { if (!isNaN(forced)) return ((forced % 24) + 24) % 24; const d = new Date(); return d.getHours() + d.getMinutes() / 60; };
 
 // ---------- the sea floor: shallow banks under the line, the station and the islets, deep water beyond ----------
+const PX = 0, PY = 1.4;                                            // where the porch stands (blender/assets/halt.py, centred)
+// The bank round the porch and its tower follows their shape, with a wandering, uneven edge (the same sums in the
+// shader below, so the painted bands match the floor and where you can wade).
+function bankEdge(bx, by) {
+  const qx = Math.max(Math.abs(bx - PX) - 5.5, 0), qy = Math.max(Math.abs(by - PY) - 2.3, 0);
+  const dp = Math.hypot(qx, qy) - 2.0, dtw = Math.hypot(bx - (PX - 7.0), by - (PY - 0.55)) - 2.45 - 2.2;
+  return Math.min(dp, dtw) + Math.sin(bx * 0.31 + 1.3) * Math.sin(by * 0.27 + 0.4) * 0.9 + Math.sin(bx * 0.73 + by * 0.41) * 0.35 + Math.sin(bx * 0.17 - by * 0.23 + 2.0) * 0.8;
+}
+// Two sea floors to try, picked with ?floor= (the current bank stays the default until one is chosen):
+//  beach  after the beach reference: from a short knee-deep shelf the floor slopes away gently (about 14 degrees on
+//         average, 20 at its steepest) down to 7 m, so the deep water starts far out, about 27 m from the shore
+//  reef   after Spirited Away: the rail runs along a shallow, light strip with soft, ragged edges; off it the floor
+//         is uneven, in patches deeper and shallower, so the sea is mottled light and dark
+//  v3     a flat, shallow strip under the rail and round the porch and tower; off it, on both sides, the floor lies
+//         lower and gently uneven (1.3 to 4.3 m), never rising or falling more than 0.8 m in a metre
+const FLOOR = { beach: 'beach', reef: 'reef', v3: 'v3' }[new URLSearchParams(location.search).get('floor')] || 'bank';
+const FLOOR_BOTTOM = { bank: 4.3, beach: 7.6, reef: 4.9, v3: 4.6 }[FLOOR];                // the plain dark base under the floor
+function shoreSD(bx, by) {                                                       // metres from the porch's and tower's stone
+  const qx = Math.max(Math.abs(bx - PX) - 5.5, 0), qy = Math.max(Math.abs(by - PY) - 2.3, 0);
+  return Math.min(Math.hypot(qx, qy), Math.hypot(bx - (PX - 7.0), by - (PY - 0.55)) - 2.45);
+}
+const FLOOR_LIGHT = 1.0;                                                        // (the sun's light on the floor, taken out so it shows the swatches)
+const smooth01 = (t) => { t = Math.min(1, Math.max(0, t)); return t * t * (3 - 2 * t); };
+function seaDepthAlt(bx, by) {
+  const dr = Math.abs(by - TRACK), ds = shoreSD(bx, by);
+  if (FLOOR === 'v3') {                                            // the far side: a gentle reef
+    const w = Math.sin(bx * 0.29 + 0.7) * 0.9 + Math.sin(bx * 0.41 + by * 0.3) * 0.45;
+    const k = Math.min(smooth01((dr - 1.8 + w) / 9.5), smooth01((ds - 1.0 + w) / 9.5));
+    const X = bx * 0.5, Y = by * 0.5, n = Math.sin(X * 0.37 + Math.sin(Y * 0.29) * 1.7) * Math.sin(Y * 0.41 + Math.sin(X * 0.23) * 1.3) * 0.9 + 0.3 * Math.sin(X * 0.91 + Y * 0.67 + 1.0) * Math.sin(Y * 1.13 - X * 0.41);
+    return 0.42 + k * (0.9 + 3.0 * (0.5 + 0.5 * Math.max(-1, Math.min(1, n))));
+  }
+  if (FLOOR === 'beach' || FLOOR === 'v3') {
+    const w = Math.sin(bx * 0.19 + 0.5) * Math.sin(by * 0.23 + 1.1) * 1.2 + Math.sin(bx * 0.47 + by * 0.31) * 0.4;
+    const d0 = Math.min(ds - 1.2, dr - 2.2) + w;
+    return 0.42 + 7.0 * smooth01(d0 / 30) - Math.sin(bx * 0.7) * Math.cos(by * 0.9) * 0.04;
+  }
+  const w = Math.sin(bx * 0.29 + 0.7) * 0.9 + Math.sin(bx * 0.83 + by * 0.5) * 0.45;
+  const k = Math.min(smooth01((dr - 1.8 + w) / 3.5), smooth01((ds - 1.0 + w) / 4.0));
+  const n = Math.sin(bx * 0.37 + Math.sin(by * 0.29) * 1.7) * Math.sin(by * 0.41 + Math.sin(bx * 0.23) * 1.3) * 0.9 + 0.45 * Math.sin(bx * 0.91 + by * 0.67 + 1.0) * Math.sin(by * 1.13 - bx * 0.41);
+  const m = 0.5 + 0.5 * Math.max(-1, Math.min(1, n));
+  return 0.42 + k * (1.3 + 3.0 * m);
+}
 function seaDepth(bx, by, islets) {
-  const dt = Math.abs(by - TRACK) - 3.0;                                           // off the track bank the sea drops away fast
-  let d = Math.max(-11 - bx, bx - 35, -2.5 - by, by - 11.5, 0) - 1.0;
+  if (FLOOR !== 'bank') return seaDepthAlt(bx, by);
+  const dt = Math.abs(by - TRACK) - 3.0 + Math.sin(bx * 0.21 + 0.7) * 0.6 + Math.sin(bx * 0.53) * 0.25;   // off the track bank the sea drops away
+  let d = bankEdge(bx, by);
   for (const [ix, iy, ir] of islets) d = Math.min(d, Math.hypot(bx - ix, by - iy) - ir * 1.15);
   let k = Math.min(Math.min(1, Math.max(0, dt / 3.5)), Math.min(1, Math.max(0, d / 8))); k = k * k * (3 - 2 * k);
   return 0.42 + 3.4 * k - Math.sin(bx * 0.7) * Math.cos(by * 0.9) * 0.05;
 }
 const DEPTH_GLSL = `
 uniform vec3 uIslets[16];
+uniform vec3 uBoat;
+// Inside the boat's hull at the waterline (blender/assets/boat.py: the same width, depth and sheer), so the sea isn't drawn
+// in the boat. uBoat: its x, z and turn.
+bool inBoat(vec3 p) {
+  vec2 d = p.xz - uBoat.xy; float c = cos(uBoat.z), s = sin(uBoat.z);
+  float t = (d.x * c - d.y * s + 1.5) / 3.0, y = abs(d.x * s + d.y * c);
+  if (t <= 0.0 || t >= 1.0) return false;
+  float w = 0.62 * (t < 0.45 ? sin(t / 0.45 * 1.5708) : 1.0 - 0.32 * pow((t - 0.45) / 0.55, 2.0));
+  float dp = 0.42 * (0.45 + 0.55 * sin(3.14159 * (0.08 + 0.84 * t))), sh = 0.28 + 0.16 * pow(1.0 - t, 3.0);
+  float k = clamp((sh - 0.12) / dp, 0.0, 1.0);
+  return y < 0.97 * w * sin(acos(pow(k, 1.25)));
+}
+float shoreSD(vec2 b) {
+  vec2 q = max(abs(b - vec2(${PX.toFixed(1)}, ${PY.toFixed(1)})) - vec2(5.5, 2.3), 0.0);
+  return min(length(q), length(b - vec2(${(PX - 7).toFixed(1)}, ${(PY - 0.55).toFixed(2)})) - 2.45);
+}
+float seaDepthAlt(vec2 b) {
+  float dr = abs(b.y - (${TRACK.toFixed(1)})), ds = shoreSD(b);
+  ${FLOOR === 'v3' ? `
+  {
+    float w = sin(b.x * 0.29 + 0.7) * 0.9 + sin(b.x * 0.41 + b.y * 0.3) * 0.45;
+    float k = min(smoothstep(0.0, 1.0, (dr - 1.8 + w) / 9.5), smoothstep(0.0, 1.0, (ds - 1.0 + w) / 9.5));
+    vec2 c = b * 0.5; float n = sin(c.x * 0.37 + sin(c.y * 0.29) * 1.7) * sin(c.y * 0.41 + sin(c.x * 0.23) * 1.3) * 0.9 + 0.3 * sin(c.x * 0.91 + c.y * 0.67 + 1.0) * sin(c.y * 1.13 - c.x * 0.41);
+    return 0.42 + k * (0.9 + 3.0 * (0.5 + 0.5 * clamp(n, -1.0, 1.0)));
+  }` : ''}
+  ${FLOOR === 'beach' || FLOOR === 'v3' ? `
+  float w = sin(b.x * 0.19 + 0.5) * sin(b.y * 0.23 + 1.1) * 1.2 + sin(b.x * 0.47 + b.y * 0.31) * 0.4;
+  float d0 = min(ds - 1.2, dr - 2.2) + w;
+  return 0.42 + 7.0 * smoothstep(0.0, 1.0, d0 / 30.0) - sin(b.x * 0.7) * cos(b.y * 0.9) * 0.04;` : `
+  float w = sin(b.x * 0.29 + 0.7) * 0.9 + sin(b.x * 0.83 + b.y * 0.5) * 0.45;
+  float k = min(smoothstep(0.0, 1.0, (dr - 1.8 + w) / 3.5), smoothstep(0.0, 1.0, (ds - 1.0 + w) / 4.0));
+  float n = sin(b.x * 0.37 + sin(b.y * 0.29) * 1.7) * sin(b.y * 0.41 + sin(b.x * 0.23) * 1.3) * 0.9 + 0.45 * sin(b.x * 0.91 + b.y * 0.67 + 1.0) * sin(b.y * 1.13 - b.x * 0.41);
+  float m = 0.5 + 0.5 * clamp(n, -1.0, 1.0);
+  return 0.42 + k * (1.3 + 3.0 * m);`}
+}
 float seaDepth(vec2 b) {
-  float dt = abs(b.y - (${TRACK.toFixed(1)})) - 3.0;
-  float d = max(max(max(-11.0 - b.x, b.x - 35.0), max(-2.5 - b.y, b.y - 11.5)), 0.0) - 1.0;
+  ${FLOOR !== 'bank' ? 'return seaDepthAlt(b);' : ''}
+  float dt = abs(b.y - (${TRACK.toFixed(1)})) - 3.0 + sin(b.x * 0.21 + 0.7) * 0.6 + sin(b.x * 0.53) * 0.25;
+  vec2 q = max(abs(b - vec2(${PX.toFixed(1)}, ${PY.toFixed(1)})) - vec2(5.5, 2.3), 0.0);
+  float d = min(length(q) - 2.0, length(b - vec2(${(PX - 7).toFixed(1)}, ${(PY - 0.55).toFixed(2)})) - 4.65)
+    + sin(b.x * 0.31 + 1.3) * sin(b.y * 0.27 + 0.4) * 0.9 + sin(b.x * 0.73 + b.y * 0.41) * 0.35 + sin(b.x * 0.17 - b.y * 0.23 + 2.0) * 0.8;
   for (int i = 0; i < 16; i++) d = min(d, length(b - uIslets[i].xy) - uIslets[i].z * 1.15);
   float k = min(clamp(dt / 3.5, 0.0, 1.0), clamp(d / 8.0, 0.0, 1.0)); k = k * k * (3.0 - 2.0 * k);
   return 0.42 + 3.4 * k - sin(b.x * 0.7) * cos(b.y * 0.9) * 0.05;
 }`;
 
 // The porch's footprint and its tower (Blender x, y): the water draws a thin foam line round them, as round the islets.
-const PX = 0, PY = 1.4;                                            // where the porch stands (blender/assets/halt.py, centred)
 const PORCH = [PX, PY, 5.5, 2.3], TOWER = [PX - 7.0, PY - 0.55, 2.45];
 
 // Ghibli-style water (docs/ghibli-water.md): flat painted colour in hard bands (lightest in a rim along every shore,
@@ -103,18 +183,7 @@ float cellDot(vec2 x, float t) {
     vec2 g = vec2(float(i), float(j)), o = 0.5 + 0.5 * sin(t + 6.2831 * wHash(n + g)); md = min(md, length(g + o - f)); }
   return md;
 }
-uniform vec4 uPorch; uniform vec3 uTower; uniform vec3 uBoat;
-// Inside the boat's hull at the waterline (blender/assets/boat.py: the same width, depth and sheer), so the sea isn't drawn
-// in the boat. uBoat: its x, z and turn.
-bool inBoat(vec3 p) {
-  vec2 d = p.xz - uBoat.xy; float c = cos(uBoat.z), s = sin(uBoat.z);
-  float t = (d.x * c - d.y * s + 1.5) / 3.0, y = abs(d.x * s + d.y * c);
-  if (t <= 0.0 || t >= 1.0) return false;
-  float w = 0.62 * (t < 0.45 ? sin(t / 0.45 * 1.5708) : 1.0 - 0.32 * pow((t - 0.45) / 0.55, 2.0));
-  float dp = 0.42 * (0.45 + 0.55 * sin(3.14159 * (0.08 + 0.84 * t))), sh = 0.28 + 0.16 * pow(1.0 - t, 3.0);
-  float k = clamp((sh - 0.12) / dp, 0.0, 1.0);
-  return y < 0.97 * w * sin(acos(pow(k, 1.25)));
-}
+uniform vec4 uPorch; uniform vec3 uTower;
 float shoreDist(vec2 b) {                                          // metres from the nearest shore: islets, the porch, its tower
   vec2 q = abs(b - uPorch.xy) - uPorch.zw; float s = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
   s = min(s, length(b - uTower.xy) - uTower.z);
@@ -133,12 +202,13 @@ function makeWater(U) {
         vec2 bp = vec2(vW.x, -vW.z);
         float dep = seaDepth(bp), shore = shoreDist(bp);
         float wob = (wNoise(bp * 3.0 + uTime * 0.2) - 0.5) * 0.12;                // edges that wobble, as if drawn by hand
-        // the colour bands: a light rim along every shore, then by depth; hard steps, like paint
-        vec3 rim = mix(uShallow, vec3(1.0), 0.28), mid = mix(uShallow, uDeep, 0.55);
-        vec3 col = uDeep; float alpha = 1.0;
-        if (dep < 2.2 + wob * 4.0) { col = mid; alpha = 0.9; }
-        if (dep < 0.9 + wob * 2.0) { col = uShallow; alpha = 0.55; }                // over the line and the banks: see-through
-        if (shore < 0.75 + wob) { col = rim; alpha = 0.38; }                         // the shallows at the shore: clearest
+        // the colour: lighter and clear in the shallows, shading smoothly into the deep blue (soft, a little uneven, like
+        // a wash of paint), a touch lighter still right along the stone
+        float deepK = smoothstep(0.45, 3.3, dep + (wNoise(bp * 0.35) - 0.5) * 0.5);
+        vec3 col = mix(uShallow, uDeep, deepK);
+        float alpha = mix(0.5, 1.0, smoothstep(0.1, 0.8, deepK));
+        float edge = 1.0 - smoothstep(0.0, 0.9, shore + wob * 2.0);
+        col = mix(col, mix(uShallow, vec3(0.75, 0.92, 1.0), 0.12), edge * 0.6); alpha = mix(alpha, 0.4, edge * 0.6);
         diffuseColor.rgb = col; diffuseColor.a = alpha;
         // the train pushes a bow wave and leaves a wake; both grow with its speed (uTrain = front x, speed 0..1, length)
         float along = bp.x - uTrain.x, side = abs(bp.y - (${TRACK.toFixed(1)}));
@@ -154,19 +224,60 @@ function makeWater(U) {
         // how stirred-up the water is: along the train and its wake, and round a wader who is moving
         float trainStir = min(1.0, uTrain.y * 3.0) * clamp(bow * 1.5 + body * (1.0 - smoothstep(1.4, 7.0 + uTrain.y * 6.0, side)) * (1.0 - smoothstep(0.0, uTrain.z + 30.0 * uTrain.y, along) * 0.7), 0.0, 1.0);
         float stir = clamp(trainStir + wet * uStir * (1.0 - smoothstep(0.3, 4.0, pd)), 0.0, 1.0);
-        // wobbly cell-like highlight lines, here and there (more where the water is stirred)
+        // wobbly cell-like lines where the light catches (caustics): crisp and bright over the shallows, softer and
+        // fainter as the water deepens, gone in the deep; livelier where the water is stirred
         vec2 cp = bp * 1.1 + (vec2(wNoise(bp * 1.6 + 3.1), wNoise(bp * 1.6 + 7.7)) - 0.5) * 0.35;
-        float lines = 1.0 - step(0.018 + 0.03 * stir, cellEdge(cp, uTime * 0.25));        // thin lines, small cells,
-        lines *= step(0.66 - 0.3 * stir, wNoise(bp * 0.09 + uTime * 0.012));             // only in patches here and there
+        float shallowK = 1.0 - smoothstep(0.5, 2.8, dep);
+        float lw = 0.011 + 0.03 * stir, blur = mix(0.06, 0.004, shallowK);
+        float lines = (1.0 - smoothstep(lw, lw + blur, cellEdge(cp, uTime * 0.25))) * clamp(shallowK * 1.1 + stir * 0.5, 0.0, 1.0);
         // sparkles that blink, in the sun
         float spark = (1.0 - step(0.035, cellDot(bp * 2.2, uTime * 0.6))) * step(0.62, wNoise(bp * 0.5 + uTime * 0.35)) * uSun;
-        float white = clamp(max(lines * 0.85, max(spark, foam)), 0.0, 1.0) * step(0.0, shore);   // (no foam line or ring round the
+        float white = clamp(max(lines * 0.7, max(spark, foam)), 0.0, 1.0) * step(0.0, shore);   // (no foam line or ring round the
                                                                                    // stone: it outlined the ruin in white)
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.91, 0.98, 1.0), white);
         diffuseColor.a = max(diffuseColor.a, white * 0.95);`)
       .replace('#include <opaque_fragment>', `float fres = pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 4.0);
         outgoingLight = mix(diffuseColor.rgb, outgoingLight, 0.3);                    // flat painted colour, with a hint of shadow
         outgoingLight = mix(outgoingLight, uSky, fres * 0.35);                          // and the sky toward the horizon
+        #include <opaque_fragment>`);
+  };
+  return m;
+}
+
+// Water version 0 (?water=v0), after the clear-water recipe: a clear surface that mirrors a bright sky by the Fresnel
+// effect (IOR 1.333, smooth), with long anime wave streaks running along the line (stretched noise as a bump); under
+// it a soft volume: Lagoon Turquoise glow in the shallows, absorbed towards Cerulean Tide and Deep Cobalt with depth,
+// so the track and its pebbles stay sharp while the deeper sides go rich blue.
+const WATER = new URLSearchParams(location.search).get('water') === 'v0' ? 'v0' : 'ghibli';
+function makeWaterV0(U) {
+  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.06, metalness: 0, transparent: true, depthWrite: false });
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, U);
+    sh.vertexShader = 'varying vec3 vW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime, uSun;\nuniform vec3 uSky;\n' + DEPTH_GLSL + WATER_GLSL.split('// distance to the nearest cell edge')[0] + `
+float streak(vec2 b) {                                              // waves stretched along the line, drifting slowly
+  vec2 q = vec2(b.x * 0.22, b.y * 2.6) + vec2(uTime * 0.05, uTime * 0.22);
+  return wNoise(q) * 0.6 + wNoise(q * 2.1 + 5.3) * 0.3 + wNoise(q * 4.3 + 1.7) * 0.1;
+}
+` + sh.fragmentShader
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        if (inBoat(vW)) discard;
+        vec2 bp = vec2(vW.x, -vW.z);
+        float dep = max(seaDepth(bp), 0.0);
+        // the volume: clear and faintly turquoise in the shallows, deepening to cerulean, then cobalt
+        vec3 col = mix(vec3(0.012, 0.392, 0.337), vec3(0.006, 0.205, 0.366), smoothstep(0.4, 2.0, dep));
+        col = mix(col, vec3(0.003, 0.070, 0.178), smoothstep(1.6, 4.2, dep));
+        diffuseColor.rgb = col;
+        diffuseColor.a = clamp(1.0 - exp(-dep * 0.55), 0.14, 0.9);`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        vec2 sb = vec2(vW.x, -vW.z); float s0 = streak(sb), e = 0.04;
+        vec2 sg = vec2(streak(sb + vec2(e, 0.0)) - s0, streak(sb + vec2(0.0, e)) - s0) / e;
+        normal = normalize(normal + (viewMatrix * vec4(-sg.x * 0.06, 0.0, sg.y * 0.06, 0.0)).xyz);`)
+      .replace('#include <opaque_fragment>', `float cosV = saturate(dot(normalize(vViewPosition), normal));
+        float fres = 0.02 + 0.98 * pow(1.0 - cosV, 5.0);                              // Schlick, water (IOR 1.333)
+        vec3 skyC = mix(uSky * 0.6, vec3(0.139, 0.546, 0.831), clamp(uSun * 1.5, 0.0, 1.0));   // the bright sky blue by day
+        outgoingLight = mix(outgoingLight, skyC, clamp(fres * 1.6, 0.0, 0.85));
+        diffuseColor.a = max(diffuseColor.a, clamp(fres * 1.6, 0.0, 0.85));
         #include <opaque_fragment>`);
   };
   return m;
@@ -194,15 +305,67 @@ export function buildTerminal() {
   const U = { uTime: { value: 0 }, uIslets: { value: Array.from({ length: 16 }, () => new THREE.Vector3(1e4, 1e4, 0)) },
     uShallow: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uSky: { value: new THREE.Color() }, uTrain: { value: new THREE.Vector3(1e4, 0, 25) }, uPlayer, uStir: { value: 0 }, uSun: { value: 1 },
     uPorch: { value: new THREE.Vector4(...PORCH) }, uTower: { value: new THREE.Vector3(...TOWER) }, uBoat: { value: new THREE.Vector3(1e4, 1e4, 0) } };
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), makeWater(U));
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), WATER === 'v0' ? makeWaterV0(U) : makeWater(U));
   water.position.set(55, 0, 0); water.receiveShadow = true; water.renderOrder = 1; water.userData.noShadow = true;
   s.add(water);
   const hideInMirror = [];                                                          // (the old mirror water's list; kept for the grass and spray)
-  const floorMat = painted(new THREE.MeshToonMaterial({ color: 0xe6d6a8 }), 'sand');
-  const deepFloor = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x14304a }));
-  deepFloor.position.set(55, -4.3, 0); deepFloor.userData.noShadow = true; s.add(deepFloor);
+  const floorMat = new THREE.MeshToonMaterial({ color: 0xffffff }), floorTint = new THREE.Color();
+  // The floor, coloured by its height: the raised path the rail runs on (and round the porch and tower) shades from
+  // Shallow Jade at the foot of its slopes up to Sunlit Sand Path on top, its edge feathered by noise; the lower floor
+  // is patchy paint in Deep Cobalt, Cerulean Tide and Lagoon Turquoise. Matte, with only a fine grain for bump.
+  floorMat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, { uTime: U.uTime });
+    sh.vertexShader = 'varying vec3 vFW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvFW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'varying vec3 vFW;\n' + WATER_GLSL.split('// distance to the nearest cell edge')[0] + `
+float fbm4(vec2 p) { float a = 0.0, w = 0.5; for (int i = 0; i < 4; i++) { a += w * wNoise(p); p = p * 2.03 + 7.1; w *= 0.65; } return a / 1.27; }
+float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.4; }
+` + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+      vec2 fp = vec2(vFW.x, -vFW.z); float dep = -vFW.y;
+      float spg = wNoise(fp * 9.0) * 0.5 + wNoise(fp * 21.0 + 3.3) * 0.32 + wNoise(fp * 47.0 + 8.1) * 0.18;   // sponge pores
+      float spg2 = wNoise(fp * 13.0 + 40.0) * 0.55 + wNoise(fp * 33.0 + 12.0) * 0.45;
+      // 1. the height mask (a map range): 1 on top of the raised path, 0 on the lower floor; feathered by noise
+      float feather = (wNoise(fp * 0.45) * 0.6 + wNoise(fp * 1.6 + 3.0) * 0.4 - 0.5) * 0.5;
+      float hm = clamp((1.7 - dep) / (1.7 - 0.45) + feather + (spg - 0.5) * 0.25, 0.0, 1.0);   // its edge sponged
+      // 2. the raised path: Shallow Jade at the foot of the slope up to Sunlit Sand Path on top
+      vec3 path = mix(vec3(0.080, 0.584, 0.352), vec3(0.479, 0.672, 0.515), smoothstep(0.45, 0.95, hm));
+      // 3. the lower floor: patchy paint (a noise through a three-colour ramp)
+      float pn = fbm4(fp * 0.08);
+      pn += (spg - 0.5) * 0.12;                                                    // stippled, not a clean line
+      vec3 low = mix(vec3(0.003, 0.070, 0.178), vec3(0.006, 0.205, 0.366), step(0.4, pn));
+      low = mix(low, vec3(0.012, 0.392, 0.337), step(0.6, pn));
+      // 4. combined by height
+      vec3 c = mix(low, path, smoothstep(0.0, 0.45, hm));
+      float farK = smoothstep(38.0, 70.0, length(vec2(fp.x - ${PX.toFixed(1)}, (fp.y - ${PY.toFixed(1)}) * 1.6)) + (spg - 0.5) * 6.0);
+      c = mix(c, vec3(0.002, 0.018, 0.027), farK);                                   // far out, the floor's own colours fade straight into the sea's dark base (#06242E)
+      // the sponge dabs: each pressed on with a sponge, solid in the middle, full of little holes, breaking into loose
+      // specks at its edge; tones from the floor's own palette (sand and jade on the path, the blues below)
+      for (int L = 0; L < 3; L++) {
+        float sc = 1.2 + float(L) * 1.5;
+        vec2 q = fp * sc + vec2(wNoise(fp * sc * 0.6 + float(L) * 5.0), wNoise(fp * sc * 0.6 + float(L) * 9.0)) * 1.1;
+        vec2 qi = floor(q), qf = fract(q); vec2 hh = wHash(qi + float(L) * 31.0);
+        float dd = length((qf - (0.25 + 0.5 * hh)) * vec2(1.0, 0.6 + 0.6 * hh.y));
+        float r = 0.26 + 0.2 * hh.y;
+        float body = clamp(1.0 - (dd + (wNoise(q * 2.5) - 0.5) * 0.18) / r, 0.0, 1.0);
+        float dab = step(L == 1 ? spg2 : spg, body * 1.6 - 0.15) * step(0.001, body);
+        float tone = hh.x * 0.6 + wNoise(fp * 0.3 + 7.0 + float(L)) * 0.7 - 0.15;
+        vec3 dLow = tone < 0.38 ? vec3(0.003, 0.070, 0.178) : (tone < 0.7 ? vec3(0.006, 0.205, 0.366) : vec3(0.012, 0.392, 0.337));
+        vec3 dPath = tone < 0.5 ? vec3(0.080, 0.584, 0.352) : vec3(0.479, 0.672, 0.515);
+        vec3 dc = mix(dLow, dPath, smoothstep(0.3, 0.6, hm));
+        c = mix(c, mix(dc, c, 0.35), dab * (0.6 - 0.12 * float(L)));
+      }
+      c *= 0.9 + 0.2 * spg;                                                          // the sponge's grain over everything
+      diffuseColor.rgb = c * diffuse;`).replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+      {
+        float e = 0.01, g0 = grain(fp);                                            // a faint grain: matte gouache, not rough
+        vec2 g = vec2(grain(fp + vec2(e, 0.0)) - g0, grain(fp + vec2(0.0, e)) - g0) / e * 0.012;
+        normal = normalize(normal + (viewMatrix * vec4(-g.x, 0.0, g.y, 0.0)).xyz);
+      }`);
+  };
+  floorMat.customProgramCacheKey = () => 'seafloor';
+  const deepFloor = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x06242e }));
+  deepFloor.position.set(55, -FLOOR_BOTTOM, 0); deepFloor.userData.noShadow = true; s.add(deepFloor);
   function buildSeabed(islets) {
-    const g = new THREE.PlaneGeometry(220, 124, 160, 90).rotateX(-Math.PI / 2), p = g.attributes.position;
+    const g = new THREE.PlaneGeometry(260, 160, 190, 116).rotateX(-Math.PI / 2), p = g.attributes.position;
     for (let i = 0; i < p.count; i++) { const bx = p.getX(i) + 55, by = -p.getZ(i); p.setY(i, -seaDepth(bx, by, islets)); }
     g.computeVertexNormals();
     const bed = new THREE.Mesh(g, floorMat); bed.position.x = 55; bed.receiveShadow = true; s.add(bed);
@@ -516,7 +679,8 @@ export function buildTerminal() {
     w.sun.color.copy(p.sun); w.sun.intensity = p.sunI; w.sun.userData.offset.copy(sd).multiplyScalar(40);
     hemi.color.copy(p.sky); hemi.groundColor.copy(p.ground); hemi.intensity = p.hemiI;
     s.fog.color.copy(p.fog);
-    U.uShallow.value.copy(p.shallow); U.uDeep.value.copy(p.deep); U.uSky.value.copy(p.mid);
+    U.uShallow.value.copy(p.deep).lerp(p.shallow, 0.32); U.uDeep.value.copy(p.deep); U.uSky.value.copy(p.mid);   // shallows: only a little lighter
+    floorMat.color.setScalar(FLOOR_LIGHT * (0.55 + 0.45 * Math.min(1, p.sunI / 3)));         // the painted floor dims with the light
     U.uSun.value = THREE.MathUtils.clamp((p.sunI - 0.8) / 1.6, 0, 1) * (1 - 0.8 * cloudy);   // sparkles need the sun
     cm.uniforms.lit.value.copy(p.cLit); cm.uniforms.shade.value.copy(p.cShade); cm.uniforms.edge.value.copy(p.cEdge); cm.uniforms.sun.value.copy(sd); cm.uniforms.haze.value.copy(p.mid);
     starField.material.opacity = p.stars;

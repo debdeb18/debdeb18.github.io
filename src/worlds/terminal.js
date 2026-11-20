@@ -355,26 +355,46 @@ export function buildTerminal() {
       if (nearStone ? rr() < 0.85 : edge && rr() < 0.25) foamSpots.push([bx, by, nearStone ? 1 : 0.7]);
     }
   }
-  const FOAM_N = 1200, PER = 5;                                                   // clusters of five bubbles
+  // Three kinds, mixed: short thin trails of small bubbles strung out along the stone or the shallows' edge (like a strand
+  // of ivy, but shorter and finer), loose scatters of tiny bubbles, and a few small clumps.
+  const PER = 9, FOAM_C = 240, FOAM_N = PER * FOAM_C;
   const foam3 = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 2), new THREE.MeshLambertMaterial({ color: 0xe9f7fb, emissive: 0x6f98a8, emissiveIntensity: 0.35, transparent: true, opacity: 0.9 }), FOAM_N);
   foam3.userData.noShadow = true; foam3.renderOrder = 2; foam3.frustumCulled = false; s.add(foam3);
-  const foamLife = Array.from({ length: FOAM_N / PER }, (_, i) => ({ spot: foamSpots[(i * 7919) % foamSpots.length], ph: (i * 0.618) % 1, len: 3 + ((i * 37) % 50) / 10, sz: 0.05 + ((i * 53) % 40) / 600, dx: 0, dz: 0 }));
-  const bub = Array.from({ length: FOAM_N }, (_, j) => [((j * 0.7548) % 1 - 0.5) * 0.22, ((j * 0.5698) % 1 - 0.5) * 0.22, 0.45 + ((j * 0.391) % 1) * 0.9]);   // offset, size
+  const foamLife = Array.from({ length: FOAM_C }, (_, i) => ({ ph: (i * 0.618) % 1, len: 3 + ((i * 37) % 50) / 10, offs: [] }));
   const fM = new THREE.Matrix4(), fQ = new THREE.Quaternion(), fS = new THREE.Vector3(), fP = new THREE.Vector3();
+  const tangent = (bx, by) => {                                                   // along the shore (or the shallows' edge)
+    const e = 0.05, near = shoreSD(bx, by) < 0.7, f = near ? shoreSD : seaDepth;
+    const gx = f(bx + e, by) - f(bx - e, by), gy = f(bx, by + e) - f(bx, by - e), l = Math.hypot(gx, gy) || 1;
+    return [-gy / l, gx / l];
+  };
+  function respawn(f, i, cycle) {
+    let h = (i * 2654435761 + cycle * 40503) >>> 0; const r = () => ((h = (h * 1103515245 + 12345) >>> 0) % 10000) / 10000;
+    f.spot = foamSpots[h % foamSpots.length]; f.dx = (r() - 0.5) * 0.2; f.dz = (r() - 0.5) * 0.2;
+    const kind = r(), [tx, ty] = tangent(f.spot[0], f.spot[1]); f.offs = [];
+    if (kind < 0.45) {                                                            // a trail: a thin, wandering string of bubbles
+      const n = 5 + Math.floor(r() * 5), step = 0.07 + r() * 0.05, bend = (r() - 0.5) * 0.5; let x = 0, y = 0, ax = tx, ay = ty;
+      for (let k = 0; k < PER; k++) {
+        if (k >= n) { f.offs.push(null); continue; }
+        const c = Math.cos(bend * 0.3 + (r() - 0.5) * 0.6), sn = Math.sin(bend * 0.3 + (r() - 0.5) * 0.6);
+        [ax, ay] = [ax * c - ay * sn, ax * sn + ay * c]; x += ax * step; y += ay * step;
+        f.offs.push([x + (r() - 0.5) * 0.03, y + (r() - 0.5) * 0.03, 0.04 + r() * 0.035 * (1 - Math.abs(k - n / 2) / n)]);
+      }
+    } else if (kind < 0.8) {                                                      // a loose scatter of tiny bubbles
+      for (let k = 0; k < PER; k++) f.offs.push(r() < 0.75 ? [(r() - 0.5) * 0.7 * (0.6 + Math.abs(tx)), (r() - 0.5) * 0.7 * (0.6 + Math.abs(ty)), 0.022 + r() * 0.035] : null);
+    } else {                                                                      // a small clump
+      for (let k = 0; k < PER; k++) f.offs.push(k < 5 ? [(r() - 0.5) * 0.14, (r() - 0.5) * 0.14, 0.04 + r() * 0.06] : null);
+    }
+  }
   function updateFoam(t) {
     const calm = 0.6 + 0.4 * Math.min(1, U.uSun.value * 1.5);
-    for (let i = 0; i < FOAM_N / PER; i++) {
+    for (let i = 0; i < FOAM_C; i++) {
       const f = foamLife[i], u = ((t / f.len) + f.ph) % 1, cycle = Math.floor(t / f.len + f.ph);
-      if (cycle !== f.cycle) {                                                     // popped: form again at a new spot
-        f.cycle = cycle; let h = (i * 2654435761 + cycle * 40503) >>> 0;
-        f.spot = foamSpots[h % foamSpots.length]; h = (h * 1103515245 + 12345) >>> 0;
-        f.dx = ((h % 1000) / 1000 - 0.5) * 0.25; f.dz = (((h >>> 10) % 1000) / 1000 - 0.5) * 0.25;
-      }
+      if (cycle !== f.cycle) { f.cycle = cycle; respawn(f, i, cycle); }
       const grow = Math.min(1, u / 0.25), pop = u > 0.85 ? 1 - (u - 0.85) / 0.15 : 1;
-      const k = f.sz * f.spot[2] * grow * pop * calm * (1 + 0.12 * Math.sin(t * 3 + i));
-      for (let b = 0; b < PER; b++) {                                              // the cluster's bubbles, each its own size
-        const j = i * PER + b, o = bub[j], kb = k * o[2] * (1 + 0.15 * Math.sin(t * 4 + j));
-        fP.set(f.spot[0] + f.dx * u + o[0] * f.sz * 6, U.uTide.value + 0.01 + kb * 0.25 + Math.sin(t * 1.7 + i) * 0.01, -(f.spot[1] + f.dz * u + o[1] * f.sz * 6));
+      for (let b = 0; b < PER; b++) {
+        const j = i * PER + b, o = f.offs[b];
+        const kb = o ? o[2] * f.spot[2] * grow * pop * calm * (1 + 0.15 * Math.sin(t * 4 + j)) : 0;
+        fP.set(f.spot[0] + f.dx * u + (o ? o[0] : 0), U.uTide.value + 0.01 + kb * 0.25 + Math.sin(t * 1.7 + i) * 0.008, -(f.spot[1] + f.dz * u + (o ? o[1] : 0)));
         fS.set(kb, kb * 0.7, kb);
         fM.compose(fP, fQ, fS); foam3.setMatrixAt(j, fM);
       }

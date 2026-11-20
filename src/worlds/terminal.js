@@ -244,6 +244,45 @@ function makeWater(U) {
   return m;
 }
 
+// Water version 0 (?water=v0), after the clear-water recipe: a clear surface that mirrors a bright sky by the Fresnel
+// effect (IOR 1.333, smooth), with long anime wave streaks running along the line (stretched noise as a bump); under
+// it a soft volume: Lagoon Turquoise glow in the shallows, absorbed towards Cerulean Tide and Deep Cobalt with depth,
+// so the track and its pebbles stay sharp while the deeper sides go rich blue.
+const WATER = new URLSearchParams(location.search).get('water') === 'v0' ? 'v0' : 'ghibli';
+function makeWaterV0(U) {
+  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.06, metalness: 0, transparent: true, depthWrite: false });
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, U);
+    sh.vertexShader = 'varying vec3 vW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime, uSun;\nuniform vec3 uSky;\n' + DEPTH_GLSL + WATER_GLSL.split('// distance to the nearest cell edge')[0] + `
+float streak(vec2 b) {                                              // waves stretched along the line, drifting slowly
+  vec2 q = vec2(b.x * 0.22, b.y * 2.6) + vec2(uTime * 0.05, uTime * 0.22);
+  return wNoise(q) * 0.6 + wNoise(q * 2.1 + 5.3) * 0.3 + wNoise(q * 4.3 + 1.7) * 0.1;
+}
+` + sh.fragmentShader
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        if (inBoat(vW)) discard;
+        vec2 bp = vec2(vW.x, -vW.z);
+        float dep = max(seaDepth(bp), 0.0);
+        // the volume: clear and faintly turquoise in the shallows, deepening to cerulean, then cobalt
+        vec3 col = mix(vec3(0.012, 0.392, 0.337), vec3(0.006, 0.205, 0.366), smoothstep(0.4, 2.0, dep));
+        col = mix(col, vec3(0.003, 0.070, 0.178), smoothstep(1.6, 4.2, dep));
+        diffuseColor.rgb = col;
+        diffuseColor.a = clamp(1.0 - exp(-dep * 0.55), 0.14, 0.9);`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        vec2 sb = vec2(vW.x, -vW.z); float s0 = streak(sb), e = 0.04;
+        vec2 sg = vec2(streak(sb + vec2(e, 0.0)) - s0, streak(sb + vec2(0.0, e)) - s0) / e;
+        normal = normalize(normal + (viewMatrix * vec4(-sg.x * 0.06, 0.0, sg.y * 0.06, 0.0)).xyz);`)
+      .replace('#include <opaque_fragment>', `float cosV = saturate(dot(normalize(vViewPosition), normal));
+        float fres = 0.02 + 0.98 * pow(1.0 - cosV, 5.0);                              // Schlick, water (IOR 1.333)
+        vec3 skyC = mix(uSky * 0.6, vec3(0.139, 0.546, 0.831), clamp(uSun * 1.5, 0.0, 1.0));   // the bright sky blue by day
+        outgoingLight = mix(outgoingLight, skyC, clamp(fres * 1.6, 0.0, 0.85));
+        diffuseColor.a = max(diffuseColor.a, clamp(fres * 1.6, 0.0, 0.85));
+        #include <opaque_fragment>`);
+  };
+  return m;
+}
+
 export function buildTerminal() {
   const w = makeWorld('terminal', 'The Terminal');
   const s = w.scene;
@@ -266,7 +305,7 @@ export function buildTerminal() {
   const U = { uTime: { value: 0 }, uIslets: { value: Array.from({ length: 16 }, () => new THREE.Vector3(1e4, 1e4, 0)) },
     uShallow: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uSky: { value: new THREE.Color() }, uTrain: { value: new THREE.Vector3(1e4, 0, 25) }, uPlayer, uStir: { value: 0 }, uSun: { value: 1 },
     uPorch: { value: new THREE.Vector4(...PORCH) }, uTower: { value: new THREE.Vector3(...TOWER) }, uBoat: { value: new THREE.Vector3(1e4, 1e4, 0) } };
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), makeWater(U));
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), WATER === 'v0' ? makeWaterV0(U) : makeWater(U));
   water.position.set(55, 0, 0); water.receiveShadow = true; water.renderOrder = 1; water.userData.noShadow = true;
   s.add(water);
   const hideInMirror = [];                                                          // (the old mirror water's list; kept for the grass and spray)

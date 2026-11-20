@@ -616,11 +616,16 @@ float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.
     if (onPier(lx, ly) || onDeck(lx, ly) || onBackStairs(lx, ly)) return true;
     return NORTH().some(([ix, iy, ir]) => Math.hypot(bx - ix, by - iy) < ir * 0.93) || wading(bx, by);
   };
+  // The stairs as the real steps (blender/assets/halt.py), not a ramp: the traveller stands on the highest step under
+  // its round base, so it hops down one step at a time instead of sinking into their edges.
+  const frontStep = (lx) => lx < 1.2 ? PZ : lx < 1.75 ? 0.617 : lx < 2.3 ? 0.283 : LOW;
+  const backStep = (o) => o < 0 ? PZ : o < 0.45 ? 0.65 : o < 0.9 ? 0.325 : 0;
+  const underFoot = (step, v) => Math.max(step(v - 0.28), step(v), step(v + 0.28));
   w.heightAt = (x, z) => {
     const bx = x, by = -z, [lx, ly] = L_(bx, by);
-    if (onPier(lx, ly)) return ly < 0.04 ? PZ - (PZ - LOW) * THREE.MathUtils.clamp((lx - 1.05) / 1.3, 0, 1) : PZ;   // two steps down, into the shallows
+    if (onPier(lx, ly)) return ly < 0.04 ? underFoot(frontStep, lx) : PZ;          // two steps down, into the shallows
     if (onDeck(lx, ly)) return PZ + 0.06;
-    if (onBackStairs(lx, ly)) return PZ - PZ * THREE.MathUtils.clamp(stairOut(lx, ly) / 1.0, 0, 1);
+    if (onBackStairs(lx, ly)) return underFoot(backStep, stairOut(lx, ly));
     return Math.max(isletTop(bx, by), -0.3);                                       // on an islet, or wading
   };
   const S = (bx, by, sx, sy) => w.solid(bx, -by, sx, sy);

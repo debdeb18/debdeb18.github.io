@@ -57,54 +57,21 @@ const hourNow = () => { if (!isNaN(forced)) return ((forced % 24) + 24) % 24; co
 
 // ---------- the sea floor: shallow banks under the line, the station and the islets, deep water beyond ----------
 const PX = 0, PY = 1.4;                                            // where the porch stands (blender/assets/halt.py, centred)
-// The bank round the porch and its tower follows their shape, with a wandering, uneven edge (the same sums in the
-// shader below, so the painted bands match the floor and where you can wade).
-function bankEdge(bx, by) {
-  const qx = Math.max(Math.abs(bx - PX) - 5.5, 0), qy = Math.max(Math.abs(by - PY) - 2.3, 0);
-  const dp = Math.hypot(qx, qy) - 2.0, dtw = Math.hypot(bx - (PX - 7.0), by - (PY - 0.55)) - 2.45 - 2.2;
-  return Math.min(dp, dtw) + Math.sin(bx * 0.31 + 1.3) * Math.sin(by * 0.27 + 0.4) * 0.9 + Math.sin(bx * 0.73 + by * 0.41) * 0.35 + Math.sin(bx * 0.17 - by * 0.23 + 2.0) * 0.8;
-}
-// Two sea floors to try, picked with ?floor= (the current bank stays the default until one is chosen):
-//  beach  after the beach reference: from a short knee-deep shelf the floor slopes away gently (about 14 degrees on
-//         average, 20 at its steepest) down to 7 m, so the deep water starts far out, about 27 m from the shore
-//  reef   after Spirited Away: the rail runs along a shallow, light strip with soft, ragged edges; off it the floor
-//         is uneven, in patches deeper and shallower, so the sea is mottled light and dark
-//  v3     a flat, shallow strip under the rail and round the porch and tower; off it, on both sides, the floor lies
-//         lower and gently uneven (1.3 to 4.3 m), never rising or falling more than 0.8 m in a metre
-const FLOOR = { beach: 'beach', reef: 'reef', v3: 'v3' }[new URLSearchParams(location.search).get('floor')] || 'bank';
-const FLOOR_BOTTOM = { bank: 4.3, beach: 7.6, reef: 4.9, v3: 4.6 }[FLOOR];                // the plain dark base under the floor
+// The sea floor: a flat, shallow strip (0.42 m) under the rail and round the porch and tower, its edges soft and ragged;
+// off it, on both sides, the floor lies lower and gently uneven (about 1.3 to 4.3 m), never rising or falling more
+// than 0.8 m in a metre. The same sums run in the shaders below, so the colours match the floor and where you can wade.
+const FLOOR_BOTTOM = 4.6;                                                        // the plain dark base under the floor
 function shoreSD(bx, by) {                                                       // metres from the porch's and tower's stone
   const qx = Math.max(Math.abs(bx - PX) - 5.5, 0), qy = Math.max(Math.abs(by - PY) - 2.3, 0);
   return Math.min(Math.hypot(qx, qy), Math.hypot(bx - (PX - 7.0), by - (PY - 0.55)) - 2.45);
 }
-const FLOOR_LIGHT = 1.0;                                                        // (the sun's light on the floor, taken out so it shows the swatches)
 const smooth01 = (t) => { t = Math.min(1, Math.max(0, t)); return t * t * (3 - 2 * t); };
-function seaDepthAlt(bx, by) {
+function seaDepth(bx, by) {
   const dr = Math.abs(by - TRACK), ds = shoreSD(bx, by);
-  if (FLOOR === 'v3') {                                            // the far side: a gentle reef
-    const w = Math.sin(bx * 0.29 + 0.7) * 0.9 + Math.sin(bx * 0.41 + by * 0.3) * 0.45;
-    const k = Math.min(smooth01((dr - 1.8 + w) / 9.5), smooth01((ds - 1.0 + w) / 9.5));
-    const X = bx * 0.5, Y = by * 0.5, n = Math.sin(X * 0.37 + Math.sin(Y * 0.29) * 1.7) * Math.sin(Y * 0.41 + Math.sin(X * 0.23) * 1.3) * 0.9 + 0.3 * Math.sin(X * 0.91 + Y * 0.67 + 1.0) * Math.sin(Y * 1.13 - X * 0.41);
-    return 0.42 + k * (0.9 + 3.0 * (0.5 + 0.5 * Math.max(-1, Math.min(1, n))));
-  }
-  if (FLOOR === 'beach' || FLOOR === 'v3') {
-    const w = Math.sin(bx * 0.19 + 0.5) * Math.sin(by * 0.23 + 1.1) * 1.2 + Math.sin(bx * 0.47 + by * 0.31) * 0.4;
-    const d0 = Math.min(ds - 1.2, dr - 2.2) + w;
-    return 0.42 + 7.0 * smooth01(d0 / 30) - Math.sin(bx * 0.7) * Math.cos(by * 0.9) * 0.04;
-  }
-  const w = Math.sin(bx * 0.29 + 0.7) * 0.9 + Math.sin(bx * 0.83 + by * 0.5) * 0.45;
-  const k = Math.min(smooth01((dr - 1.8 + w) / 3.5), smooth01((ds - 1.0 + w) / 4.0));
-  const n = Math.sin(bx * 0.37 + Math.sin(by * 0.29) * 1.7) * Math.sin(by * 0.41 + Math.sin(bx * 0.23) * 1.3) * 0.9 + 0.45 * Math.sin(bx * 0.91 + by * 0.67 + 1.0) * Math.sin(by * 1.13 - bx * 0.41);
-  const m = 0.5 + 0.5 * Math.max(-1, Math.min(1, n));
-  return 0.42 + k * (1.3 + 3.0 * m);
-}
-function seaDepth(bx, by, islets) {
-  if (FLOOR !== 'bank') return seaDepthAlt(bx, by);
-  const dt = Math.abs(by - TRACK) - 3.0 + Math.sin(bx * 0.21 + 0.7) * 0.6 + Math.sin(bx * 0.53) * 0.25;   // off the track bank the sea drops away
-  let d = bankEdge(bx, by);
-  for (const [ix, iy, ir] of islets) d = Math.min(d, Math.hypot(bx - ix, by - iy) - ir * 1.15);
-  let k = Math.min(Math.min(1, Math.max(0, dt / 3.5)), Math.min(1, Math.max(0, d / 8))); k = k * k * (3 - 2 * k);
-  return 0.42 + 3.4 * k - Math.sin(bx * 0.7) * Math.cos(by * 0.9) * 0.05;
+  const w = Math.sin(bx * 0.29 + 0.7) * 0.9 + Math.sin(bx * 0.41 + by * 0.3) * 0.45;          // the strip's edge wanders
+  const k = Math.min(smooth01((dr - 1.8 + w) / 9.5), smooth01((ds - 1.0 + w) / 9.5));   // 0 on the strip, 1 off it
+  const X = bx * 0.5, Y = by * 0.5, n = Math.sin(X * 0.37 + Math.sin(Y * 0.29) * 1.7) * Math.sin(Y * 0.41 + Math.sin(X * 0.23) * 1.3) * 0.9 + 0.3 * Math.sin(X * 0.91 + Y * 0.67 + 1.0) * Math.sin(Y * 1.13 - X * 0.41);
+  return 0.42 + k * (0.9 + 3.0 * (0.5 + 0.5 * Math.max(-1, Math.min(1, n))));          // wide, gentle patches
 }
 const DEPTH_GLSL = `
 uniform vec3 uIslets[16];
@@ -124,34 +91,12 @@ float shoreSD(vec2 b) {
   vec2 q = max(abs(b - vec2(${PX.toFixed(1)}, ${PY.toFixed(1)})) - vec2(5.5, 2.3), 0.0);
   return min(length(q), length(b - vec2(${(PX - 7).toFixed(1)}, ${(PY - 0.55).toFixed(2)})) - 2.45);
 }
-float seaDepthAlt(vec2 b) {
-  float dr = abs(b.y - (${TRACK.toFixed(1)})), ds = shoreSD(b);
-  ${FLOOR === 'v3' ? `
-  {
-    float w = sin(b.x * 0.29 + 0.7) * 0.9 + sin(b.x * 0.41 + b.y * 0.3) * 0.45;
-    float k = min(smoothstep(0.0, 1.0, (dr - 1.8 + w) / 9.5), smoothstep(0.0, 1.0, (ds - 1.0 + w) / 9.5));
-    vec2 c = b * 0.5; float n = sin(c.x * 0.37 + sin(c.y * 0.29) * 1.7) * sin(c.y * 0.41 + sin(c.x * 0.23) * 1.3) * 0.9 + 0.3 * sin(c.x * 0.91 + c.y * 0.67 + 1.0) * sin(c.y * 1.13 - c.x * 0.41);
-    return 0.42 + k * (0.9 + 3.0 * (0.5 + 0.5 * clamp(n, -1.0, 1.0)));
-  }` : ''}
-  ${FLOOR === 'beach' || FLOOR === 'v3' ? `
-  float w = sin(b.x * 0.19 + 0.5) * sin(b.y * 0.23 + 1.1) * 1.2 + sin(b.x * 0.47 + b.y * 0.31) * 0.4;
-  float d0 = min(ds - 1.2, dr - 2.2) + w;
-  return 0.42 + 7.0 * smoothstep(0.0, 1.0, d0 / 30.0) - sin(b.x * 0.7) * cos(b.y * 0.9) * 0.04;` : `
-  float w = sin(b.x * 0.29 + 0.7) * 0.9 + sin(b.x * 0.83 + b.y * 0.5) * 0.45;
-  float k = min(smoothstep(0.0, 1.0, (dr - 1.8 + w) / 3.5), smoothstep(0.0, 1.0, (ds - 1.0 + w) / 4.0));
-  float n = sin(b.x * 0.37 + sin(b.y * 0.29) * 1.7) * sin(b.y * 0.41 + sin(b.x * 0.23) * 1.3) * 0.9 + 0.45 * sin(b.x * 0.91 + b.y * 0.67 + 1.0) * sin(b.y * 1.13 - b.x * 0.41);
-  float m = 0.5 + 0.5 * clamp(n, -1.0, 1.0);
-  return 0.42 + k * (1.3 + 3.0 * m);`}
-}
 float seaDepth(vec2 b) {
-  ${FLOOR !== 'bank' ? 'return seaDepthAlt(b);' : ''}
-  float dt = abs(b.y - (${TRACK.toFixed(1)})) - 3.0 + sin(b.x * 0.21 + 0.7) * 0.6 + sin(b.x * 0.53) * 0.25;
-  vec2 q = max(abs(b - vec2(${PX.toFixed(1)}, ${PY.toFixed(1)})) - vec2(5.5, 2.3), 0.0);
-  float d = min(length(q) - 2.0, length(b - vec2(${(PX - 7).toFixed(1)}, ${(PY - 0.55).toFixed(2)})) - 4.65)
-    + sin(b.x * 0.31 + 1.3) * sin(b.y * 0.27 + 0.4) * 0.9 + sin(b.x * 0.73 + b.y * 0.41) * 0.35 + sin(b.x * 0.17 - b.y * 0.23 + 2.0) * 0.8;
-  for (int i = 0; i < 16; i++) d = min(d, length(b - uIslets[i].xy) - uIslets[i].z * 1.15);
-  float k = min(clamp(dt / 3.5, 0.0, 1.0), clamp(d / 8.0, 0.0, 1.0)); k = k * k * (3.0 - 2.0 * k);
-  return 0.42 + 3.4 * k - sin(b.x * 0.7) * cos(b.y * 0.9) * 0.05;
+  float dr = abs(b.y - (${TRACK.toFixed(1)})), ds = shoreSD(b);
+  float w = sin(b.x * 0.29 + 0.7) * 0.9 + sin(b.x * 0.41 + b.y * 0.3) * 0.45;
+  float k = min(smoothstep(0.0, 1.0, (dr - 1.8 + w) / 9.5), smoothstep(0.0, 1.0, (ds - 1.0 + w) / 9.5));
+  vec2 c = b * 0.5; float n = sin(c.x * 0.37 + sin(c.y * 0.29) * 1.7) * sin(c.y * 0.41 + sin(c.x * 0.23) * 1.3) * 0.9 + 0.3 * sin(c.x * 0.91 + c.y * 0.67 + 1.0) * sin(c.y * 1.13 - c.x * 0.41);
+  return 0.42 + k * (0.9 + 3.0 * (0.5 + 0.5 * clamp(n, -1.0, 1.0)));
 }`;
 
 // The porch's footprint and its tower (Blender x, y): the water draws a thin foam line round them, as round the islets.
@@ -680,7 +625,7 @@ float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.
     hemi.color.copy(p.sky); hemi.groundColor.copy(p.ground); hemi.intensity = p.hemiI;
     s.fog.color.copy(p.fog);
     U.uShallow.value.copy(p.deep).lerp(p.shallow, 0.32); U.uDeep.value.copy(p.deep); U.uSky.value.copy(p.mid);   // shallows: only a little lighter
-    floorMat.color.setScalar(FLOOR_LIGHT * (0.55 + 0.45 * Math.min(1, p.sunI / 3)));         // the painted floor dims with the light
+    floorMat.color.setScalar((0.55 + 0.45 * Math.min(1, p.sunI / 3)));         // the painted floor dims with the light
     U.uSun.value = THREE.MathUtils.clamp((p.sunI - 0.8) / 1.6, 0, 1) * (1 - 0.8 * cloudy);   // sparkles need the sun
     cm.uniforms.lit.value.copy(p.cLit); cm.uniforms.shade.value.copy(p.cShade); cm.uniforms.edge.value.copy(p.cEdge); cm.uniforms.sun.value.copy(sd); cm.uniforms.haze.value.copy(p.mid);
     starField.material.opacity = p.stars;

@@ -355,13 +355,14 @@ export function buildTerminal() {
       if (nearStone ? rr() < 0.85 : edge && rr() < 0.25) foamSpots.push([bx, by, nearStone ? 1 : 0.7]);
     }
   }
-  // Three kinds, mixed: short thin trails of small bubbles strung out along the stone or the shallows' edge (like a strand
-  // of ivy, but shorter and finer), loose scatters of tiny bubbles, and a few small clumps.
-  const PER = 9, FOAM_C = 240, FOAM_N = PER * FOAM_C;
+  // Foam as connected froth, not loose beads: each piece is a thin flat film of foam with bubbles packed on it so they
+  // overlap and merge. Three kinds, mixed: short thin trails along the stone or the shallows' edge (like a strand of
+  // ivy, but shorter and finer), loose spread patches, and a few small round clumps.
+  const PER = 16, FOAM_C = 320, FOAM_N = (PER + 1) * FOAM_C;                       // per piece: one film + its bubbles
   const foam3 = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 2), new THREE.MeshLambertMaterial({ color: 0xe9f7fb, emissive: 0x6f98a8, emissiveIntensity: 0.35, transparent: true, opacity: 0.9 }), FOAM_N);
   foam3.userData.noShadow = true; foam3.renderOrder = 2; foam3.frustumCulled = false; s.add(foam3);
-  const foamLife = Array.from({ length: FOAM_C }, (_, i) => ({ ph: (i * 0.618) % 1, len: 3 + ((i * 37) % 50) / 10, offs: [] }));
-  const fM = new THREE.Matrix4(), fQ = new THREE.Quaternion(), fS = new THREE.Vector3(), fP = new THREE.Vector3();
+  const foamLife = Array.from({ length: FOAM_C }, (_, i) => ({ ph: (i * 0.618) % 1, len: 3 + ((i * 37) % 50) / 10, offs: [], film: [0, 0, 0, 0, 0] }));
+  const fM = new THREE.Matrix4(), fQ = new THREE.Quaternion(), fS = new THREE.Vector3(), fP = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0), Q0 = new THREE.Quaternion();
   const tangent = (bx, by) => {                                                   // along the shore (or the shallows' edge)
     const e = 0.05, near = shoreSD(bx, by) < 0.7, f = near ? shoreSD : seaDepth;
     const gx = f(bx + e, by) - f(bx - e, by), gy = f(bx, by + e) - f(bx, by - e), l = Math.hypot(gx, gy) || 1;
@@ -371,32 +372,41 @@ export function buildTerminal() {
     let h = (i * 2654435761 + cycle * 40503) >>> 0; const r = () => ((h = (h * 1103515245 + 12345) >>> 0) % 10000) / 10000;
     f.spot = foamSpots[h % foamSpots.length]; f.dx = (r() - 0.5) * 0.2; f.dz = (r() - 0.5) * 0.2;
     const kind = r(), [tx, ty] = tangent(f.spot[0], f.spot[1]); f.offs = [];
-    if (kind < 0.45) {                                                            // a trail: a thin, wandering string of bubbles
-      const n = 5 + Math.floor(r() * 5), step = 0.07 + r() * 0.05, bend = (r() - 0.5) * 0.5; let x = 0, y = 0, ax = tx, ay = ty;
+    if (kind < 0.5) {                                                             // a trail: bubbles packed along a wandering line
+      const n = 9 + Math.floor(r() * 7), bend = (r() - 0.5) * 0.4; let x = 0, y = 0, ax = tx, ay = ty, prev = 0.03;
       for (let k = 0; k < PER; k++) {
         if (k >= n) { f.offs.push(null); continue; }
-        const c = Math.cos(bend * 0.3 + (r() - 0.5) * 0.6), sn = Math.sin(bend * 0.3 + (r() - 0.5) * 0.6);
-        [ax, ay] = [ax * c - ay * sn, ax * sn + ay * c]; x += ax * step; y += ay * step;
-        f.offs.push([x + (r() - 0.5) * 0.03, y + (r() - 0.5) * 0.03, 0.04 + r() * 0.035 * (1 - Math.abs(k - n / 2) / n)]);
+        const sz = (0.035 + r() * 0.045) * (1 - 0.5 * Math.abs(k - n / 2) / n), c = Math.cos(bend * 0.3 + (r() - 0.5) * 0.5), sn = Math.sin(bend * 0.3 + (r() - 0.5) * 0.5);
+        [ax, ay] = [ax * c - ay * sn, ax * sn + ay * c]; const st = (prev + sz) * 0.55; x += ax * st; y += ay * st; prev = sz;   // overlapping
+        f.offs.push([x + (r() - 0.5) * 0.02, y + (r() - 0.5) * 0.02, sz]);
       }
-    } else if (kind < 0.8) {                                                      // a loose scatter of tiny bubbles
-      for (let k = 0; k < PER; k++) f.offs.push(r() < 0.75 ? [(r() - 0.5) * 0.7 * (0.6 + Math.abs(tx)), (r() - 0.5) * 0.7 * (0.6 + Math.abs(ty)), 0.022 + r() * 0.035] : null);
-    } else {                                                                      // a small clump
-      for (let k = 0; k < PER; k++) f.offs.push(k < 5 ? [(r() - 0.5) * 0.14, (r() - 0.5) * 0.14, 0.04 + r() * 0.06] : null);
+    } else if (kind < 0.82) {                                                     // a spread patch: a few small merged groups
+      const g = [[0, 0], [(r() - 0.5) * 0.45, (r() - 0.5) * 0.45], [(r() - 0.5) * 0.6, (r() - 0.5) * 0.6]];
+      for (let k = 0; k < PER; k++) { const c = g[k % 3], sz = 0.03 + r() * 0.04; f.offs.push([c[0] + (r() - 0.5) * 0.14, c[1] + (r() - 0.5) * 0.14, sz]); }
+    } else {                                                                      // a small round clump
+      for (let k = 0; k < PER; k++) f.offs.push(k < 8 ? [(r() - 0.5) * 0.14, (r() - 0.5) * 0.14, 0.045 + r() * 0.05] : null);
     }
+    // the film under it: a flat ellipse covering the bubbles, so the piece reads as one foam
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    for (const o of f.offs) if (o) { x0 = Math.min(x0, o[0] - o[2]); x1 = Math.max(x1, o[0] + o[2]); y0 = Math.min(y0, o[1] - o[2]); y1 = Math.max(y1, o[1] + o[2]); }
+    f.film = [(x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2 * 1.05, (y1 - y0) / 2 * 1.05];
   }
   function updateFoam(t) {
     const calm = 0.6 + 0.4 * Math.min(1, U.uSun.value * 1.5);
     for (let i = 0; i < FOAM_C; i++) {
       const f = foamLife[i], u = ((t / f.len) + f.ph) % 1, cycle = Math.floor(t / f.len + f.ph);
       if (cycle !== f.cycle) { f.cycle = cycle; respawn(f, i, cycle); }
-      const grow = Math.min(1, u / 0.25), pop = u > 0.85 ? 1 - (u - 0.85) / 0.15 : 1;
+      const life = Math.min(1, u / 0.25) * (u > 0.85 ? 1 - (u - 0.85) / 0.15 : 1) * f.spot[2] * calm;
+      const cx = f.spot[0] + f.dx * u, cz = -(f.spot[1] + f.dz * u), y = U.uTide.value + 0.006 + Math.sin(t * 1.7 + i) * 0.006;
+      const fl = f.film;                                                            // the film: flat, thin, under the bubbles
+      fP.set(cx + fl[0], y, cz - fl[1]); fS.set(Math.max(fl[2], 0.01) * life, 0.004, Math.max(fl[3], 0.01) * life);
+      fM.compose(fP, Q0, fS); foam3.setMatrixAt(i * (PER + 1), fM);
       for (let b = 0; b < PER; b++) {
-        const j = i * PER + b, o = f.offs[b];
-        const kb = o ? o[2] * f.spot[2] * grow * pop * calm * (1 + 0.15 * Math.sin(t * 4 + j)) : 0;
-        fP.set(f.spot[0] + f.dx * u + (o ? o[0] : 0), U.uTide.value + 0.01 + kb * 0.25 + Math.sin(t * 1.7 + i) * 0.008, -(f.spot[1] + f.dz * u + (o ? o[1] : 0)));
-        fS.set(kb, kb * 0.7, kb);
-        fM.compose(fP, fQ, fS); foam3.setMatrixAt(j, fM);
+        const j = i * (PER + 1) + 1 + b, o = f.offs[b];
+        const kb = o ? o[2] * life * (1 + 0.12 * Math.sin(t * 4 + j)) : 0;
+        fP.set(cx + (o ? o[0] : 0), y + kb * 0.2, cz - (o ? o[1] : 0));
+        fS.set(kb, kb * 0.55, kb);
+        fM.compose(fP, Q0, fS); foam3.setMatrixAt(j, fM);
       }
     }
     foam3.instanceMatrix.needsUpdate = true;

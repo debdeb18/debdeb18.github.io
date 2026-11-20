@@ -26,7 +26,7 @@ def rail_bar(name, y, parent):
 def pebble_bed(r, rnd):
     """Real 3D pebbles, all in one mesh: two overlapping layers of small rounded stones, each lit on top and darker
     underneath, thinning out unevenly at the sides so the edge is ragged, piled up around the sleepers."""
-    tones = [Vector(((h >> 16 & 255) / 255, (h >> 8 & 255) / 255, (h & 255) / 255)) for h in (0x4D8270, 0x5A8F7C, 0x679A86, 0x76A592, 0x528676, 0x5F9481, 0x84AE9B, 0x447565)]
+    tones = [Vector(((h >> 16 & 255) / 255, (h >> 8 & 255) / 255, (h & 255) / 255)) for h in (0x355F55, 0x3E695E, 0x477368, 0x527D71, 0x39645A, 0x426E63, 0x5D877A, 0x2E544B)]
     bm = bmesh.new(); col = bm.verts.layers.color.new('Col')
     for layer, (n, rmin, rmax, z0) in enumerate(((1100, 0.08, 0.13, -0.03), (1100, 0.06, 0.1, 0.03))):
         for _ in range(n):

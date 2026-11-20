@@ -150,7 +150,10 @@ function makeWater(U) {
         // the colour: lighter and clear in the shallows, shading smoothly into the deep blue (soft, a little uneven, like
         // a wash of paint), a touch lighter still right along the stone
         float deepK = smoothstep(0.45, 3.3, dep + (wNoise(bp * 0.35) - 0.5) * 0.5);
-        vec3 col = mix(uShallow, uDeep, deepK);
+        // the deep colour of the clear water by day (Cerulean Tide, then Deep Cobalt with depth); the palette's at night
+        vec3 deepClear = mix(vec3(0.012, 0.392, 0.337), vec3(0.006, 0.205, 0.366), smoothstep(0.4, 2.0, dep));   // turquoise,
+        deepClear = mix(deepClear, vec3(0.003, 0.070, 0.178), smoothstep(1.6, 4.2, dep));                             // cerulean, cobalt
+        vec3 col = mix(uShallow, mix(uDeep, deepClear, clamp(uSun * 1.5, 0.0, 1.0)), deepK);
         float alpha = mix(0.5, 1.0, smoothstep(0.1, 0.8, deepK));
         float edge = 1.0 - smoothstep(0.0, 0.9, shore + wob * 2.0);
         col = mix(col, mix(uShallow, vec3(0.75, 0.92, 1.0), 0.12), edge * 0.6); alpha = mix(alpha, 0.4, edge * 0.6);
@@ -183,7 +186,9 @@ function makeWater(U) {
         diffuseColor.a = max(diffuseColor.a, white * 0.95);`)
       .replace('#include <opaque_fragment>', `float fres = pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 4.0);
         outgoingLight = mix(diffuseColor.rgb, outgoingLight, 0.3);                    // flat painted colour, with a hint of shadow
-        outgoingLight = mix(outgoingLight, uSky, fres * 0.35);                          // and the sky toward the horizon
+        vec3 skyC = mix(uSky, vec3(0.139, 0.546, 0.831), clamp(uSun * 1.5, 0.0, 1.0));   // by day the clear water's bright sky blue
+        float fresC = 0.02 + 0.98 * pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 5.0);
+        outgoingLight = mix(outgoingLight, skyC, clamp(max(fres * 0.35, fresC * 1.4), 0.0, 0.75));   // the sky's sheen
         #include <opaque_fragment>`);
   };
   return m;

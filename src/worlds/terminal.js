@@ -183,9 +183,17 @@ function makeWater(U) {
         float band = 1.0 - smoothstep(0.0, 0.2, abs(dep - 0.75 - wash + (wNoise(bp * 0.8 + uTime * 0.1) - 0.5) * 0.3));
         float near = 1.0 - smoothstep(0.1, 0.7 + (wNoise(bp * 1.3 + uTime * 0.15) - 0.5) * 0.6, shore);
         vec2 lp = bp * 2.6 + (vec2(wNoise(bp * 1.1 + uTime * 0.2), wNoise(bp * 1.1 + 4.0 - uTime * 0.2)) - 0.5) * 0.8;
-        float lace = 1.0 - smoothstep(0.025, 0.07, cellEdge(lp, uTime * 0.5));
-        float clumps = smoothstep(0.64, 0.74, wNoise(bp * 3.5 + uTime * 0.3));
-        float surf = max(band * 0.6, near * 0.9) * clamp(lace * 0.85 + clumps * 0.7, 0.0, 1.0) * mix(0.6, 1.0, uSun);
+        float breathe = 0.5 + 0.5 * sin(uTime * 0.9 + wNoise(bp * 0.6) * 6.28);       // the lace thickens and thins
+        lp += vec2(uTime * 0.12, sin(uTime * 0.3) * 0.2);                               //  and drifts
+        float flw = mix(0.018, 0.05, breathe);
+        float lace = 1.0 - smoothstep(flw, flw + 0.04, cellEdge(lp, uTime * 0.5));
+        float clumps = smoothstep(0.7 - 0.1 * breathe, 0.78 - 0.1 * breathe, wNoise(bp * 3.5 + uTime * 0.3));
+        float surfK = max(band * 0.6, near * 0.9) * mix(0.6, 1.0, uSun);
+        float surf = surfK * clamp(lace * 0.85 + clumps * 0.7, 0.0, 1.0);
+        // a soft blue shadow just beside the foam, as if it floats on the surface
+        float lace2 = 1.0 - smoothstep(flw, flw + 0.08, cellEdge(lp + vec2(0.06, -0.09), uTime * 0.5));
+        float fshadow = surfK * clamp(lace2 * 0.8 + clumps * 0.5, 0.0, 1.0) * (1.0 - surf);
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.7, 0.8, 0.9), fshadow * 0.6);
         float white = clamp(max(max(lines * 0.7, surf), max(spark, foam)), 0.0, 1.0) * step(0.0, shore);   // (no foam line or ring round the
                                                                                    // stone: it outlined the ruin in white)
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.91, 0.98, 1.0), white);
@@ -321,6 +329,43 @@ export function buildTerminal() {
   water.position.set(55, 0, 0); water.receiveShadow = true; water.renderOrder = 1; water.userData.noShadow = true;
   s.add(water);
   const hideInMirror = [];                                                          // (the old mirror water's list; kept for the grass and spray)
+  // Foam with body: small soft clumps of bubbles floating on the water round the stone and along the edge of the shallows.
+  // Each swells up, bobs, drifts a little and pops, then forms again somewhere else nearby.
+  const foamSpots = [];
+  {
+    let sd = 7; const rr = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+    for (let t = 0; t < 60000 && foamSpots.length < 900; t++) {
+      const bx = -45 + rr() * 90, by = -14 + rr() * 30, ds = shoreSD(bx, by), d = seaDepth(bx, by);
+      const nearStone = ds > 0.02 && ds < 0.55, edge = Math.abs(d - 0.75) < 0.12;
+      if (nearStone ? rr() < 0.85 : edge && rr() < 0.25) foamSpots.push([bx, by, nearStone ? 1 : 0.7]);
+    }
+  }
+  const FOAM_N = 1200, PER = 5;                                                   // clusters of five bubbles
+  const foam3 = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 2), new THREE.MeshLambertMaterial({ color: 0xe9f7fb, emissive: 0x6f98a8, emissiveIntensity: 0.35, transparent: true, opacity: 0.9 }), FOAM_N);
+  foam3.userData.noShadow = true; foam3.renderOrder = 2; foam3.frustumCulled = false; s.add(foam3);
+  const foamLife = Array.from({ length: FOAM_N / PER }, (_, i) => ({ spot: foamSpots[(i * 7919) % foamSpots.length], ph: (i * 0.618) % 1, len: 3 + ((i * 37) % 50) / 10, sz: 0.05 + ((i * 53) % 40) / 600, dx: 0, dz: 0 }));
+  const bub = Array.from({ length: FOAM_N }, (_, j) => [((j * 0.7548) % 1 - 0.5) * 0.22, ((j * 0.5698) % 1 - 0.5) * 0.22, 0.45 + ((j * 0.391) % 1) * 0.9]);   // offset, size
+  const fM = new THREE.Matrix4(), fQ = new THREE.Quaternion(), fS = new THREE.Vector3(), fP = new THREE.Vector3();
+  function updateFoam(t) {
+    const calm = 0.6 + 0.4 * Math.min(1, U.uSun.value * 1.5);
+    for (let i = 0; i < FOAM_N / PER; i++) {
+      const f = foamLife[i], u = ((t / f.len) + f.ph) % 1, cycle = Math.floor(t / f.len + f.ph);
+      if (cycle !== f.cycle) {                                                     // popped: form again at a new spot
+        f.cycle = cycle; let h = (i * 2654435761 + cycle * 40503) >>> 0;
+        f.spot = foamSpots[h % foamSpots.length]; h = (h * 1103515245 + 12345) >>> 0;
+        f.dx = ((h % 1000) / 1000 - 0.5) * 0.25; f.dz = (((h >>> 10) % 1000) / 1000 - 0.5) * 0.25;
+      }
+      const grow = Math.min(1, u / 0.25), pop = u > 0.85 ? 1 - (u - 0.85) / 0.15 : 1;
+      const k = f.sz * f.spot[2] * grow * pop * calm * (1 + 0.12 * Math.sin(t * 3 + i));
+      for (let b = 0; b < PER; b++) {                                              // the cluster's bubbles, each its own size
+        const j = i * PER + b, o = bub[j], kb = k * o[2] * (1 + 0.15 * Math.sin(t * 4 + j));
+        fP.set(f.spot[0] + f.dx * u + o[0] * f.sz * 6, 0.01 + kb * 0.25 + Math.sin(t * 1.7 + i) * 0.01, -(f.spot[1] + f.dz * u + o[1] * f.sz * 6));
+        fS.set(kb, kb * 0.7, kb);
+        fM.compose(fP, fQ, fS); foam3.setMatrixAt(j, fM);
+      }
+    }
+    foam3.instanceMatrix.needsUpdate = true;
+  }
   const floorMat = new THREE.MeshToonMaterial({ color: 0xffffff }), floorTint = new THREE.Color();
   // The floor, coloured by its height: the raised path the rail runs on (and round the porch and tower) shades from
   // Shallow Jade at the foot of its slopes up to Sunlit Sand Path on top, its edge feathered by noise; the lower floor
@@ -804,6 +849,7 @@ float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.
   }
   const water0 = new THREE.Vector3();
   const lastP = new THREE.Vector3(); let stir = 0;
+  w.ticks.push((t) => updateFoam(t));
   w.ticks.push((t, dt) => {
     U.uTime.value = t;
     const v = dt > 0 ? lastP.distanceTo(uPlayer.value) / dt : 0; lastP.copy(uPlayer.value);

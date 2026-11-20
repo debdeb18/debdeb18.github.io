@@ -153,6 +153,7 @@ function makeWater(U) {
         // the deep colour of the clear water by day (Cerulean Tide, then Deep Cobalt with depth); the palette's at night
         vec3 deepClear = mix(vec3(0.012, 0.392, 0.337), vec3(0.006, 0.205, 0.366), smoothstep(0.4, 2.0, dep));   // turquoise,
         deepClear = mix(deepClear, vec3(0.003, 0.070, 0.178), smoothstep(1.6, 4.2, dep));                             // cerulean, cobalt
+        deepClear = mix(deepClear, vec3(dot(deepClear, vec3(0.3, 0.5, 0.2))), 0.35) * 0.88;                            // toned down: no neon
         vec3 col = mix(uShallow, mix(uDeep, deepClear, clamp(uSun * 1.5, 0.0, 1.0)), deepK);
         float alpha = mix(0.5, 1.0, smoothstep(0.1, 0.8, deepK));
         float edge = 1.0 - smoothstep(0.0, 0.9, shore + wob * 2.0);
@@ -188,7 +189,7 @@ function makeWater(U) {
         outgoingLight = mix(diffuseColor.rgb, outgoingLight, 0.3);                    // flat painted colour, with a hint of shadow
         vec3 skyC = mix(uSky, vec3(0.139, 0.546, 0.831), clamp(uSun * 1.5, 0.0, 1.0));   // by day the clear water's bright sky blue
         float fresC = 0.02 + 0.98 * pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 5.0);
-        outgoingLight = mix(outgoingLight, skyC, clamp(max(fres * 0.35, fresC * 1.4), 0.0, 0.75));   // the sky's sheen
+        outgoingLight = mix(outgoingLight, skyC, clamp(max(fres * 0.35, fresC * 1.1), 0.0, 0.5));   // the sky's sheen
         #include <opaque_fragment>`);
   };
   return m;
@@ -335,12 +336,12 @@ float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.
       float feather = (wNoise(fp * 0.45) * 0.6 + wNoise(fp * 1.6 + 3.0) * 0.4 - 0.5) * 0.5;
       float hm = clamp((1.7 - dep) / (1.7 - 0.45) + feather + (spg - 0.5) * 0.25, 0.0, 1.0);   // its edge sponged
       // 2. the raised path: Shallow Jade at the foot of the slope up to Sunlit Sand Path on top
-      vec3 path = mix(vec3(0.080, 0.584, 0.352), vec3(0.479, 0.672, 0.515), smoothstep(0.45, 0.95, hm));
+      vec3 path = mix(vec3(0.159, 0.381, 0.305), vec3(0.479, 0.672, 0.515), smoothstep(0.45, 0.95, hm));
       // 3. the lower floor: patchy paint (a noise through a three-colour ramp)
       float pn = fbm4(fp * 0.08);
       pn += (spg - 0.5) * 0.12;                                                    // stippled, not a clean line
       vec3 low = mix(vec3(0.003, 0.070, 0.178), vec3(0.006, 0.205, 0.366), step(0.4, pn));
-      low = mix(low, vec3(0.012, 0.392, 0.337), step(0.6, pn));
+      low = mix(low, vec3(0.027, 0.254, 0.254), step(0.6, pn));
       // 4. combined by height
       vec3 c = mix(low, path, smoothstep(0.0, 0.45, hm));
       float farK = smoothstep(38.0, 70.0, length(vec2(fp.x - ${PX.toFixed(1)}, (fp.y - ${PY.toFixed(1)}) * 1.6)) + (spg - 0.5) * 6.0);
@@ -356,8 +357,8 @@ float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.
         float body = clamp(1.0 - (dd + (wNoise(q * 2.5) - 0.5) * 0.18) / r, 0.0, 1.0);
         float dab = step(L == 1 ? spg2 : spg, body * 1.6 - 0.15) * step(0.001, body);
         float tone = hh.x * 0.6 + wNoise(fp * 0.3 + 7.0 + float(L)) * 0.7 - 0.15;
-        vec3 dLow = tone < 0.38 ? vec3(0.003, 0.070, 0.178) : (tone < 0.7 ? vec3(0.006, 0.205, 0.366) : vec3(0.012, 0.392, 0.337));
-        vec3 dPath = tone < 0.5 ? vec3(0.080, 0.584, 0.352) : vec3(0.479, 0.672, 0.515);
+        vec3 dLow = tone < 0.38 ? vec3(0.003, 0.070, 0.178) : (tone < 0.7 ? vec3(0.006, 0.205, 0.366) : vec3(0.027, 0.254, 0.254));
+        vec3 dPath = tone < 0.5 ? vec3(0.159, 0.381, 0.305) : vec3(0.479, 0.672, 0.515);
         vec3 dc = mix(dLow, dPath, smoothstep(0.3, 0.6, hm));
         c = mix(c, mix(dc, c, 0.35), dab * (0.6 - 0.12 * float(L)));
       }

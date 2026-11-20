@@ -270,56 +270,44 @@ export function buildTerminal() {
   s.add(water);
   const hideInMirror = [];                                                          // (the old mirror water's list; kept for the grass and spray)
   const floorMat = new THREE.MeshToonMaterial({ color: 0xffffff }), floorTint = new THREE.Color();
-  // The floor, after the stylised-seabed recipe: a colour ramp by depth (warm, sunlit sand near the surface, muted
-  // teal-blue deeper down); a painterly sand texture of noise mixed with a cell pattern through a soft ramp, giving soft
-  // clumps of sand and pebbles (pebbles a greyish stone, in tone with the floor); the toon material gives the cel shading.
-  // On top, caustics: wavy cell edges of moving light, bright in the shallows, fading with depth.
+  // The floor painted after the Spirited Away sea: pale sea-green along the shallow strip under the rail and round the
+  // stone, teal down the slopes, deep green-blue below, and over it all soft painted patches of weed green and dark
+  // blue, edged like brush strokes, not blended.
   floorMat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, { uTime: U.uTime });
     sh.vertexShader = 'varying vec3 vFW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvFW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'varying vec3 vFW;\nuniform float uTime;\n' + WATER_GLSL.split('// distance to the nearest cell edge')[0] + `
-// distance to the nearest cell edge, and to the nearest cell centre (Voronoi F1), of a moving cell pattern
-vec2 vor(vec2 x, float t) {
-  vec2 n = floor(x), f = fract(x), mg, mr; float md = 8.0, f1 = 8.0;
-  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
-    vec2 g = vec2(float(i), float(j)), o = 0.5 + 0.5 * sin(t + 6.2831 * wHash(n + g)), r = g + o - f; float d = dot(r, r);
-    if (d < md) { md = d; mr = r; mg = g; } }
-  f1 = sqrt(md); md = 8.0;
-  for (int j = -2; j <= 2; j++) for (int i = -2; i <= 2; i++) {
-    vec2 g = mg + vec2(float(i), float(j)), o = 0.5 + 0.5 * sin(t + 6.2831 * wHash(n + g)), r = g + o - f;
-    if (dot(mr - r, mr - r) > 0.00001) md = min(md, dot(0.5 * (mr + r), normalize(r - mr))); }
-  return vec2(md, f1);
-}
-float fbm3(vec2 p) { return wNoise(p) * 0.55 + wNoise(p * 2.03 + 7.1) * 0.3 + wNoise(p * 4.1 + 3.3) * 0.15; }
-` + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+    sh.fragmentShader = 'varying vec3 vFW;\n' + WATER_GLSL.split('// distance to the nearest cell edge')[0] + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       vec2 fp = vec2(vFW.x, -vFW.z); float dep = -vFW.y;
-      // 1. the base colour ramp, by depth (its edge a little uneven)
-      float dk = clamp((dep + (fbm3(fp * 0.12) - 0.5) * 0.8 - 0.35) / 3.6, 0.0, 1.0);
-      vec3 c = mix(vec3(0.74, 0.64, 0.44), vec3(0.42, 0.55, 0.46), smoothstep(0.0, 0.3, dk));   // sunlit sand -> sea-green
-      c = mix(c, vec3(0.16, 0.42, 0.46), smoothstep(0.25, 0.6, dk));                           // -> teal
-      c = mix(c, vec3(0.09, 0.27, 0.40), smoothstep(0.6, 1.0, dk));                            // -> muted deep teal-blue
-      // the mottled patches of the reference, off the shallow strip: soft weed green and darker blue
-      float f1 = fbm3(fp * 0.09), f2 = fbm3(fp * 0.13 + 17.0), off = smoothstep(0.9, 1.6, dep);
-      c = mix(c, vec3(0.12, 0.38, 0.28), smoothstep(0.6, 0.66, f2) * 0.6 * off);
-      c = mix(c, vec3(0.07, 0.21, 0.38), smoothstep(0.64, 0.7, f1 + (f2 - 0.5) * 0.3) * 0.55 * off);
-      // 2. the painterly sand: noise mixed with a cell pattern (F1), through a soft ramp
-      float nz = fbm3(fp * 2.2);
-      vec2 vp = fp * 5.0 + (vec2(wNoise(fp * 1.3), wNoise(fp * 1.3 + 4.0)) - 0.5) * 0.8;
-      vec2 v = vor(vp, 0.0); vec2 vh = wHash(floor(vp));
-      float clump = smoothstep(0.35, 0.75, mix(nz, 1.0 - v.y, 0.45));
-      c *= 0.86 + 0.24 * clump;                                                        // soft light and dark clumps
-      float peb = (1.0 - smoothstep(0.22, 0.34, v.y + (nz - 0.5) * 0.25)) * step(0.5, vh.x) * step(0.45, nz);   // pebbles in the clumps
-      vec3 stone = mix(vec3(0.52, 0.55, 0.53), c, 0.45) * mix(0.8, 1.15, vh.y);        // greyish stone, in tone with the floor
-      stone *= 1.0 + 0.18 * (0.5 - v.y * 2.0);                                         // rounded: lighter in the middle
-      c = mix(c, c * 0.8, (1.0 - smoothstep(0.3, 0.42, v.y)) * step(0.5, vh.x) * step(0.45, nz) * 0.6);   // their soft shadow
-      c = mix(c, stone, peb * 0.9);
-      // 3. caustics: wavy, moving cell edges, crisp and bright in the shallows, fading with depth
-      vec2 cp = fp * 0.9 + (vec2(wNoise(fp * 1.4 + uTime * 0.15), wNoise(fp * 1.4 + 5.0 - uTime * 0.12)) - 0.5) * 0.55;
-      float ce = vor(cp, uTime * 0.6).x;
-      float shallow = 1.0 - smoothstep(0.6, 3.2, dep);
-      float cw = 0.006 + 0.01 * (1.0 - shallow);
-      float caus = (1.0 - smoothstep(cw, cw + mix(0.05, 0.012, shallow), ce)) * shallow;
-      c = 1.0 - (1.0 - c) * (1.0 - vec3(0.75, 0.97, 1.0) * caus * 0.55);             // screen blend, bright cyan-white
+      float f1 = wNoise(fp * 0.09) * 0.55 + wNoise(fp * 0.23 + 3.7) * 0.3 + wNoise(fp * 0.71 + 9.1) * 0.15;
+      float f2 = wNoise(fp * 0.13 + 17.0) * 0.6 + wNoise(fp * 0.41 + 5.3) * 0.4;
+      float dd0 = dep + (f1 - 0.5) * 0.9;                                           // ragged edges between the bands
+      vec3 c = vec3(0.30, 0.53, 0.43);                                              // pale sea-green: the shallows
+      c = mix(c, vec3(0.19, 0.46, 0.41), smoothstep(0.75, 0.95, dd0));
+      c = mix(c, vec3(0.10, 0.45, 0.46), smoothstep(1.4, 1.6, dd0));                // teal
+      c = mix(c, vec3(0.06, 0.33, 0.39), smoothstep(2.4, 2.6, dd0));
+      c = mix(c, vec3(0.05, 0.21, 0.35), smoothstep(3.6, 3.8, dd0));                // deep green-blue
+      float sh2 = smoothstep(0.7, 1.4, dep);                                        // patches only off the strip
+      c = mix(c, vec3(0.10, 0.35, 0.24), step(0.62, f2) * 0.75 * sh2);              // weed green
+      c = mix(c, vec3(0.06, 0.19, 0.39), step(0.68, f1 + (f2 - 0.5) * 0.3) * 0.7 * sh2);   // dark blue
+      c = mix(c, c * 1.18 + 0.03, step(0.8, wNoise(fp * 0.6 + 21.0)) * 0.6);       // a few lighter dabs
+      // the brushwork, after the close-up of the reference: layers of soft, ragged dabs in dark blue-green, teal and
+      // light sea-green, clustered (neighbouring dabs share a tone), each layer smaller than the last; a few pale flecks
+      for (int L = 0; L < 3; L++) {
+        float sc = 1.2 + float(L) * 1.5;
+        vec2 q = fp * sc + vec2(wNoise(fp * sc * 0.6 + float(L) * 5.0), wNoise(fp * sc * 0.6 + float(L) * 9.0)) * 1.1;
+        vec2 qi = floor(q), qf = fract(q); vec2 hh = wHash(qi + float(L) * 31.0);
+        float dd = length((qf - (0.25 + 0.5 * hh)) * vec2(1.0, 0.6 + 0.6 * hh.y));
+        float r = 0.24 + 0.2 * hh.y;
+        float dab = 1.0 - smoothstep(r * 0.7, r, dd + (wNoise(q * 3.0) - 0.5) * 0.2);
+        float tone = hh.x * 0.6 + wNoise(fp * 0.3 + 7.0 + float(L)) * 0.7 - 0.15;
+        vec3 dc = tone < 0.38 ? vec3(0.05, 0.22, 0.27) : (tone < 0.7 ? vec3(0.08, 0.40, 0.40) : vec3(0.28, 0.55, 0.45));
+        dc = mix(dc, c, 0.4 + 0.3 * (1.0 - smoothstep(0.6, 1.4, dep)));         // keep the depth colour underneath; calmer on the strip
+        c = mix(c, dc, dab * (0.55 - 0.13 * float(L)));
+      }
+      vec2 fq = fp * 6.0 + wNoise(fp * 2.0) * 1.5; vec2 fh = wHash(floor(fq));
+      float fl = (1.0 - smoothstep(0.05, 0.11, length((fract(fq) - (0.2 + 0.6 * fh)) * vec2(1.0, 1.8)))) * step(0.88, fh.x);
+      c = mix(c, vec3(0.55, 0.78, 0.66), fl * 0.45 * (1.0 - smoothstep(2.5, 3.5, dep)));
+      c *= 0.94 + 0.12 * wNoise(fp * 6.0);                                           // fine painted grain
       diffuseColor.rgb = c * diffuse;`);
   };
   floorMat.customProgramCacheKey = () => 'seafloor';

@@ -313,7 +313,7 @@ export function buildTerminal() {
       diffuseColor.rgb = c * diffuse;`);
   };
   floorMat.customProgramCacheKey = () => 'seafloor';
-  const deepFloor = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x0e3348 }));
+  const deepFloor = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x06242e }));
   deepFloor.position.set(55, -FLOOR_BOTTOM, 0); deepFloor.userData.noShadow = true; s.add(deepFloor);
   function buildSeabed(islets) {
     const g = new THREE.PlaneGeometry(220, 124, 160, 90).rotateX(-Math.PI / 2), p = g.attributes.position;

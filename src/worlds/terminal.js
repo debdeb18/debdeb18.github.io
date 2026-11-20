@@ -27,7 +27,7 @@ const NUMBERS = new Set(['sunI', 'hemiI', 'lamps', 'stars', 'glow', 'bloom']);  
 const pal = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, NUMBERS.has(k) ? v : new THREE.Color(v)]));
 const NIGHT = pal({ top: 0x070b24, mid: 0x1b2552, bot: 0x0e1638, sun: 0x8fa8ff, sunI: 0.45, sky: 0x3a4a80, ground: 0x182030, hemiI: 0.55, fog: 0x18214a, shallow: 0x1d5a6e, deep: 0x07142e, lamps: 1, cLit: 0x5d68a0, cShade: 0x20264a, cEdge: 0x8c96cc, stars: 1, glow: 0.45, bloom: 0.75 });
 const DAWN = pal({ top: 0x4a6fb0, mid: 0xffc2a0, bot: 0x8aa0c8, sun: 0xffb38a, sunI: 1.3, sky: 0xd8c8e8, ground: 0x8a9a78, hemiI: 1.0, fog: 0xf0c8b8, shallow: 0x6ab4c4, deep: 0x24508c, lamps: 0.5, cLit: 0xffe2d2, cShade: 0x9890c4, cEdge: 0xffd0b4, stars: 0.15, glow: 0.3, bloom: 0.45 });
-const DAY = pal({ top: 0x2f86e0, mid: 0xbfe4f3, bot: 0xbfe4ea, sun: 0xfff2d6, sunI: 3.0, sky: 0xb4d4f4, ground: 0x8a9c8c, hemiI: 1.2, fog: 0xd2ecf2, shallow: 0x45b8c8, deep: 0x1a4f96, lamps: 0, cLit: 0xfbf8ee, cShade: 0xa3b0cf, cEdge: 0xffffff, stars: 0, glow: 0.2, bloom: 0.3 });
+const DAY = pal({ top: 0x2f86e0, mid: 0xbfe4f3, bot: 0xbfe4ea, sun: 0xfff2d6, sunI: 3.0, sky: 0xb4d4f4, ground: 0x8a9c8c, hemiI: 1.2, fog: 0xd2ecf2, shallow: 0x45b8c8, deep: 0x2a5582, lamps: 0, cLit: 0xfbf8ee, cShade: 0xa3b0cf, cEdge: 0xffffff, stars: 0, glow: 0.2, bloom: 0.3 });
 const DUSK = pal({ top: 0x232a5c, mid: 0xf6b3a0, bot: 0x7a86b4, sun: 0xffa070, sunI: 1.5, sky: 0xc8a8c8, ground: 0x6a6a7a, hemiI: 0.95, fog: 0xe8b9b0, shallow: 0x5a8fb4, deep: 0x1d3270, lamps: 1, cLit: 0xffd9c4, cShade: 0x8a7bb0, cEdge: 0xffc4a0, stars: 0.1, glow: 0.6, bloom: 0.55 });
 const KEYS = [[0, NIGHT], [5.2, NIGHT], [6.5, DAWN], [8.5, DAY], [16.4, DAY], [18.2, DUSK], [19.7, NIGHT], [24, NIGHT]];
 function mixPal(out, a, b, k) {
@@ -150,11 +150,7 @@ function makeWater(U) {
         // the colour: lighter and clear in the shallows, shading smoothly into the deep blue (soft, a little uneven, like
         // a wash of paint), a touch lighter still right along the stone
         float deepK = smoothstep(0.45, 3.3, dep + (wNoise(bp * 0.35) - 0.5) * 0.5);
-        // the deep colour of the clear water by day (Cerulean Tide, then Deep Cobalt with depth); the palette's at night
-        vec3 deepClear = mix(vec3(0.012, 0.392, 0.337), vec3(0.006, 0.205, 0.366), smoothstep(0.4, 2.0, dep));   // turquoise,
-        deepClear = mix(deepClear, vec3(0.003, 0.070, 0.178), smoothstep(1.6, 4.2, dep));                             // cerulean, cobalt
-        deepClear = mix(deepClear, vec3(dot(deepClear, vec3(0.3, 0.5, 0.2))), 0.35) * 0.88;                            // toned down: no neon
-        vec3 col = mix(uShallow, mix(uDeep, deepClear, clamp(uSun * 1.5, 0.0, 1.0)), deepK);
+        vec3 col = mix(uShallow, uDeep, deepK);
         float alpha = mix(0.5, 1.0, smoothstep(0.1, 0.8, deepK));
         float edge = 1.0 - smoothstep(0.0, 0.9, shore + wob * 2.0);
         col = mix(col, mix(uShallow, vec3(0.75, 0.92, 1.0), 0.12), edge * 0.6); alpha = mix(alpha, 0.4, edge * 0.6);
@@ -187,9 +183,7 @@ function makeWater(U) {
         diffuseColor.a = max(diffuseColor.a, white * 0.95);`)
       .replace('#include <opaque_fragment>', `float fres = pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 4.0);
         outgoingLight = mix(diffuseColor.rgb, outgoingLight, 0.3);                    // flat painted colour, with a hint of shadow
-        vec3 skyC = mix(uSky, vec3(0.139, 0.546, 0.831), clamp(uSun * 1.5, 0.0, 1.0));   // by day the clear water's bright sky blue
-        float fresC = 0.02 + 0.98 * pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 5.0);
-        outgoingLight = mix(outgoingLight, skyC, clamp(max(fres * 0.35, fresC * 1.1), 0.0, 0.5));   // the sky's sheen
+        outgoingLight = mix(outgoingLight, uSky, fres * 0.35);                          // and the sky toward the horizon
         #include <opaque_fragment>`);
   };
   return m;

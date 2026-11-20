@@ -189,11 +189,68 @@ function makeWater(U) {
   return m;
 }
 
+// Water 'beach' (?water=beach), after the beach reference: vivid, saturated blue in the deep, turquoise over the
+// slope, clear and glassy over the shallows; white surf lace round the stone and along the edge of the shallows,
+// breathing in and out; bright glints of sun; the train's wake and the wader's rings as in the painted water.
+function makeWaterBeach(U) {
+  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0, transparent: true, depthWrite: false });
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, U);
+    sh.vertexShader = 'varying vec3 vW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime, uSun;\nuniform vec3 uShallow, uDeep, uSky, uTrain, uPlayer;\nuniform float uStir;\n' + DEPTH_GLSL + WATER_GLSL + '\n' + sh.fragmentShader
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        if (inBoat(vW)) discard;
+        vec2 bp = vec2(vW.x, -vW.z);
+        float dep = seaDepth(bp), shore = shoreDist(bp);
+        float day = 0.3 + 0.7 * clamp(uSun * 1.6, 0.0, 1.0);                       // the vivid colours dim at night
+        // the colour: clear with a cyan tint in the shallows, turquoise over the slope, saturated blue in the deep
+        float dn = dep + (wNoise(bp * 0.3) - 0.5) * 0.4;
+        vec3 col = mix(vec3(0.30, 0.78, 0.80), vec3(0.02, 0.55, 0.66), smoothstep(0.5, 1.3, dn));
+        col = mix(col, vec3(0.01, 0.16, 0.62), smoothstep(1.2, 2.8, dn));
+        col = mix(col, vec3(0.005, 0.06, 0.36), smoothstep(2.8, 4.2, dn));
+        float alpha = mix(0.18, 0.97, smoothstep(0.45, 2.2, dn));
+        diffuseColor.rgb = col * day; diffuseColor.a = alpha;
+        // the train pushes a bow wave and leaves a wake; both grow with its speed (uTrain = front x, speed 0..1, length)
+        float along = bp.x - uTrain.x, side = abs(bp.y - (${TRACK.toFixed(1)}));
+        float bow = smoothstep(-1.6, -0.2, along) * (1.0 - smoothstep(-0.2, 0.6, along)) * (1.0 - smoothstep(1.4, 2.6 + uTrain.y * 2.0, side));
+        float body = step(0.0, along) * (1.0 - smoothstep(uTrain.z, uTrain.z + 4.0 + uTrain.y * 40.0, along));
+        float spread = 1.45 + 0.35 + max(along, 0.0) * 0.05 * uTrain.y;
+        float wake = body * smoothstep(1.3, 1.45, side) * (1.0 - smoothstep(spread - 0.3, spread + 0.4, side));
+        float ripple = 0.55 + 0.45 * sin(bp.x * 6.0 + uTime * 9.0) * sin(bp.y * 9.0 - uTime * 6.0);
+        float foam = uTrain.y * clamp(bow * 1.4 + wake * ripple, 0.0, 1.0);
+        float pd = length(bp - vec2(uPlayer.x, -uPlayer.z));                     // rings spreading from legs in the water
+        float wet = 1.0 - smoothstep(0.05, 0.25, uPlayer.y);
+        for (int k = 0; k < 2; k++) { float rr = 0.35 + fract(uTime * 0.7 + float(k) * 0.5) * 1.3; foam += wet * (1.0 - smoothstep(0.0, 0.07, abs(pd - rr))) * (1.0 - (rr - 0.35) / 1.3) * 0.8; }
+        // how stirred-up the water is: along the train and its wake, and round a wader who is moving
+        float trainStir = min(1.0, uTrain.y * 3.0) * clamp(bow * 1.5 + body * (1.0 - smoothstep(1.4, 7.0 + uTrain.y * 6.0, side)) * (1.0 - smoothstep(0.0, uTrain.z + 30.0 * uTrain.y, along) * 0.7), 0.0, 1.0);
+        float stir = clamp(trainStir + wet * uStir * (1.0 - smoothstep(0.3, 4.0, pd)), 0.0, 1.0);
+        // surf: a band of white lace along the edge of the shallows, washing in and out, and lace round the stone
+        float wash = sin(uTime * 0.55 + bp.x * 0.08) * 0.12;
+        float band = 1.0 - smoothstep(0.0, 0.22, abs(dep - 0.72 - wash + (wNoise(bp * 0.8 + uTime * 0.1) - 0.5) * 0.25));
+        float near = 1.0 - smoothstep(0.15, 0.9 + (wNoise(bp * 1.3 + uTime * 0.15) - 0.5) * 0.6, shore);
+        vec2 lp = bp * 2.6 + (vec2(wNoise(bp * 1.1 + uTime * 0.2), wNoise(bp * 1.1 + 4.0 - uTime * 0.2)) - 0.5) * 0.8;
+        float lace = 1.0 - smoothstep(0.03, 0.09, cellEdge(lp, uTime * 0.5));       // a web of thin foam lines
+        float blobs = smoothstep(0.62, 0.72, wNoise(bp * 3.5 + uTime * 0.3));          // and denser patches
+        float surf = max(band * 0.8, near) * clamp(lace * 0.9 + blobs * 0.8, 0.0, 1.0);
+        surf = max(surf, near * smoothstep(0.55, 0.8, wNoise(bp * 2.2 - uTime * 0.25)) * 0.9);
+        // sun glints: small bright specks that blink, mostly over the shallows and the slope
+        float glint = (1.0 - step(0.04, cellDot(bp * 3.2, uTime * 0.9))) * step(0.55, wNoise(bp * 0.7 + uTime * 0.4)) * uSun * (1.0 - smoothstep(2.0, 4.0, dep));
+        float white = clamp(max(max(surf, foam), glint), 0.0, 1.0) * step(0.0, shore);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.98, 1.0) * mix(0.45, 1.0, day), white);
+        diffuseColor.a = max(diffuseColor.a, white * 0.92);`)
+      .replace('#include <opaque_fragment>', `float fres = pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 4.0);
+        outgoingLight = mix(diffuseColor.rgb, outgoingLight, 0.25);                   // bright, flat colour, a hint of shade
+        outgoingLight = mix(outgoingLight, uSky, fres * 0.3);
+        #include <opaque_fragment>`);
+  };
+  return m;
+}
+
 // Water version 0 (?water=v0), after the clear-water recipe: a clear surface that mirrors a bright sky by the Fresnel
 // effect (IOR 1.333, smooth), with long anime wave streaks running along the line (stretched noise as a bump); under
 // it a soft volume: Lagoon Turquoise glow in the shallows, absorbed towards Cerulean Tide and Deep Cobalt with depth,
 // so the track and its pebbles stay sharp while the deeper sides go rich blue.
-const WATER = new URLSearchParams(location.search).get('water') === 'v0' ? 'v0' : 'ghibli';
+const WATER = { v0: 'v0', beach: 'beach' }[new URLSearchParams(location.search).get('water')] || 'ghibli';
 function makeWaterV0(U) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.06, metalness: 0, transparent: true, depthWrite: false });
   m.onBeforeCompile = (sh) => {
@@ -250,7 +307,7 @@ export function buildTerminal() {
   const U = { uTime: { value: 0 }, uIslets: { value: Array.from({ length: 16 }, () => new THREE.Vector3(1e4, 1e4, 0)) },
     uShallow: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uSky: { value: new THREE.Color() }, uTrain: { value: new THREE.Vector3(1e4, 0, 25) }, uPlayer, uStir: { value: 0 }, uSun: { value: 1 },
     uPorch: { value: new THREE.Vector4(...PORCH) }, uTower: { value: new THREE.Vector3(...TOWER) }, uBoat: { value: new THREE.Vector3(1e4, 1e4, 0) } };
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), WATER === 'v0' ? makeWaterV0(U) : makeWater(U));
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), WATER === 'v0' ? makeWaterV0(U) : WATER === 'beach' ? makeWaterBeach(U) : makeWater(U));
   water.position.set(55, 0, 0); water.receiveShadow = true; water.renderOrder = 1; water.userData.noShadow = true;
   s.add(water);
   const hideInMirror = [];                                                          // (the old mirror water's list; kept for the grass and spray)

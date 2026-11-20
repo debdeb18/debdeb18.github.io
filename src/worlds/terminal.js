@@ -269,10 +269,31 @@ export function buildTerminal() {
   water.position.set(55, 0, 0); water.receiveShadow = true; water.renderOrder = 1; water.userData.noShadow = true;
   s.add(water);
   const hideInMirror = [];                                                          // (the old mirror water's list; kept for the grass and spray)
-  // No sand showing through: like the sea in Spirited Away, the floor is a blue-green the water barely lightens, so
-  // the shallows read as a slightly lighter shade of the same blue and things look to float on one wide sea.
-  const floorMat = new THREE.MeshToonMaterial({ color: 0x2f6f96 }), floorTint = new THREE.Color();
-  const deepFloor = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x14304a }));
+  const floorMat = new THREE.MeshToonMaterial({ color: 0xffffff }), floorTint = new THREE.Color();
+  // The floor painted after the Spirited Away sea: pale sea-green along the shallow strip under the rail and round the
+  // stone, teal down the slopes, deep green-blue below, and over it all soft painted patches of weed green and dark
+  // blue, edged like brush strokes, not blended.
+  floorMat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, { uTime: U.uTime });
+    sh.vertexShader = 'varying vec3 vFW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvFW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'varying vec3 vFW;\n' + WATER_GLSL.split('// distance to the nearest cell edge')[0] + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+      vec2 fp = vec2(vFW.x, -vFW.z); float dep = -vFW.y;
+      float f1 = wNoise(fp * 0.09) * 0.55 + wNoise(fp * 0.23 + 3.7) * 0.3 + wNoise(fp * 0.71 + 9.1) * 0.15;
+      float f2 = wNoise(fp * 0.13 + 17.0) * 0.6 + wNoise(fp * 0.41 + 5.3) * 0.4;
+      float dd = dep + (f1 - 0.5) * 0.9;                                           // ragged edges between the bands
+      vec3 c = vec3(0.30, 0.53, 0.43);                                              // pale sea-green: the shallows
+      c = mix(c, vec3(0.19, 0.46, 0.41), smoothstep(0.75, 0.95, dd));
+      c = mix(c, vec3(0.10, 0.45, 0.46), smoothstep(1.4, 1.6, dd));                // teal
+      c = mix(c, vec3(0.06, 0.33, 0.39), smoothstep(2.4, 2.6, dd));
+      c = mix(c, vec3(0.05, 0.21, 0.35), smoothstep(3.6, 3.8, dd));                // deep green-blue
+      float sh2 = smoothstep(0.7, 1.4, dep);                                        // patches only off the strip
+      c = mix(c, vec3(0.10, 0.35, 0.24), step(0.62, f2) * 0.75 * sh2);              // weed green
+      c = mix(c, vec3(0.06, 0.19, 0.39), step(0.68, f1 + (f2 - 0.5) * 0.3) * 0.7 * sh2);   // dark blue
+      c = mix(c, c * 1.18 + 0.03, step(0.8, wNoise(fp * 0.6 + 21.0)) * 0.6);       // a few lighter dabs
+      diffuseColor.rgb = c * diffuse;`);
+  };
+  floorMat.customProgramCacheKey = () => 'seafloor';
+  const deepFloor = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x0e3348 }));
   deepFloor.position.set(55, -FLOOR_BOTTOM, 0); deepFloor.userData.noShadow = true; s.add(deepFloor);
   function buildSeabed(islets) {
     const g = new THREE.PlaneGeometry(220, 124, 160, 90).rotateX(-Math.PI / 2), p = g.attributes.position;
@@ -590,7 +611,7 @@ export function buildTerminal() {
     hemi.color.copy(p.sky); hemi.groundColor.copy(p.ground); hemi.intensity = p.hemiI;
     s.fog.color.copy(p.fog);
     U.uShallow.value.copy(p.deep).lerp(p.shallow, 0.32); U.uDeep.value.copy(p.deep); U.uSky.value.copy(p.mid);   // shallows: only a little lighter
-    floorMat.color.copy(floorTint.copy(p.deep).lerp(p.shallow, 0.45));
+    floorMat.color.setScalar(0.6 + 0.4 * Math.min(1, p.sunI / 3));                // the painted floor dims with the light
     U.uSun.value = THREE.MathUtils.clamp((p.sunI - 0.8) / 1.6, 0, 1) * (1 - 0.8 * cloudy);   // sparkles need the sun
     cm.uniforms.lit.value.copy(p.cLit); cm.uniforms.shade.value.copy(p.cShade); cm.uniforms.edge.value.copy(p.cEdge); cm.uniforms.sun.value.copy(sd); cm.uniforms.haze.value.copy(p.mid);
     starField.material.opacity = p.stars;

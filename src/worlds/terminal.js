@@ -280,36 +280,43 @@ export function buildTerminal() {
     sh.vertexShader = 'varying vec3 vFW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvFW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = 'varying vec3 vFW;\n' + WATER_GLSL.split('// distance to the nearest cell edge')[0] + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       vec2 fp = vec2(vFW.x, -vFW.z); float dep = -vFW.y;
+      // sponge: a fine, porous texture (pores a few centimetres across) that breaks every edge into specks and holes
+      float spg = wNoise(fp * 9.0) * 0.5 + wNoise(fp * 21.0 + 3.3) * 0.32 + wNoise(fp * 47.0 + 8.1) * 0.18;
+      float spg2 = wNoise(fp * 13.0 + 40.0) * 0.55 + wNoise(fp * 33.0 + 12.0) * 0.45;
       float f1 = wNoise(fp * 0.09) * 0.55 + wNoise(fp * 0.23 + 3.7) * 0.3 + wNoise(fp * 0.71 + 9.1) * 0.15;
       float f2 = wNoise(fp * 0.13 + 17.0) * 0.6 + wNoise(fp * 0.41 + 5.3) * 0.4;
-      float dd0 = dep + (f1 - 0.5) * 0.9;                                           // ragged edges between the bands
-      vec3 c = vec3(0.027, 0.305, 0.227);                                              // pale sea-green: the shallows
-      c = mix(c, vec3(0.011, 0.147, 0.102), smoothstep(0.75, 0.95, dd0));
-      c = mix(c, vec3(0.007, 0.109, 0.133), smoothstep(1.4, 1.6, dd0));                // teal
-      c = mix(c, vec3(0.004, 0.047, 0.054), smoothstep(2.4, 2.6, dd0));
-      c = mix(c, vec3(0.002, 0.018, 0.027), smoothstep(3.6, 3.8, dd0));                // deep green-blue
+      // the bands by depth, their borders stippled by the sponge (no clean line between two colours)
+      float dd0 = dep + (f1 - 0.5) * 0.9 + (spg - 0.5) * 0.55;
+      vec3 c = vec3(0.027, 0.305, 0.227);                                                                   // Seafoam Jade: the shallows
+      c = mix(c, vec3(0.011, 0.147, 0.102), step(0.85, dd0));                                               // Forest Emerald
+      c = mix(c, vec3(0.007, 0.109, 0.133), step(1.5, dd0));                                                // Ocean Teal
+      c = mix(c, vec3(0.004, 0.047, 0.054), step(2.5, dd0));                                               // Deep Pine
+      c = mix(c, vec3(0.002, 0.018, 0.027), step(3.7, dd0));                                                // Abyssal Navy
       float sh2 = smoothstep(0.7, 1.4, dep);                                        // patches only off the strip
-      c = mix(c, vec3(0.011, 0.147, 0.102), step(0.62, f2) * 0.75 * sh2);              // weed green
-      c = mix(c, vec3(0.004, 0.047, 0.054), step(0.68, f1 + (f2 - 0.5) * 0.3) * 0.7 * sh2);   // dark blue
-      c = mix(c, vec3(0.080, 0.578, 0.305), step(0.82, wNoise(fp * 0.6 + 21.0)) * 0.35 * (1.0 - smoothstep(1.0, 3.0, dep)));   // glowing mint highlights
-      // the brushwork, after the close-up of the reference: layers of soft, ragged dabs in dark blue-green, teal and
-      // light sea-green, clustered (neighbouring dabs share a tone), each layer smaller than the last; a few pale flecks
+      c = mix(c, vec3(0.011, 0.147, 0.102), step(0.62, f2 + (spg - 0.5) * 0.12) * 0.8 * sh2);               // weed green, sponged edge
+      c = mix(c, vec3(0.004, 0.047, 0.054), step(0.68, f1 + (f2 - 0.5) * 0.3 + (spg2 - 0.5) * 0.12) * 0.75 * sh2);   // dark, sponged edge
+      // the sponge dabs, after the close-up: each dab pressed on with a sponge, so it is solid in the middle, full of
+      // little holes, and breaks into loose specks at its edge; clustered tones, each layer smaller than the last
       for (int L = 0; L < 3; L++) {
         float sc = 1.2 + float(L) * 1.5;
         vec2 q = fp * sc + vec2(wNoise(fp * sc * 0.6 + float(L) * 5.0), wNoise(fp * sc * 0.6 + float(L) * 9.0)) * 1.1;
         vec2 qi = floor(q), qf = fract(q); vec2 hh = wHash(qi + float(L) * 31.0);
         float dd = length((qf - (0.25 + 0.5 * hh)) * vec2(1.0, 0.6 + 0.6 * hh.y));
-        float r = 0.24 + 0.2 * hh.y;
-        float dab = 1.0 - smoothstep(r * 0.7, r, dd + (wNoise(q * 3.0) - 0.5) * 0.2);
+        float r = 0.26 + 0.2 * hh.y;
+        float body = clamp(1.0 - (dd + (wNoise(q * 2.5) - 0.5) * 0.18) / r, 0.0, 1.0);   // 1 in the middle, 0 at the edge
+        float pores = L == 1 ? spg2 : spg;
+        float dab = step(pores, body * 1.6 - 0.15) * step(0.001, body);                 // porous: specks at the rim, holes inside
         float tone = hh.x * 0.6 + wNoise(fp * 0.3 + 7.0 + float(L)) * 0.7 - 0.15;
         vec3 dc = tone < 0.38 ? vec3(0.004, 0.047, 0.054) : (tone < 0.7 ? vec3(0.007, 0.109, 0.133) : vec3(0.027, 0.305, 0.227));
-        dc = mix(dc, c, 0.4 + 0.3 * (1.0 - smoothstep(0.6, 1.4, dep)));         // keep the depth colour underneath; calmer on the strip
-        c = mix(c, dc, dab * (0.55 - 0.13 * float(L)));
+        dc = mix(dc, c, 0.3 + 0.35 * (1.0 - smoothstep(0.6, 1.4, dep)));        // keep the depth colour; calmer on the strip
+        c = mix(c, dc, dab * (0.7 - 0.12 * float(L)));
       }
-      vec2 fq = fp * 6.0 + wNoise(fp * 2.0) * 1.5; vec2 fh = wHash(floor(fq));
-      float fl = (1.0 - smoothstep(0.05, 0.11, length((fract(fq) - (0.2 + 0.6 * fh)) * vec2(1.0, 1.8)))) * step(0.88, fh.x);
-      c = mix(c, vec3(0.080, 0.578, 0.305), fl * 0.55 * (1.0 - smoothstep(2.5, 3.5, dep)));
-      c *= 0.94 + 0.12 * wNoise(fp * 6.0);                                           // fine painted grain
+      // luminous mint, dabbed with the sponge too: glowing clusters in the shallows, loose flecks elsewhere
+      float glow = step(spg, (wNoise(fp * 0.6 + 21.0) - 0.62) * 3.0);
+      c = mix(c, vec3(0.080, 0.578, 0.305), glow * 0.45 * (1.0 - smoothstep(1.0, 3.0, dep)));
+      float fleck = step(0.86, spg2) * step(0.6, wNoise(fp * 1.7 + 4.0));
+      c = mix(c, vec3(0.080, 0.578, 0.305), fleck * 0.4 * (1.0 - smoothstep(2.5, 3.5, dep)));
+      c *= 0.9 + 0.2 * spg;                                                          // the sponge's grain over everything
       diffuseColor.rgb = c * diffuse;`);
   };
   floorMat.customProgramCacheKey = () => 'seafloor';

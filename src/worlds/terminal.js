@@ -64,7 +64,33 @@ function bankEdge(bx, by) {
   const dp = Math.hypot(qx, qy) - 2.0, dtw = Math.hypot(bx - (PX - 7.0), by - (PY - 0.55)) - 2.45 - 2.2;
   return Math.min(dp, dtw) + Math.sin(bx * 0.31 + 1.3) * Math.sin(by * 0.27 + 0.4) * 0.9 + Math.sin(bx * 0.73 + by * 0.41) * 0.35 + Math.sin(bx * 0.17 - by * 0.23 + 2.0) * 0.8;
 }
+// Two sea floors to try, picked with ?floor= (the current bank stays the default until one is chosen):
+//  beach  after the beach reference: from a short knee-deep shelf the floor slopes away gently (about 14 degrees on
+//         average, 20 at its steepest) down to 7 m, so the deep water starts far out, about 27 m from the shore
+//  reef   after Spirited Away: the rail runs along a shallow, light strip with soft, ragged edges; off it the floor
+//         is uneven, in patches deeper and shallower, so the sea is mottled light and dark
+const FLOOR = { beach: 'beach', reef: 'reef' }[new URLSearchParams(location.search).get('floor')] || 'bank';
+const FLOOR_BOTTOM = { bank: 4.3, beach: 7.6, reef: 4.9 }[FLOOR];                // the plain dark base under the floor
+function shoreSD(bx, by) {                                                       // metres from the porch's and tower's stone
+  const qx = Math.max(Math.abs(bx - PX) - 5.5, 0), qy = Math.max(Math.abs(by - PY) - 2.3, 0);
+  return Math.min(Math.hypot(qx, qy), Math.hypot(bx - (PX - 7.0), by - (PY - 0.55)) - 2.45);
+}
+const smooth01 = (t) => { t = Math.min(1, Math.max(0, t)); return t * t * (3 - 2 * t); };
+function seaDepthAlt(bx, by) {
+  const dr = Math.abs(by - TRACK), ds = shoreSD(bx, by);
+  if (FLOOR === 'beach') {
+    const w = Math.sin(bx * 0.19 + 0.5) * Math.sin(by * 0.23 + 1.1) * 1.2 + Math.sin(bx * 0.47 + by * 0.31) * 0.4;
+    const d0 = Math.min(ds - 1.2, dr - 2.2) + w;
+    return 0.42 + 7.0 * smooth01(d0 / 30) - Math.sin(bx * 0.7) * Math.cos(by * 0.9) * 0.04;
+  }
+  const w = Math.sin(bx * 0.29 + 0.7) * 0.9 + Math.sin(bx * 0.83 + by * 0.5) * 0.45;
+  const k = Math.min(smooth01((dr - 1.8 + w) / 3.5), smooth01((ds - 1.0 + w) / 4.0));
+  const n = Math.sin(bx * 0.37 + Math.sin(by * 0.29) * 1.7) * Math.sin(by * 0.41 + Math.sin(bx * 0.23) * 1.3) * 0.9 + 0.45 * Math.sin(bx * 0.91 + by * 0.67 + 1.0) * Math.sin(by * 1.13 - bx * 0.41);
+  const m = 0.5 + 0.5 * Math.max(-1, Math.min(1, n));
+  return 0.42 + k * (1.3 + 3.0 * m);
+}
 function seaDepth(bx, by, islets) {
+  if (FLOOR !== 'bank') return seaDepthAlt(bx, by);
   const dt = Math.abs(by - TRACK) - 3.0 + Math.sin(bx * 0.21 + 0.7) * 0.6 + Math.sin(bx * 0.53) * 0.25;   // off the track bank the sea drops away
   let d = bankEdge(bx, by);
   for (const [ix, iy, ir] of islets) d = Math.min(d, Math.hypot(bx - ix, by - iy) - ir * 1.15);
@@ -85,7 +111,24 @@ bool inBoat(vec3 p) {
   float k = clamp((sh - 0.12) / dp, 0.0, 1.0);
   return y < 0.97 * w * sin(acos(pow(k, 1.25)));
 }
+float shoreSD(vec2 b) {
+  vec2 q = max(abs(b - vec2(${PX.toFixed(1)}, ${PY.toFixed(1)})) - vec2(5.5, 2.3), 0.0);
+  return min(length(q), length(b - vec2(${(PX - 7).toFixed(1)}, ${(PY - 0.55).toFixed(2)})) - 2.45);
+}
+float seaDepthAlt(vec2 b) {
+  float dr = abs(b.y - (${TRACK.toFixed(1)})), ds = shoreSD(b);
+  ${FLOOR === 'beach' ? `
+  float w = sin(b.x * 0.19 + 0.5) * sin(b.y * 0.23 + 1.1) * 1.2 + sin(b.x * 0.47 + b.y * 0.31) * 0.4;
+  float d0 = min(ds - 1.2, dr - 2.2) + w;
+  return 0.42 + 7.0 * smoothstep(0.0, 1.0, d0 / 30.0) - sin(b.x * 0.7) * cos(b.y * 0.9) * 0.04;` : `
+  float w = sin(b.x * 0.29 + 0.7) * 0.9 + sin(b.x * 0.83 + b.y * 0.5) * 0.45;
+  float k = min(smoothstep(0.0, 1.0, (dr - 1.8 + w) / 3.5), smoothstep(0.0, 1.0, (ds - 1.0 + w) / 4.0));
+  float n = sin(b.x * 0.37 + sin(b.y * 0.29) * 1.7) * sin(b.y * 0.41 + sin(b.x * 0.23) * 1.3) * 0.9 + 0.45 * sin(b.x * 0.91 + b.y * 0.67 + 1.0) * sin(b.y * 1.13 - b.x * 0.41);
+  float m = 0.5 + 0.5 * clamp(n, -1.0, 1.0);
+  return 0.42 + k * (1.3 + 3.0 * m);`}
+}
 float seaDepth(vec2 b) {
+  ${FLOOR !== 'bank' ? 'return seaDepthAlt(b);' : ''}
   float dt = abs(b.y - (${TRACK.toFixed(1)})) - 3.0 + sin(b.x * 0.21 + 0.7) * 0.6 + sin(b.x * 0.53) * 0.25;
   vec2 q = max(abs(b - vec2(${PX.toFixed(1)}, ${PY.toFixed(1)})) - vec2(5.5, 2.3), 0.0);
   float d = min(length(q) - 2.0, length(b - vec2(${(PX - 7).toFixed(1)}, ${(PY - 0.55).toFixed(2)})) - 4.65)
@@ -215,7 +258,7 @@ export function buildTerminal() {
   // the shallows read as a slightly lighter shade of the same blue and things look to float on one wide sea.
   const floorMat = new THREE.MeshToonMaterial({ color: 0x2f6f96 }), floorTint = new THREE.Color();
   const deepFloor = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x14304a }));
-  deepFloor.position.set(55, -4.3, 0); deepFloor.userData.noShadow = true; s.add(deepFloor);
+  deepFloor.position.set(55, -FLOOR_BOTTOM, 0); deepFloor.userData.noShadow = true; s.add(deepFloor);
   function buildSeabed(islets) {
     const g = new THREE.PlaneGeometry(220, 124, 160, 90).rotateX(-Math.PI / 2), p = g.attributes.position;
     for (let i = 0; i < p.count; i++) { const bx = p.getX(i) + 55, by = -p.getZ(i); p.setY(i, -seaDepth(bx, by, islets)); }

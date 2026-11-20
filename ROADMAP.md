@@ -45,6 +45,12 @@ Porch v2 (on the ruin), assets in `blender/assets/halt.py`, `heron.py`, `fish.py
 - [ ] Heron on the rocks in the shallows by the tower (the 'heron_spot' empty), only when sunny; swap to the flying model to take off: flies off when a train passes, comes back while it stays sunny
 - [ ] Low-poly orange fish (`fish.py`) by the back stairs; in rain only one or two, under the deck
 
+Sea (v2)
+- [ ] Choose the sea floor (`?floor=v3` is the favourite so far) and make it the default
+- [ ] Choose the water (Ghibli painted, or `?water=v0` clear) and make it the default
+- [ ] Sea floor details: more shaped slopes, moss, sea grass, rocks and the like
+- [ ] Water v0: train wake, wading ripples and caustics (the Ghibli water has them)
+
 Build in the website
 - [x] Assemble the station, with walkable areas and collisions
 - [x] Trilingual name on the sign (어딘가 / Somewhere / Entah di mana)

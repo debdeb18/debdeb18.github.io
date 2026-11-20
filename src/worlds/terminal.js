@@ -53,6 +53,21 @@ const weatherNow = () => {
   const h = Date.now() / 3.6e6, n = 0.5 + 0.28 * Math.sin(h * 6.283 / 7.3) + 0.22 * Math.sin(h * 6.283 / 3.1 + 1.7);
   return THREE.MathUtils.smoothstep(n, 0.58, 0.8);                               // cloudy roughly a third of the time
 };
+// ---------- the tide, by the real moon ----------
+// Two high and two low tides a lunar day (12 h 25 min apart): high when the moon is overhead (or underfoot), low between.
+// The moon crosses the sky about 50 minutes later each day, so the tide does too; the tides are bigger round new and
+// full moon (springs) and smaller at the half moons (neaps). ?tide=high | low | -1..1 pins it.
+const tideParam = new URLSearchParams(location.search).get('tide');
+function tideNow() {
+  const d = new Date(); if (!isNaN(forced)) d.setHours(Math.floor(forced), (forced % 1) * 60, 0, 0);
+  const age = (((d.getTime() - Date.UTC(2000, 0, 6, 18, 14)) / 864e5) % 29.530589 + 29.530589) % 29.530589;   // days since new moon
+  const amp = 0.11 + 0.05 * Math.cos(4 * Math.PI * age / 29.530589);              // springs 0.16 m, neaps 0.06 m
+  if (tideParam === 'high') return 0.16; if (tideParam === 'low') return -0.16;
+  if (tideParam && !isNaN(+tideParam)) return 0.16 * Math.max(-1, Math.min(1, +tideParam));
+  const transit = 12 + age * 24 / 29.530589;                                       // the moon's crossing, local hours
+  const hours = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
+  return amp * Math.cos(2 * Math.PI * (hours - transit) / 12.42);
+}
 const hourNow = () => { if (!isNaN(forced)) return ((forced % 24) + 24) % 24; const d = new Date(); return d.getHours() + d.getMinutes() / 60; };
 
 // ---------- the sea floor: shallow banks under the line, the station and the islets, deep water beyond ----------
@@ -141,11 +156,11 @@ function makeWater(U) {
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = 'varying vec3 vW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime, uSun;\nuniform vec3 uShallow, uDeep, uSky, uTrain, uPlayer;\nuniform float uStir;\n' + DEPTH_GLSL + WATER_GLSL + '\n' + sh.fragmentShader
+    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime, uSun, uTide;\nuniform vec3 uShallow, uDeep, uSky, uTrain, uPlayer;\nuniform float uStir;\n' + DEPTH_GLSL + WATER_GLSL + '\n' + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
         if (inBoat(vW)) discard;
         vec2 bp = vec2(vW.x, -vW.z);
-        float dep = seaDepth(bp), shore = shoreDist(bp);
+        float dep = seaDepth(bp) + uTide, shore = shoreDist(bp);
         float wob = (wNoise(bp * 3.0 + uTime * 0.2) - 0.5) * 0.12;                // edges that wobble, as if drawn by hand
         // the colour: lighter and clear in the shallows, shading smoothly into the deep blue (soft, a little uneven, like
         // a wash of paint), a touch lighter still right along the stone
@@ -164,7 +179,7 @@ function makeWater(U) {
         float ripple = 0.55 + 0.45 * sin(bp.x * 6.0 + uTime * 9.0) * sin(bp.y * 9.0 - uTime * 6.0);
         float foam = uTrain.y * clamp(bow * 1.4 + wake * ripple, 0.0, 1.0);
         float pd = length(bp - vec2(uPlayer.x, -uPlayer.z));                     // rings spreading from legs in the water
-        float wet = 1.0 - smoothstep(0.05, 0.25, uPlayer.y);
+        float wet = 1.0 - smoothstep(0.05, 0.25, uPlayer.y - uTide);
         for (int k = 0; k < 2; k++) { float rr = 0.35 + fract(uTime * 0.7 + float(k) * 0.5) * 1.3; foam += wet * (1.0 - smoothstep(0.0, 0.07, abs(pd - rr))) * (1.0 - (rr - 0.35) / 1.3) * 0.8; }
         // how stirred-up the water is: along the train and its wake, and round a wader who is moving
         float trainStir = min(1.0, uTrain.y * 3.0) * clamp(bow * 1.5 + body * (1.0 - smoothstep(1.4, 7.0 + uTrain.y * 6.0, side)) * (1.0 - smoothstep(0.0, uTrain.z + 30.0 * uTrain.y, along) * 0.7), 0.0, 1.0);
@@ -177,7 +192,24 @@ function makeWater(U) {
         float lines = (1.0 - smoothstep(lw, lw + blur, cellEdge(cp, uTime * 0.25))) * clamp(shallowK * 1.1 + stir * 0.5, 0.0, 1.0);
         // sparkles that blink, in the sun
         float spark = (1.0 - step(0.035, cellDot(bp * 2.2, uTime * 0.6))) * step(0.62, wNoise(bp * 0.5 + uTime * 0.35)) * uSun;
-        float white = clamp(max(lines * 0.7, max(spark, foam)), 0.0, 1.0) * step(0.0, shore);   // (no foam line or ring round the
+        // foam: broken white lace (a web of thin lines with denser patches) hugging the stone, and a looser band along
+        // the edge of the shallows that washes slowly in and out; never a solid outline
+        float wash = sin(uTime * 0.55 + bp.x * 0.08) * 0.12;
+        float band = 1.0 - smoothstep(0.0, 0.2, abs(dep - 0.75 - wash + (wNoise(bp * 0.8 + uTime * 0.1) - 0.5) * 0.3));
+        float near = 1.0 - smoothstep(0.1, 0.7 + (wNoise(bp * 1.3 + uTime * 0.15) - 0.5) * 0.6, shore);
+        vec2 lp = bp * 2.6 + (vec2(wNoise(bp * 1.1 + uTime * 0.2), wNoise(bp * 1.1 + 4.0 - uTime * 0.2)) - 0.5) * 0.8;
+        float breathe = 0.5 + 0.5 * sin(uTime * 0.9 + wNoise(bp * 0.6) * 6.28);       // the lace thickens and thins
+        lp += vec2(uTime * 0.12, sin(uTime * 0.3) * 0.2);                               //  and drifts
+        float flw = mix(0.018, 0.05, breathe);
+        float lace = 1.0 - smoothstep(flw, flw + 0.04, cellEdge(lp, uTime * 0.5));
+        float clumps = smoothstep(0.7 - 0.1 * breathe, 0.78 - 0.1 * breathe, wNoise(bp * 3.5 + uTime * 0.3));
+        float surfK = max(band * 0.6, near * 0.9) * mix(0.6, 1.0, uSun);
+        float surf = surfK * clamp(lace * 0.85 + clumps * 0.7, 0.0, 1.0);
+        // a soft blue shadow just beside the foam, as if it floats on the surface
+        float lace2 = 1.0 - smoothstep(flw, flw + 0.08, cellEdge(lp + vec2(0.06, -0.09), uTime * 0.5));
+        float fshadow = surfK * clamp(lace2 * 0.8 + clumps * 0.5, 0.0, 1.0) * (1.0 - surf);
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.7, 0.8, 0.9), fshadow * 0.6);
+        float white = clamp(max(max(lines * 0.7, surf), max(spark, foam)), 0.0, 1.0) * step(0.0, shore);   // (no foam line or ring round the
                                                                                    // stone: it outlined the ruin in white)
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.91, 0.98, 1.0), white);
         diffuseColor.a = max(diffuseColor.a, white * 0.95);`)
@@ -189,17 +221,75 @@ function makeWater(U) {
   return m;
 }
 
+// Water 'beach' (?water=beach), after the beach reference: vivid, saturated blue in the deep, turquoise over the
+// slope, clear and glassy over the shallows; white surf lace round the stone and along the edge of the shallows,
+// breathing in and out; bright glints of sun; the train's wake and the wader's rings as in the painted water.
+function makeWaterBeach(U) {
+  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0, transparent: true, depthWrite: false });
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, U);
+    sh.vertexShader = 'varying vec3 vW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime, uSun, uTide;\nuniform vec3 uShallow, uDeep, uSky, uTrain, uPlayer;\nuniform float uStir;\n' + DEPTH_GLSL + WATER_GLSL + '\n' + sh.fragmentShader
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        if (inBoat(vW)) discard;
+        vec2 bp = vec2(vW.x, -vW.z);
+        float dep = seaDepth(bp) + uTide, shore = shoreDist(bp);
+        float day = 0.3 + 0.7 * clamp(uSun * 1.6, 0.0, 1.0);                       // the vivid colours dim at night
+        // the colour: clear with a cyan tint in the shallows, turquoise over the slope, saturated blue in the deep
+        float dn = dep + (wNoise(bp * 0.3) - 0.5) * 0.4;
+        vec3 col = mix(vec3(0.30, 0.78, 0.80), vec3(0.02, 0.55, 0.66), smoothstep(0.5, 1.3, dn));
+        col = mix(col, vec3(0.01, 0.16, 0.62), smoothstep(1.2, 2.8, dn));
+        col = mix(col, vec3(0.005, 0.06, 0.36), smoothstep(2.8, 4.2, dn));
+        float alpha = mix(0.18, 0.97, smoothstep(0.45, 2.2, dn));
+        diffuseColor.rgb = col * day; diffuseColor.a = alpha;
+        // the train pushes a bow wave and leaves a wake; both grow with its speed (uTrain = front x, speed 0..1, length)
+        float along = bp.x - uTrain.x, side = abs(bp.y - (${TRACK.toFixed(1)}));
+        float bow = smoothstep(-1.6, -0.2, along) * (1.0 - smoothstep(-0.2, 0.6, along)) * (1.0 - smoothstep(1.4, 2.6 + uTrain.y * 2.0, side));
+        float body = step(0.0, along) * (1.0 - smoothstep(uTrain.z, uTrain.z + 4.0 + uTrain.y * 40.0, along));
+        float spread = 1.45 + 0.35 + max(along, 0.0) * 0.05 * uTrain.y;
+        float wake = body * smoothstep(1.3, 1.45, side) * (1.0 - smoothstep(spread - 0.3, spread + 0.4, side));
+        float ripple = 0.55 + 0.45 * sin(bp.x * 6.0 + uTime * 9.0) * sin(bp.y * 9.0 - uTime * 6.0);
+        float foam = uTrain.y * clamp(bow * 1.4 + wake * ripple, 0.0, 1.0);
+        float pd = length(bp - vec2(uPlayer.x, -uPlayer.z));                     // rings spreading from legs in the water
+        float wet = 1.0 - smoothstep(0.05, 0.25, uPlayer.y - uTide);
+        for (int k = 0; k < 2; k++) { float rr = 0.35 + fract(uTime * 0.7 + float(k) * 0.5) * 1.3; foam += wet * (1.0 - smoothstep(0.0, 0.07, abs(pd - rr))) * (1.0 - (rr - 0.35) / 1.3) * 0.8; }
+        // how stirred-up the water is: along the train and its wake, and round a wader who is moving
+        float trainStir = min(1.0, uTrain.y * 3.0) * clamp(bow * 1.5 + body * (1.0 - smoothstep(1.4, 7.0 + uTrain.y * 6.0, side)) * (1.0 - smoothstep(0.0, uTrain.z + 30.0 * uTrain.y, along) * 0.7), 0.0, 1.0);
+        float stir = clamp(trainStir + wet * uStir * (1.0 - smoothstep(0.3, 4.0, pd)), 0.0, 1.0);
+        // surf: a band of white lace along the edge of the shallows, washing in and out, and lace round the stone
+        float wash = sin(uTime * 0.55 + bp.x * 0.08) * 0.12;
+        float band = 1.0 - smoothstep(0.0, 0.22, abs(dep - 0.72 - wash + (wNoise(bp * 0.8 + uTime * 0.1) - 0.5) * 0.25));
+        float near = 1.0 - smoothstep(0.15, 0.9 + (wNoise(bp * 1.3 + uTime * 0.15) - 0.5) * 0.6, shore);
+        vec2 lp = bp * 2.6 + (vec2(wNoise(bp * 1.1 + uTime * 0.2), wNoise(bp * 1.1 + 4.0 - uTime * 0.2)) - 0.5) * 0.8;
+        float lace = 1.0 - smoothstep(0.03, 0.09, cellEdge(lp, uTime * 0.5));       // a web of thin foam lines
+        float blobs = smoothstep(0.62, 0.72, wNoise(bp * 3.5 + uTime * 0.3));          // and denser patches
+        float surf = max(band * 0.8, near) * clamp(lace * 0.9 + blobs * 0.8, 0.0, 1.0);
+        surf = max(surf, near * smoothstep(0.55, 0.8, wNoise(bp * 2.2 - uTime * 0.25)) * 0.9);
+        // sun glints: small bright specks that blink, mostly over the shallows and the slope
+        float glint = (1.0 - step(0.04, cellDot(bp * 3.2, uTime * 0.9))) * step(0.55, wNoise(bp * 0.7 + uTime * 0.4)) * uSun * (1.0 - smoothstep(2.0, 4.0, dep));
+        float white = clamp(max(max(surf, foam), glint), 0.0, 1.0) * step(0.0, shore);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.98, 1.0) * mix(0.45, 1.0, day), white);
+        diffuseColor.a = max(diffuseColor.a, white * 0.92);`)
+      .replace('#include <opaque_fragment>', `float fres = pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 4.0);
+        outgoingLight = mix(diffuseColor.rgb, outgoingLight, 0.25);                   // bright, flat colour, a hint of shade
+        outgoingLight = mix(outgoingLight, uSky, fres * 0.3);
+        #include <opaque_fragment>`);
+  };
+  return m;
+}
+
 // Water version 0 (?water=v0), after the clear-water recipe: a clear surface that mirrors a bright sky by the Fresnel
 // effect (IOR 1.333, smooth), with long anime wave streaks running along the line (stretched noise as a bump); under
 // it a soft volume: Lagoon Turquoise glow in the shallows, absorbed towards Cerulean Tide and Deep Cobalt with depth,
 // so the track and its pebbles stay sharp while the deeper sides go rich blue.
-const WATER = new URLSearchParams(location.search).get('water') === 'v0' ? 'v0' : 'ghibli';
+const PLAIN_FLOOR = new URLSearchParams(location.search).get('seabed') === 'plain';   // to try: the floor all one light colour
+const WATER = { v0: 'v0', beach: 'beach' }[new URLSearchParams(location.search).get('water')] || 'ghibli';
 function makeWaterV0(U) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.06, metalness: 0, transparent: true, depthWrite: false });
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = 'varying vec3 vW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime, uSun;\nuniform vec3 uSky;\n' + DEPTH_GLSL + WATER_GLSL.split('// distance to the nearest cell edge')[0] + `
+    sh.fragmentShader = 'varying vec3 vW;\nuniform float uTime, uSun, uTide;\nuniform vec3 uSky;\n' + DEPTH_GLSL + WATER_GLSL.split('// distance to the nearest cell edge')[0] + `
 float streak(vec2 b) {                                              // waves stretched along the line, drifting slowly
   vec2 q = vec2(b.x * 0.22, b.y * 2.6) + vec2(uTime * 0.05, uTime * 0.22);
   return wNoise(q) * 0.6 + wNoise(q * 2.1 + 5.3) * 0.3 + wNoise(q * 4.3 + 1.7) * 0.1;
@@ -208,7 +298,7 @@ float streak(vec2 b) {                                              // waves str
       .replace('#include <color_fragment>', `#include <color_fragment>
         if (inBoat(vW)) discard;
         vec2 bp = vec2(vW.x, -vW.z);
-        float dep = max(seaDepth(bp), 0.0);
+        float dep = max(seaDepth(bp) + uTide, 0.0);
         // the volume: clear and faintly turquoise in the shallows, deepening to cerulean, then cobalt
         vec3 col = mix(vec3(0.012, 0.392, 0.337), vec3(0.006, 0.205, 0.366), smoothstep(0.4, 2.0, dep));
         col = mix(col, vec3(0.003, 0.070, 0.178), smoothstep(1.6, 4.2, dep));
@@ -248,12 +338,79 @@ export function buildTerminal() {
 
   // ---------- water and sea floor ----------
   const U = { uTime: { value: 0 }, uIslets: { value: Array.from({ length: 16 }, () => new THREE.Vector3(1e4, 1e4, 0)) },
-    uShallow: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uSky: { value: new THREE.Color() }, uTrain: { value: new THREE.Vector3(1e4, 0, 25) }, uPlayer, uStir: { value: 0 }, uSun: { value: 1 },
+    uShallow: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uSky: { value: new THREE.Color() }, uTrain: { value: new THREE.Vector3(1e4, 0, 25) }, uPlayer, uStir: { value: 0 }, uSun: { value: 1 }, uTide: { value: tideNow() },
     uPorch: { value: new THREE.Vector4(...PORCH) }, uTower: { value: new THREE.Vector3(...TOWER) }, uBoat: { value: new THREE.Vector3(1e4, 1e4, 0) } };
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), WATER === 'v0' ? makeWaterV0(U) : makeWater(U));
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), WATER === 'v0' ? makeWaterV0(U) : WATER === 'beach' ? makeWaterBeach(U) : makeWater(U));
   water.position.set(55, 0, 0); water.receiveShadow = true; water.renderOrder = 1; water.userData.noShadow = true;
   s.add(water);
   const hideInMirror = [];                                                          // (the old mirror water's list; kept for the grass and spray)
+  // Foam with body: small soft clumps of bubbles floating on the water round the stone and along the edge of the shallows.
+  // Each swells up, bobs, drifts a little and pops, then forms again somewhere else nearby.
+  const foamSpots = [];
+  {
+    let sd = 7; const rr = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+    for (let t = 0; t < 60000 && foamSpots.length < 900; t++) {
+      const bx = -45 + rr() * 90, by = -14 + rr() * 30, ds = shoreSD(bx, by), d = seaDepth(bx, by);
+      const nearStone = ds > 0.02 && ds < 0.55, edge = Math.abs(d - 0.75) < 0.12;
+      if (nearStone ? rr() < 0.85 : edge && rr() < 0.25) foamSpots.push([bx, by, nearStone ? 1 : 0.7]);
+    }
+  }
+  // Foam as connected froth, not loose beads: each piece is a thin flat film of foam with bubbles packed on it so they
+  // overlap and merge. Three kinds, mixed: short thin trails along the stone or the shallows' edge (like a strand of
+  // ivy, but shorter and finer), loose spread patches, and a few small round clumps.
+  const PER = 16, FOAM_C = 320, FOAM_N = (PER + 1) * FOAM_C;                       // per piece: one film + its bubbles
+  const foam3 = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 2), new THREE.MeshLambertMaterial({ color: 0xe9f7fb, emissive: 0x6f98a8, emissiveIntensity: 0.35, transparent: true, opacity: 0.9 }), FOAM_N);
+  foam3.userData.noShadow = true; foam3.renderOrder = 2; foam3.frustumCulled = false; s.add(foam3);
+  const foamLife = Array.from({ length: FOAM_C }, (_, i) => ({ ph: (i * 0.618) % 1, len: 3 + ((i * 37) % 50) / 10, offs: [], film: [0, 0, 0, 0, 0] }));
+  const fM = new THREE.Matrix4(), fQ = new THREE.Quaternion(), fS = new THREE.Vector3(), fP = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0), Q0 = new THREE.Quaternion();
+  const tangent = (bx, by) => {                                                   // along the shore (or the shallows' edge)
+    const e = 0.05, near = shoreSD(bx, by) < 0.7, f = near ? shoreSD : seaDepth;
+    const gx = f(bx + e, by) - f(bx - e, by), gy = f(bx, by + e) - f(bx, by - e), l = Math.hypot(gx, gy) || 1;
+    return [-gy / l, gx / l];
+  };
+  function respawn(f, i, cycle) {
+    let h = (i * 2654435761 + cycle * 40503) >>> 0; const r = () => ((h = (h * 1103515245 + 12345) >>> 0) % 10000) / 10000;
+    f.spot = foamSpots[h % foamSpots.length]; f.dx = (r() - 0.5) * 0.2; f.dz = (r() - 0.5) * 0.2;
+    const kind = r(), [tx, ty] = tangent(f.spot[0], f.spot[1]); f.offs = [];
+    if (kind < 0.5) {                                                             // a trail: bubbles packed along a wandering line
+      const n = 9 + Math.floor(r() * 7), bend = (r() - 0.5) * 0.4; let x = 0, y = 0, ax = tx, ay = ty, prev = 0.03;
+      for (let k = 0; k < PER; k++) {
+        if (k >= n) { f.offs.push(null); continue; }
+        const sz = (0.035 + r() * 0.045) * (1 - 0.5 * Math.abs(k - n / 2) / n), c = Math.cos(bend * 0.3 + (r() - 0.5) * 0.5), sn = Math.sin(bend * 0.3 + (r() - 0.5) * 0.5);
+        [ax, ay] = [ax * c - ay * sn, ax * sn + ay * c]; const st = (prev + sz) * 0.55; x += ax * st; y += ay * st; prev = sz;   // overlapping
+        f.offs.push([x + (r() - 0.5) * 0.02, y + (r() - 0.5) * 0.02, sz]);
+      }
+    } else if (kind < 0.82) {                                                     // a spread patch: a few small merged groups
+      const g = [[0, 0], [(r() - 0.5) * 0.45, (r() - 0.5) * 0.45], [(r() - 0.5) * 0.6, (r() - 0.5) * 0.6]];
+      for (let k = 0; k < PER; k++) { const c = g[k % 3], sz = 0.03 + r() * 0.04; f.offs.push([c[0] + (r() - 0.5) * 0.14, c[1] + (r() - 0.5) * 0.14, sz]); }
+    } else {                                                                      // a small round clump
+      for (let k = 0; k < PER; k++) f.offs.push(k < 8 ? [(r() - 0.5) * 0.14, (r() - 0.5) * 0.14, 0.045 + r() * 0.05] : null);
+    }
+    // the film under it: a flat ellipse covering the bubbles, so the piece reads as one foam
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    for (const o of f.offs) if (o) { x0 = Math.min(x0, o[0] - o[2]); x1 = Math.max(x1, o[0] + o[2]); y0 = Math.min(y0, o[1] - o[2]); y1 = Math.max(y1, o[1] + o[2]); }
+    f.film = [(x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2 * 1.05, (y1 - y0) / 2 * 1.05];
+  }
+  function updateFoam(t) {
+    const calm = 0.6 + 0.4 * Math.min(1, U.uSun.value * 1.5);
+    for (let i = 0; i < FOAM_C; i++) {
+      const f = foamLife[i], u = ((t / f.len) + f.ph) % 1, cycle = Math.floor(t / f.len + f.ph);
+      if (cycle !== f.cycle) { f.cycle = cycle; respawn(f, i, cycle); }
+      const life = Math.min(1, u / 0.25) * (u > 0.85 ? 1 - (u - 0.85) / 0.15 : 1) * f.spot[2] * calm;
+      const cx = f.spot[0] + f.dx * u, cz = -(f.spot[1] + f.dz * u), y = U.uTide.value + 0.006 + Math.sin(t * 1.7 + i) * 0.006;
+      const fl = f.film;                                                            // the film: flat, thin, under the bubbles
+      fP.set(cx + fl[0], y, cz - fl[1]); fS.set(Math.max(fl[2], 0.01) * life, 0.004, Math.max(fl[3], 0.01) * life);
+      fM.compose(fP, Q0, fS); foam3.setMatrixAt(i * (PER + 1), fM);
+      for (let b = 0; b < PER; b++) {
+        const j = i * (PER + 1) + 1 + b, o = f.offs[b];
+        const kb = o ? o[2] * life * (1 + 0.12 * Math.sin(t * 4 + j)) : 0;
+        fP.set(cx + (o ? o[0] : 0), y + kb * 0.2, cz - (o ? o[1] : 0));
+        fS.set(kb, kb * 0.55, kb);
+        fM.compose(fP, Q0, fS); foam3.setMatrixAt(j, fM);
+      }
+    }
+    foam3.instanceMatrix.needsUpdate = true;
+  }
   const floorMat = new THREE.MeshToonMaterial({ color: 0xffffff }), floorTint = new THREE.Color();
   // The floor, coloured by its height: the raised path the rail runs on (and round the porch and tower) shades from
   // Shallow Jade at the foot of its slopes up to Sunlit Sand Path on top, its edge feathered by noise; the lower floor
@@ -299,6 +456,7 @@ float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.
         c = mix(c, mix(dc, c, 0.35), dab * (0.6 - 0.12 * float(L)));
       }
       c *= 0.9 + 0.2 * spg;                                                          // the sponge's grain over everything
+      ${PLAIN_FLOOR ? 'c = vec3(0.479, 0.672, 0.515) * (0.94 + 0.12 * spg);' : ''}          // ?seabed=plain: all one colour, Sunlit Sand Path
       diffuseColor.rgb = c * diffuse;`).replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
       {
         float e = 0.01, g0 = grain(fp);                                            // a faint grain: matte gouache, not rough
@@ -552,7 +710,7 @@ float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.
   const wading = (bx, by) => {
     const [lx, ly] = L_(bx, by);
     if (by < PY - 0.6 || Math.abs(lx) < 5.5 && Math.abs(ly) < 2.3 || Math.hypot(lx + 7.0, ly + 0.55) < 2.6) return false;
-    return bx > -22 && bx < 46 && by < 19 && seaDepth(bx, by, ISL) < 0.62;
+    return bx > -22 && bx < 46 && by < 19 && seaDepth(bx, by, ISL) + U.uTide.value < 0.62;
   };
   w.inside = (x, z) => {
     const bx = x, by = -z, [lx, ly] = L_(bx, by);
@@ -704,7 +862,7 @@ float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.
   const FLY = new THREE.Vector3(14, 9, -24), fpos = new THREE.Vector3(), fprev = new THREE.Vector3();
   const FISH_AT = B(PX - 4.0, PY + 4.2, 0), FISH_RAIN = B(PX + 3.85, PY + 3.6, 0);
   function animals(t, dt) {
-    if (boat) { boat.position.y = -0.12 + Math.sin(t * 0.8) * 0.025; boat.rotation.z = Math.sin(t * 0.6) * 0.02; boat.rotation.x = Math.sin(t * 0.7 + 1) * 0.015; }
+    if (boat) { boat.position.y = -0.12 + U.uTide.value + Math.sin(t * 0.8) * 0.025; boat.rotation.z = Math.sin(t * 0.6) * 0.02; boat.rotation.x = Math.sin(t * 0.7 + 1) * 0.015; }
     const rain = cloudy > 0.6;
     fishes.forEach((f, i) => {
       const here = rain ? FISH_RAIN : FISH_AT, r = rain ? 0.35 + i * 0.1 : f.r;
@@ -736,8 +894,11 @@ float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.
   }
   const water0 = new THREE.Vector3();
   const lastP = new THREE.Vector3(); let stir = 0;
+  w.ticks.push((t) => updateFoam(t));
   w.ticks.push((t, dt) => {
     U.uTime.value = t;
+    if (Math.floor(t) !== Math.floor(t - 0.02)) U.uTide.value = tideNow();          // the tide moves slowly: once a second is plenty
+    water.position.y = U.uTide.value;
     const v = dt > 0 ? lastP.distanceTo(uPlayer.value) / dt : 0; lastP.copy(uPlayer.value);
     const want = v > 0.3 && v < 20 ? Math.min(1, v / 3) : 0;                       // walking through water stirs it up...
     stir += (want - stir) * Math.min(1, dt * (want > stir ? 4 : 0.6));              // ...and it settles over a few seconds

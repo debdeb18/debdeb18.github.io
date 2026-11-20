@@ -62,7 +62,12 @@ Build in the website
 - [x] Hotspots: chair, timetable, vending machine, station sign, cat
 - [ ] Extra details pass
 
-## 2. Character
+## 2. Character (after the foam; take it slow, aim high)
+References in `docs/refs/character/`: a chibi girl in a coat (big head, soft rounded forms, big glossy eyes, chunky
+scarf and boots), a soft blob with headphones (simple, matte, very rounded), a block-headed guy (one bold shape, few
+details). What they share: smooth, rounded, toy-like shapes, soft matte materials, gentle light, small dot or big
+expressive eyes, few but well-placed details. Built step by step, each step shown for approval before the next.
+- [ ] Settle the style and proportions from the references (sketch sheet first)
 - [ ] Design in Blender: face, hair, red cardigan, proportions
 - [ ] Skeleton and animations: idle, walk, run, sit, stand up, look around
 - [ ] Replace the current code-built character

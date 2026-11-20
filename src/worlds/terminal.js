@@ -290,6 +290,30 @@ export function buildTerminal() {
       c = mix(c, vec3(0.10, 0.35, 0.24), step(0.62, f2) * 0.75 * sh2);              // weed green
       c = mix(c, vec3(0.06, 0.19, 0.39), step(0.68, f1 + (f2 - 0.5) * 0.3) * 0.7 * sh2);   // dark blue
       c = mix(c, c * 1.18 + 0.03, step(0.8, wNoise(fp * 0.6 + 21.0)) * 0.6);       // a few lighter dabs
+      // the detail, close up: sand ripples over the shallow strip, then pebbles and speckles, weed tufts in the patches,
+      // dark cracks between rocks deeper down, and a fine painted grain over everything
+      float strip = 1.0 - smoothstep(0.8, 1.6, dep);
+      vec2 rp = fp + vec2(wNoise(fp * 0.5), wNoise(fp * 0.5 + 4.0)) * 1.6;
+      float rip = sin(rp.x * 3.1 + rp.y * 1.3 + wNoise(fp * 1.7) * 2.5);
+      c *= 1.0 + strip * (smoothstep(0.55, 0.95, rip) * 0.10 - smoothstep(-0.6, -0.95, rip) * 0.07);   // ripples: light crest, dark trough
+      vec2 cp2 = fp * 2.6; vec2 ci = floor(cp2), cf = fract(cp2); vec2 h = wHash(ci);
+      float pr = 0.12 + 0.2 * h.y, pd = length(cf - (0.2 + 0.6 * h));
+      vec2 pc = cf - (0.2 + 0.6 * h); float has = step(0.6, h.x);                    // pebbles, a few per square metre:
+      float shd = (1.0 - smoothstep(pr - 0.03, pr + 0.03, length(pc - vec2(0.04, -0.05)))) * has;   // a soft shadow below,
+      c = mix(c, c * 0.75, shd * 0.6);
+      float peb = (1.0 - smoothstep(pr - 0.03, pr, pd)) * has;                       // the pebble, lit on top
+      vec3 pcol = c * mix(0.85, 1.3, wHash(ci + 7.0).x);
+      pcol *= 1.0 + 0.25 * clamp(dot(normalize(pc + 1e-4), vec2(-0.6, 0.8)) * (pd / pr), -1.0, 1.0);
+      c = mix(c, pcol, peb * 0.9);
+      vec2 sc = fp * 8.0, si = floor(sc); vec2 sh3 = wHash(si);                       // tiny round specks of shell and grit
+      float sp = (1.0 - smoothstep(0.05, 0.09, length(fract(sc) - (0.2 + 0.6 * sh3)))) * step(0.82, sh3.x);
+      c = mix(c, c * 1.3 + 0.04, sp * (0.25 + 0.35 * strip));
+      float tuft = step(0.62, f2) * smoothstep(0.55, 0.85, wNoise(fp * 3.3 + 2.0));    // weed tufts in the green patches
+      c = mix(c, vec3(0.08, 0.30, 0.20), tuft * 0.55 * sh2);
+      c = mix(c, vec3(0.20, 0.52, 0.32), smoothstep(0.82, 0.9, wNoise(fp * 3.3 + 2.0)) * step(0.62, f2) * 0.45 * sh2);   // their lit tips
+      float crack = 1.0 - smoothstep(0.0, 0.05, abs(wNoise(fp * 0.8 + 11.0) - 0.5));   // dark cracks between rocks, deeper
+      c *= 1.0 - crack * 0.18 * smoothstep(1.8, 2.8, dep);
+      c *= 0.92 + 0.16 * wNoise(fp * 6.0);                                           // fine painted grain
       diffuseColor.rgb = c * diffuse;`);
   };
   floorMat.customProgramCacheKey = () => 'seafloor';

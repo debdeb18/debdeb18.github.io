@@ -56,14 +56,11 @@ const weatherNow = () => {
 // ---------- the tide, by the real moon ----------
 // Two high and two low tides a lunar day (12 h 25 min apart): high when the moon is overhead (or underfoot), low between.
 // The moon crosses the sky about 50 minutes later each day, so the tide does too; the tides are bigger round new and
-// full moon (springs) and smaller at the half moons (neaps). ?tide=high | low | -1..1 pins it.
-const tideParam = new URLSearchParams(location.search).get('tide');
+// full moon (springs) and smaller at the half moons (neaps).
 function tideNow() {
   const d = new Date(); if (!isNaN(forced)) d.setHours(Math.floor(forced), (forced % 1) * 60, 0, 0);
   const age = (((d.getTime() - Date.UTC(2000, 0, 6, 18, 14)) / 864e5) % 29.530589 + 29.530589) % 29.530589;   // days since new moon
   const amp = 0.11 + 0.05 * Math.cos(4 * Math.PI * age / 29.530589);              // springs 0.16 m, neaps 0.06 m
-  if (tideParam === 'high') return 0.16; if (tideParam === 'low') return -0.16;
-  if (tideParam && !isNaN(+tideParam)) return 0.16 * Math.max(-1, Math.min(1, +tideParam));
   const transit = 12 + age * 24 / 29.530589;                                       // the moon's crossing, local hours
   const hours = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
   return amp * Math.cos(2 * Math.PI * (hours - transit) / 12.42);

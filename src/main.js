@@ -5,7 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { uTime, uPlayer } from './kit.js';
-import { makeCharacter } from './character.js';
+import { makeBlob } from './blob.js';
 import { CONTENT } from './content.js';
 import { buildTerminal } from './worlds/terminal.js';
 import { buildHome } from './worlds/home.js';
@@ -51,7 +51,7 @@ paint.enabled = !matchMedia('(pointer: coarse)').matches && new URLSearchParams(
 composer.addPass(renderPass); composer.addPass(paint); composer.addPass(bloom); composer.addPass(new OutputPass());
 
 // ---------- the little traveller ----------
-const player = makeCharacter();
+const player = makeBlob();
 let sitting = false, speed = 0;
 const vel = new THREE.Vector3();
 

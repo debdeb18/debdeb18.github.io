@@ -67,9 +67,9 @@ References in `docs/refs/character/`: a soft blob with headphones (simple, matte
 boots). What they share: smooth, rounded, toy-like shapes, soft matte materials, gentle light, small dot or big
 expressive eyes, few but well-placed details. The red-cardigan girl is dropped. Start with the easiest, the soft blob,
 and work up; each step shown for approval before the next.
-- [ ] The soft blob: shape, dot eyes, headphones; soft matte look (sketch, then Blender)
-- [ ] Move and animate it: idle bob, walk (a waddle or hop), sit, look around
-- [ ] Replace the current code-built character with it
+- [x] The soft blob: shape, dot eyes, headphones; soft matte look (`blender/assets/blob.py`)
+- [x] Bouncy: hops with squash and stretch, jelly wobble on landing, breathing, little idle bounces, blinks
+- [x] Replaces the red-cardigan character (`src/blob.js`)
 - [ ] Later, if wanted: the block-headed guy, then the chibi girl in the coat
 - [ ] Extra details pass (expressions, small gestures, accessories)
 

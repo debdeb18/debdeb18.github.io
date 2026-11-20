@@ -27,7 +27,7 @@ const NUMBERS = new Set(['sunI', 'hemiI', 'lamps', 'stars', 'glow', 'bloom']);  
 const pal = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, NUMBERS.has(k) ? v : new THREE.Color(v)]));
 const NIGHT = pal({ top: 0x070b24, mid: 0x1b2552, bot: 0x0e1638, sun: 0x8fa8ff, sunI: 0.45, sky: 0x3a4a80, ground: 0x182030, hemiI: 0.55, fog: 0x18214a, shallow: 0x1d5a6e, deep: 0x07142e, lamps: 1, cLit: 0x5d68a0, cShade: 0x20264a, cEdge: 0x8c96cc, stars: 1, glow: 0.45, bloom: 0.75 });
 const DAWN = pal({ top: 0x4a6fb0, mid: 0xffc2a0, bot: 0x8aa0c8, sun: 0xffb38a, sunI: 1.3, sky: 0xd8c8e8, ground: 0x8a9a78, hemiI: 1.0, fog: 0xf0c8b8, shallow: 0x6ab4c4, deep: 0x24508c, lamps: 0.5, cLit: 0xffe2d2, cShade: 0x9890c4, cEdge: 0xffd0b4, stars: 0.15, glow: 0.3, bloom: 0.45 });
-const DAY = pal({ top: 0x2f86e0, mid: 0xbfe4f3, bot: 0xbfe4ea, sun: 0xfff2d6, sunI: 3.0, sky: 0xb4d4f4, ground: 0x8a9c8c, hemiI: 1.2, fog: 0xd2ecf2, shallow: 0x45b8c8, deep: 0x2a5582, lamps: 0, cLit: 0xfbf8ee, cShade: 0xa3b0cf, cEdge: 0xffffff, stars: 0, glow: 0.2, bloom: 0.3 });
+const DAY = pal({ top: 0x2f86e0, mid: 0xbfe4f3, bot: 0xbfe4ea, sun: 0xfff2d6, sunI: 3.0, sky: 0xb4d4f4, ground: 0x8a9c8c, hemiI: 1.2, fog: 0xd2ecf2, shallow: 0x45b8c8, deep: 0x1a4f96, lamps: 0, cLit: 0xfbf8ee, cShade: 0xa3b0cf, cEdge: 0xffffff, stars: 0, glow: 0.2, bloom: 0.3 });
 const DUSK = pal({ top: 0x232a5c, mid: 0xf6b3a0, bot: 0x7a86b4, sun: 0xffa070, sunI: 1.5, sky: 0xc8a8c8, ground: 0x6a6a7a, hemiI: 0.95, fog: 0xe8b9b0, shallow: 0x5a8fb4, deep: 0x1d3270, lamps: 1, cLit: 0xffd9c4, cShade: 0x8a7bb0, cEdge: 0xffc4a0, stars: 0.1, glow: 0.6, bloom: 0.55 });
 const KEYS = [[0, NIGHT], [5.2, NIGHT], [6.5, DAWN], [8.5, DAY], [16.4, DAY], [18.2, DUSK], [19.7, NIGHT], [24, NIGHT]];
 function mixPal(out, a, b, k) {
@@ -177,7 +177,16 @@ function makeWater(U) {
         float lines = (1.0 - smoothstep(lw, lw + blur, cellEdge(cp, uTime * 0.25))) * clamp(shallowK * 1.1 + stir * 0.5, 0.0, 1.0);
         // sparkles that blink, in the sun
         float spark = (1.0 - step(0.035, cellDot(bp * 2.2, uTime * 0.6))) * step(0.62, wNoise(bp * 0.5 + uTime * 0.35)) * uSun;
-        float white = clamp(max(lines * 0.7, max(spark, foam)), 0.0, 1.0) * step(0.0, shore);   // (no foam line or ring round the
+        // foam: broken white lace (a web of thin lines with denser patches) hugging the stone, and a looser band along
+        // the edge of the shallows that washes slowly in and out; never a solid outline
+        float wash = sin(uTime * 0.55 + bp.x * 0.08) * 0.12;
+        float band = 1.0 - smoothstep(0.0, 0.2, abs(dep - 0.75 - wash + (wNoise(bp * 0.8 + uTime * 0.1) - 0.5) * 0.3));
+        float near = 1.0 - smoothstep(0.1, 0.7 + (wNoise(bp * 1.3 + uTime * 0.15) - 0.5) * 0.6, shore);
+        vec2 lp = bp * 2.6 + (vec2(wNoise(bp * 1.1 + uTime * 0.2), wNoise(bp * 1.1 + 4.0 - uTime * 0.2)) - 0.5) * 0.8;
+        float lace = 1.0 - smoothstep(0.025, 0.07, cellEdge(lp, uTime * 0.5));
+        float clumps = smoothstep(0.64, 0.74, wNoise(bp * 3.5 + uTime * 0.3));
+        float surf = max(band * 0.6, near * 0.9) * clamp(lace * 0.85 + clumps * 0.7, 0.0, 1.0) * mix(0.6, 1.0, uSun);
+        float white = clamp(max(max(lines * 0.7, surf), max(spark, foam)), 0.0, 1.0) * step(0.0, shore);   // (no foam line or ring round the
                                                                                    // stone: it outlined the ruin in white)
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.91, 0.98, 1.0), white);
         diffuseColor.a = max(diffuseColor.a, white * 0.95);`)
@@ -330,12 +339,12 @@ float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.
       float feather = (wNoise(fp * 0.45) * 0.6 + wNoise(fp * 1.6 + 3.0) * 0.4 - 0.5) * 0.5;
       float hm = clamp((1.7 - dep) / (1.7 - 0.45) + feather + (spg - 0.5) * 0.25, 0.0, 1.0);   // its edge sponged
       // 2. the raised path: Shallow Jade at the foot of the slope up to Sunlit Sand Path on top
-      vec3 path = mix(vec3(0.159, 0.381, 0.305), vec3(0.479, 0.672, 0.515), smoothstep(0.45, 0.95, hm));
+      vec3 path = mix(vec3(0.080, 0.584, 0.352), vec3(0.479, 0.672, 0.515), smoothstep(0.45, 0.95, hm));
       // 3. the lower floor: patchy paint (a noise through a three-colour ramp)
       float pn = fbm4(fp * 0.08);
       pn += (spg - 0.5) * 0.12;                                                    // stippled, not a clean line
       vec3 low = mix(vec3(0.003, 0.070, 0.178), vec3(0.006, 0.205, 0.366), step(0.4, pn));
-      low = mix(low, vec3(0.027, 0.254, 0.254), step(0.6, pn));
+      low = mix(low, vec3(0.012, 0.392, 0.337), step(0.6, pn));
       // 4. combined by height
       vec3 c = mix(low, path, smoothstep(0.0, 0.45, hm));
       float farK = smoothstep(38.0, 70.0, length(vec2(fp.x - ${PX.toFixed(1)}, (fp.y - ${PY.toFixed(1)}) * 1.6)) + (spg - 0.5) * 6.0);
@@ -351,8 +360,8 @@ float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.
         float body = clamp(1.0 - (dd + (wNoise(q * 2.5) - 0.5) * 0.18) / r, 0.0, 1.0);
         float dab = step(L == 1 ? spg2 : spg, body * 1.6 - 0.15) * step(0.001, body);
         float tone = hh.x * 0.6 + wNoise(fp * 0.3 + 7.0 + float(L)) * 0.7 - 0.15;
-        vec3 dLow = tone < 0.38 ? vec3(0.003, 0.070, 0.178) : (tone < 0.7 ? vec3(0.006, 0.205, 0.366) : vec3(0.027, 0.254, 0.254));
-        vec3 dPath = tone < 0.5 ? vec3(0.159, 0.381, 0.305) : vec3(0.479, 0.672, 0.515);
+        vec3 dLow = tone < 0.38 ? vec3(0.003, 0.070, 0.178) : (tone < 0.7 ? vec3(0.006, 0.205, 0.366) : vec3(0.012, 0.392, 0.337));
+        vec3 dPath = tone < 0.5 ? vec3(0.080, 0.584, 0.352) : vec3(0.479, 0.672, 0.515);
         vec3 dc = mix(dLow, dPath, smoothstep(0.3, 0.6, hm));
         c = mix(c, mix(dc, c, 0.35), dab * (0.6 - 0.12 * float(L)));
       }

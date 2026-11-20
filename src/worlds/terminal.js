@@ -250,6 +250,7 @@ function makeWaterBeach(U) {
 // effect (IOR 1.333, smooth), with long anime wave streaks running along the line (stretched noise as a bump); under
 // it a soft volume: Lagoon Turquoise glow in the shallows, absorbed towards Cerulean Tide and Deep Cobalt with depth,
 // so the track and its pebbles stay sharp while the deeper sides go rich blue.
+const PLAIN_FLOOR = new URLSearchParams(location.search).get('seabed') === 'plain';   // to try: the floor all one light colour
 const WATER = { v0: 'v0', beach: 'beach' }[new URLSearchParams(location.search).get('water')] || 'ghibli';
 function makeWaterV0(U) {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.06, metalness: 0, transparent: true, depthWrite: false });
@@ -356,6 +357,7 @@ float grain(vec2 p) { return wNoise(p * 9.0) * 0.6 + wNoise(p * 23.0 + 3.0) * 0.
         c = mix(c, mix(dc, c, 0.35), dab * (0.6 - 0.12 * float(L)));
       }
       c *= 0.9 + 0.2 * spg;                                                          // the sponge's grain over everything
+      ${PLAIN_FLOOR ? 'c = vec3(0.479, 0.672, 0.515) * (0.94 + 0.12 * spg);' : ''}          // ?seabed=plain: all one colour, Sunlit Sand Path
       diffuseColor.rgb = c * diffuse;`).replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
       {
         float e = 0.01, g0 = grain(fp);                                            // a faint grain: matte gouache, not rough

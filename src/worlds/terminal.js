@@ -77,6 +77,7 @@ function shoreSD(bx, by) {                                                      
   const qx = Math.max(Math.abs(bx - PX) - 5.5, 0), qy = Math.max(Math.abs(by - PY) - 2.3, 0);
   return Math.min(Math.hypot(qx, qy), Math.hypot(bx - (PX - 7.0), by - (PY - 0.55)) - 2.45);
 }
+const FLOOR_LIGHT = 1.0;                                                        // (the sun's light on the floor, taken out so it shows the swatches)
 const smooth01 = (t) => { t = Math.min(1, Math.max(0, t)); return t * t * (3 - 2 * t); };
 function seaDepthAlt(bx, by) {
   const dr = Math.abs(by - TRACK), ds = shoreSD(bx, by);
@@ -270,7 +271,8 @@ export function buildTerminal() {
   s.add(water);
   const hideInMirror = [];                                                          // (the old mirror water's list; kept for the grass and spray)
   const floorMat = new THREE.MeshToonMaterial({ color: 0xffffff }), floorTint = new THREE.Color();
-  // The floor painted after the Spirited Away sea: pale sea-green along the shallow strip under the rail and round the
+  // The floor painted after the Spirited Away sea, in the reference's swatches (Abyssal Navy, Deep Pine, Ocean Teal,
+  // Forest Emerald, Seafoam Jade, Luminous Mint): pale sea-green along the shallow strip under the rail and round the
   // stone, teal down the slopes, deep green-blue below, and over it all soft painted patches of weed green and dark
   // blue, edged like brush strokes, not blended.
   floorMat.onBeforeCompile = (sh) => {
@@ -281,15 +283,15 @@ export function buildTerminal() {
       float f1 = wNoise(fp * 0.09) * 0.55 + wNoise(fp * 0.23 + 3.7) * 0.3 + wNoise(fp * 0.71 + 9.1) * 0.15;
       float f2 = wNoise(fp * 0.13 + 17.0) * 0.6 + wNoise(fp * 0.41 + 5.3) * 0.4;
       float dd0 = dep + (f1 - 0.5) * 0.9;                                           // ragged edges between the bands
-      vec3 c = vec3(0.20, 0.42, 0.36);                                              // pale sea-green: the shallows
-      c = mix(c, vec3(0.13, 0.36, 0.34), smoothstep(0.75, 0.95, dd0));
-      c = mix(c, vec3(0.07, 0.31, 0.34), smoothstep(1.4, 1.6, dd0));                // teal
-      c = mix(c, vec3(0.05, 0.23, 0.29), smoothstep(2.4, 2.6, dd0));
-      c = mix(c, vec3(0.04, 0.15, 0.25), smoothstep(3.6, 3.8, dd0));                // deep green-blue
+      vec3 c = vec3(0.027, 0.305, 0.227);                                              // pale sea-green: the shallows
+      c = mix(c, vec3(0.011, 0.147, 0.102), smoothstep(0.75, 0.95, dd0));
+      c = mix(c, vec3(0.007, 0.109, 0.133), smoothstep(1.4, 1.6, dd0));                // teal
+      c = mix(c, vec3(0.004, 0.047, 0.054), smoothstep(2.4, 2.6, dd0));
+      c = mix(c, vec3(0.002, 0.018, 0.027), smoothstep(3.6, 3.8, dd0));                // deep green-blue
       float sh2 = smoothstep(0.7, 1.4, dep);                                        // patches only off the strip
-      c = mix(c, vec3(0.08, 0.27, 0.19), step(0.62, f2) * 0.75 * sh2);              // weed green
-      c = mix(c, vec3(0.04, 0.13, 0.28), step(0.68, f1 + (f2 - 0.5) * 0.3) * 0.7 * sh2);   // dark blue
-      c = mix(c, c * 1.18 + 0.03, step(0.8, wNoise(fp * 0.6 + 21.0)) * 0.6);       // a few lighter dabs
+      c = mix(c, vec3(0.011, 0.147, 0.102), step(0.62, f2) * 0.75 * sh2);              // weed green
+      c = mix(c, vec3(0.004, 0.047, 0.054), step(0.68, f1 + (f2 - 0.5) * 0.3) * 0.7 * sh2);   // dark blue
+      c = mix(c, vec3(0.080, 0.578, 0.305), step(0.82, wNoise(fp * 0.6 + 21.0)) * 0.35 * (1.0 - smoothstep(1.0, 3.0, dep)));   // glowing mint highlights
       // the brushwork, after the close-up of the reference: layers of soft, ragged dabs in dark blue-green, teal and
       // light sea-green, clustered (neighbouring dabs share a tone), each layer smaller than the last; a few pale flecks
       for (int L = 0; L < 3; L++) {
@@ -300,13 +302,13 @@ export function buildTerminal() {
         float r = 0.24 + 0.2 * hh.y;
         float dab = 1.0 - smoothstep(r * 0.7, r, dd + (wNoise(q * 3.0) - 0.5) * 0.2);
         float tone = hh.x * 0.6 + wNoise(fp * 0.3 + 7.0 + float(L)) * 0.7 - 0.15;
-        vec3 dc = tone < 0.38 ? vec3(0.03, 0.14, 0.18) : (tone < 0.7 ? vec3(0.06, 0.30, 0.31) : vec3(0.22, 0.45, 0.36));
+        vec3 dc = tone < 0.38 ? vec3(0.004, 0.047, 0.054) : (tone < 0.7 ? vec3(0.007, 0.109, 0.133) : vec3(0.027, 0.305, 0.227));
         dc = mix(dc, c, 0.4 + 0.3 * (1.0 - smoothstep(0.6, 1.4, dep)));         // keep the depth colour underneath; calmer on the strip
         c = mix(c, dc, dab * (0.55 - 0.13 * float(L)));
       }
       vec2 fq = fp * 6.0 + wNoise(fp * 2.0) * 1.5; vec2 fh = wHash(floor(fq));
       float fl = (1.0 - smoothstep(0.05, 0.11, length((fract(fq) - (0.2 + 0.6 * fh)) * vec2(1.0, 1.8)))) * step(0.88, fh.x);
-      c = mix(c, vec3(0.42, 0.64, 0.52), fl * 0.4 * (1.0 - smoothstep(2.5, 3.5, dep)));
+      c = mix(c, vec3(0.080, 0.578, 0.305), fl * 0.55 * (1.0 - smoothstep(2.5, 3.5, dep)));
       c *= 0.94 + 0.12 * wNoise(fp * 6.0);                                           // fine painted grain
       diffuseColor.rgb = c * diffuse;`);
   };
@@ -629,7 +631,7 @@ export function buildTerminal() {
     hemi.color.copy(p.sky); hemi.groundColor.copy(p.ground); hemi.intensity = p.hemiI;
     s.fog.color.copy(p.fog);
     U.uShallow.value.copy(p.deep).lerp(p.shallow, 0.32); U.uDeep.value.copy(p.deep); U.uSky.value.copy(p.mid);   // shallows: only a little lighter
-    floorMat.color.setScalar(0.42 + 0.3 * Math.min(1, p.sunI / 3));                // the painted floor dims with the light
+    floorMat.color.setScalar(FLOOR_LIGHT * (0.55 + 0.45 * Math.min(1, p.sunI / 3)));         // the painted floor dims with the light
     U.uSun.value = THREE.MathUtils.clamp((p.sunI - 0.8) / 1.6, 0, 1) * (1 - 0.8 * cloudy);   // sparkles need the sun
     cm.uniforms.lit.value.copy(p.cLit); cm.uniforms.shade.value.copy(p.cShade); cm.uniforms.edge.value.copy(p.cEdge); cm.uniforms.sun.value.copy(sd); cm.uniforms.haze.value.copy(p.mid);
     starField.material.opacity = p.stars;

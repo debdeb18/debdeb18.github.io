@@ -271,53 +271,41 @@ export function buildTerminal() {
   s.add(water);
   const hideInMirror = [];                                                          // (the old mirror water's list; kept for the grass and spray)
   const floorMat = new THREE.MeshToonMaterial({ color: 0xffffff }), floorTint = new THREE.Color();
-  // The floor painted after the Spirited Away sea, in the reference's swatches (Abyssal Navy, Deep Pine, Ocean Teal,
-  // Forest Emerald, Seafoam Jade, Luminous Mint): pale sea-green along the shallow strip under the rail and round the
-  // stone, teal down the slopes, deep green-blue below, and over it all soft painted patches of weed green and dark
-  // blue, edged like brush strokes, not blended.
+  // The floor: sand above, rock below, blended by height. Sand (Seafoam Jade) on the higher, flatter shallows where the
+  // light is strongest, fine and smooth; lower down, rock (Deep Pine) with moss and algae (Forest Emerald) in sponged
+  // patches and Abyssal Navy in the cracks and the lowest hollows. The rock gets a coarse, craggy bump, the sand only a
+  // faint, fine one; no shine (the water above gives the underwater look).
   floorMat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, { uTime: U.uTime });
     sh.vertexShader = 'varying vec3 vFW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvFW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'varying vec3 vFW;\n' + WATER_GLSL.split('// distance to the nearest cell edge')[0] + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+    sh.fragmentShader = 'varying vec3 vFW;\n' + WATER_GLSL.split('// distance to the nearest cell edge')[0] + `
+float rockH(vec2 p) { return wNoise(p * 1.1) * 0.5 + wNoise(p * 2.7 + 5.0) * 0.3 + wNoise(p * 6.1 + 9.0) * 0.2; }   // craggy stone
+float sandH(vec2 p) { return wNoise(p * 26.0) * 0.6 + wNoise(p * 61.0 + 3.0) * 0.4; }                          // fine sand
+` + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       vec2 fp = vec2(vFW.x, -vFW.z); float dep = -vFW.y;
-      // sponge: a fine, porous texture (pores a few centimetres across) that breaks every edge into specks and holes
-      float spg = wNoise(fp * 9.0) * 0.5 + wNoise(fp * 21.0 + 3.3) * 0.32 + wNoise(fp * 47.0 + 8.1) * 0.18;
-      float spg2 = wNoise(fp * 13.0 + 40.0) * 0.55 + wNoise(fp * 33.0 + 12.0) * 0.45;
+      float spg = wNoise(fp * 9.0) * 0.5 + wNoise(fp * 21.0 + 3.3) * 0.32 + wNoise(fp * 47.0 + 8.1) * 0.18;   // sponge pores
       float f1 = wNoise(fp * 0.09) * 0.55 + wNoise(fp * 0.23 + 3.7) * 0.3 + wNoise(fp * 0.71 + 9.1) * 0.15;
-      float f2 = wNoise(fp * 0.13 + 17.0) * 0.6 + wNoise(fp * 0.41 + 5.3) * 0.4;
-      // the bands by depth, their borders stippled by the sponge (no clean line between two colours)
-      float dd0 = dep + (f1 - 0.5) * 0.9 + (spg - 0.5) * 0.55;
-      vec3 c = vec3(0.027, 0.305, 0.227);                                                                   // Seafoam Jade: the shallows
-      c = mix(c, vec3(0.011, 0.147, 0.102), step(0.85, dd0));                                               // Forest Emerald
-      c = mix(c, vec3(0.007, 0.109, 0.133), step(1.5, dd0));                                                // Ocean Teal
-      c = mix(c, vec3(0.004, 0.047, 0.054), step(2.5, dd0));                                               // Deep Pine
-      c = mix(c, vec3(0.002, 0.018, 0.027), step(3.7, dd0));                                                // Abyssal Navy
-      float sh2 = smoothstep(0.7, 1.4, dep);                                        // patches only off the strip
-      c = mix(c, vec3(0.011, 0.147, 0.102), step(0.62, f2 + (spg - 0.5) * 0.12) * 0.8 * sh2);               // weed green, sponged edge
-      c = mix(c, vec3(0.004, 0.047, 0.054), step(0.68, f1 + (f2 - 0.5) * 0.3 + (spg2 - 0.5) * 0.12) * 0.75 * sh2);   // dark, sponged edge
-      // the sponge dabs, after the close-up: each dab pressed on with a sponge, so it is solid in the middle, full of
-      // little holes, and breaks into loose specks at its edge; clustered tones, each layer smaller than the last
-      for (int L = 0; L < 3; L++) {
-        float sc = 1.2 + float(L) * 1.5;
-        vec2 q = fp * sc + vec2(wNoise(fp * sc * 0.6 + float(L) * 5.0), wNoise(fp * sc * 0.6 + float(L) * 9.0)) * 1.1;
-        vec2 qi = floor(q), qf = fract(q); vec2 hh = wHash(qi + float(L) * 31.0);
-        float dd = length((qf - (0.25 + 0.5 * hh)) * vec2(1.0, 0.6 + 0.6 * hh.y));
-        float r = 0.26 + 0.2 * hh.y;
-        float body = clamp(1.0 - (dd + (wNoise(q * 2.5) - 0.5) * 0.18) / r, 0.0, 1.0);   // 1 in the middle, 0 at the edge
-        float pores = L == 1 ? spg2 : spg;
-        float dab = step(pores, body * 1.6 - 0.15) * step(0.001, body);                 // porous: specks at the rim, holes inside
-        float tone = hh.x * 0.6 + wNoise(fp * 0.3 + 7.0 + float(L)) * 0.7 - 0.15;
-        vec3 dc = tone < 0.38 ? vec3(0.004, 0.047, 0.054) : (tone < 0.7 ? vec3(0.007, 0.109, 0.133) : vec3(0.027, 0.305, 0.227));
-        dc = mix(dc, c, 0.3 + 0.35 * (1.0 - smoothstep(0.6, 1.4, dep)));        // keep the depth colour; calmer on the strip
-        c = mix(c, dc, dab * (0.7 - 0.12 * float(L)));
-      }
-      // luminous mint, dabbed with the sponge too: glowing clusters in the shallows, loose flecks elsewhere
-      float glow = step(spg, (wNoise(fp * 0.6 + 21.0) - 0.62) * 3.0);
-      c = mix(c, vec3(0.080, 0.578, 0.305), glow * 0.45 * (1.0 - smoothstep(1.0, 3.0, dep)));
-      float fleck = step(0.86, spg2) * step(0.6, wNoise(fp * 1.7 + 4.0));
-      c = mix(c, vec3(0.080, 0.578, 0.305), fleck * 0.4 * (1.0 - smoothstep(2.5, 3.5, dep)));
-      c *= 0.9 + 0.2 * spg;                                                          // the sponge's grain over everything
-      diffuseColor.rgb = c * diffuse;`);
+      // the height blend (a map range on depth): sand above about 0.7 m, rock below about 1.7 m, a broken edge between
+      float rockK = smoothstep(0.7, 1.7, dep + (f1 - 0.5) * 0.7 + (spg - 0.5) * 0.3);
+      float rh = rockH(fp);
+      vec3 sand = vec3(0.027, 0.305, 0.227) * (0.94 + 0.12 * sandH(fp));
+      vec3 rock = vec3(0.004, 0.047, 0.054) * (0.7 + 0.6 * rh);                   // craggy: lit tops, shaded dips
+      float moss = wNoise(fp * 0.35 + 17.0) * 0.6 + wNoise(fp * 0.9 + 5.0) * 0.4;                          // moss on the tops
+      rock = mix(rock, vec3(0.011, 0.147, 0.102), step(spg, (moss - 0.48) * 3.0 + (rh - 0.5) * 1.2) * 0.9);                      //  of the stones, sponged
+      float crev = (1.0 - smoothstep(0.0, 0.018, abs(wNoise(fp * 1.3 + 11.0) - 0.5))) * step(0.6, wNoise(fp * 0.9 + 2.0));   // short cracks
+      rock = mix(rock, vec3(0.002, 0.018, 0.027), max(crev * 0.85, (1.0 - smoothstep(0.22, 0.32, rh)) * 0.8));                   // and the hollows
+      rock = mix(rock, vec3(0.002, 0.018, 0.027), smoothstep(2.6, 3.8, dep) * 0.6);                                                // darker in the deep
+      vec3 c = mix(sand, rock, rockK);
+      c *= 0.92 + 0.16 * spg;
+      diffuseColor.rgb = c * diffuse;`).replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+      {
+        float e = 0.03;                                                             // bump: craggy on rock, faint on sand
+        float hr0 = rockH(fp), hs0 = sandH(fp);
+        vec2 gr = vec2(rockH(fp + vec2(e, 0.0)) - hr0, rockH(fp + vec2(0.0, e)) - hr0) / e;
+        vec2 gs = vec2(sandH(fp + vec2(0.006, 0.0)) - hs0, sandH(fp + vec2(0.0, 0.006)) - hs0) / 0.006;
+        vec2 g = gr * 0.5 * rockK + gs * 0.008 * (1.0 - rockK);
+        normal = normalize(normal + (viewMatrix * vec4(-g.x, 0.0, g.y, 0.0)).xyz);
+      }`);
   };
   floorMat.customProgramCacheKey = () => 'seafloor';
   const deepFloor = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x06242e }));

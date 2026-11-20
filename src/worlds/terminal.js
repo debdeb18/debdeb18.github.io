@@ -69,8 +69,8 @@ function bankEdge(bx, by) {
 //         average, 20 at its steepest) down to 7 m, so the deep water starts far out, about 27 m from the shore
 //  reef   after Spirited Away: the rail runs along a shallow, light strip with soft, ragged edges; off it the floor
 //         is uneven, in patches deeper and shallower, so the sea is mottled light and dark
-//  v3     both: the beach on the porch's side of the rail, the reef on the far side, its patches gentle (deeper and
-//         shallower by less than 0.8 m)
+//  v3     both: the beach on the porch's side of the rail, the reef on the far side: patches from about 1.3 to 4.3 m
+//         deep, but wide and gentle, so the floor never rises or falls more than 0.8 m in a metre
 const FLOOR = { beach: 'beach', reef: 'reef', v3: 'v3' }[new URLSearchParams(location.search).get('floor')] || 'bank';
 const FLOOR_BOTTOM = { bank: 4.3, beach: 7.6, reef: 4.9, v3: 7.6 }[FLOOR];                // the plain dark base under the floor
 function shoreSD(bx, by) {                                                       // metres from the porch's and tower's stone
@@ -81,10 +81,10 @@ const smooth01 = (t) => { t = Math.min(1, Math.max(0, t)); return t * t * (3 - 2
 function seaDepthAlt(bx, by) {
   const dr = Math.abs(by - TRACK), ds = shoreSD(bx, by);
   if (FLOOR === 'v3' && by < TRACK) {                                            // the far side: a gentle reef
-    const w = Math.sin(bx * 0.29 + 0.7) * 0.9 + Math.sin(bx * 0.83 + by * 0.5) * 0.45;
-    const k = smooth01((dr - 1.8 + w) / 3.5);
-    const n = Math.sin(bx * 0.37 + Math.sin(by * 0.29) * 1.7) * Math.sin(by * 0.41 + Math.sin(bx * 0.23) * 1.3) * 0.9 + 0.45 * Math.sin(bx * 0.91 + by * 0.67 + 1.0) * Math.sin(by * 1.13 - bx * 0.41);
-    return 0.42 + k * (1.8 + 0.75 * (0.5 + 0.5 * Math.max(-1, Math.min(1, n))));
+    const w = Math.sin(bx * 0.29 + 0.7) * 0.9 + Math.sin(bx * 0.41 + by * 0.3) * 0.45;
+    const k = smooth01((dr - 1.8 + w) / 9.5);
+    const X = bx * 0.5, Y = by * 0.5, n = Math.sin(X * 0.37 + Math.sin(Y * 0.29) * 1.7) * Math.sin(Y * 0.41 + Math.sin(X * 0.23) * 1.3) * 0.9 + 0.3 * Math.sin(X * 0.91 + Y * 0.67 + 1.0) * Math.sin(Y * 1.13 - X * 0.41);
+    return 0.42 + k * (0.9 + 3.0 * (0.5 + 0.5 * Math.max(-1, Math.min(1, n))));
   }
   if (FLOOR === 'beach' || FLOOR === 'v3') {
     const w = Math.sin(bx * 0.19 + 0.5) * Math.sin(by * 0.23 + 1.1) * 1.2 + Math.sin(bx * 0.47 + by * 0.31) * 0.4;
@@ -127,10 +127,10 @@ float seaDepthAlt(vec2 b) {
   float dr = abs(b.y - (${TRACK.toFixed(1)})), ds = shoreSD(b);
   ${FLOOR === 'v3' ? `
   if (b.y < ${TRACK.toFixed(1)}) {
-    float w = sin(b.x * 0.29 + 0.7) * 0.9 + sin(b.x * 0.83 + b.y * 0.5) * 0.45;
-    float k = smoothstep(0.0, 1.0, (dr - 1.8 + w) / 3.5);
-    float n = sin(b.x * 0.37 + sin(b.y * 0.29) * 1.7) * sin(b.y * 0.41 + sin(b.x * 0.23) * 1.3) * 0.9 + 0.45 * sin(b.x * 0.91 + b.y * 0.67 + 1.0) * sin(b.y * 1.13 - b.x * 0.41);
-    return 0.42 + k * (1.8 + 0.75 * (0.5 + 0.5 * clamp(n, -1.0, 1.0)));
+    float w = sin(b.x * 0.29 + 0.7) * 0.9 + sin(b.x * 0.41 + b.y * 0.3) * 0.45;
+    float k = smoothstep(0.0, 1.0, (dr - 1.8 + w) / 9.5);
+    vec2 c = b * 0.5; float n = sin(c.x * 0.37 + sin(c.y * 0.29) * 1.7) * sin(c.y * 0.41 + sin(c.x * 0.23) * 1.3) * 0.9 + 0.3 * sin(c.x * 0.91 + c.y * 0.67 + 1.0) * sin(c.y * 1.13 - c.x * 0.41);
+    return 0.42 + k * (0.9 + 3.0 * (0.5 + 0.5 * clamp(n, -1.0, 1.0)));
   }` : ''}
   ${FLOOR === 'beach' || FLOOR === 'v3' ? `
   float w = sin(b.x * 0.19 + 0.5) * sin(b.y * 0.23 + 1.1) * 1.2 + sin(b.x * 0.47 + b.y * 0.31) * 0.4;

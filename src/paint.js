@@ -274,8 +274,8 @@ const PAINTERS = {
   // A pebbly sea floor, after the rail reference: small rounded pebbles packed close, blue-grey, pale grey and sand,
   // each lit on top with a soft shadow under it and a bright glint, dark gaps between them.
   pebbles(g, r) {
-    g.fillStyle = '#5b6873'; g.fillRect(0, 0, SIZE, SIZE);
-    const tones = ['#7f93a3', '#93a6b4', '#a9b8c2', '#c3ccd1', '#8fa0ad', '#93a0a8', '#d3d9dc'];
+    g.fillStyle = '#545f5c'; g.fillRect(0, 0, SIZE, SIZE);
+    const tones = ['#7f8a87', '#8e9893', '#9fa7a0', '#b3b8ae', '#8a958f', '#97a099', '#c2c5b8'];   // grey stone, a little sea-green
     for (let pass = 0; pass < 2; pass++) for (let i = 0; i < (pass ? 700 : 420); i++) {
       const x = r() * SIZE, y = r() * SIZE, rr = (pass ? 6 : 9) + r() * (pass ? 6 : 9), c = pick(tones, r()), a = r() * 3;
       wrap(x, y, rr + 6, (X, Y) => {

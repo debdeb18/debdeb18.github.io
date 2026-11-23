@@ -45,6 +45,9 @@ function sunDir(h, out) {                                        // the sun by d
   return out.set(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).normalize();
 }
 const forced = parseFloat(new URLSearchParams(location.search).get('time'));
+// The time of day the visitor has picked on the slider (hours, 0..24), or null to follow the real clock.
+export const clock = { hour: null };
+const pinned = () => clock.hour !== null ? clock.hour : forced;
 // ---------- weather: mostly fair, with stretches of heavy cloud that come and go over a few hours ----------
 // Everyone visiting at the same time sees the same weather. ?weather=clear | cloudy | 0..1 pins it.
 const wParam = new URLSearchParams(location.search).get('weather');
@@ -58,14 +61,14 @@ const weatherNow = () => {
 // The moon crosses the sky about 50 minutes later each day, so the tide does too; the tides are bigger round new and
 // full moon (springs) and smaller at the half moons (neaps).
 function tideNow() {
-  const d = new Date(); if (!isNaN(forced)) d.setHours(Math.floor(forced), (forced % 1) * 60, 0, 0);
+  const d = new Date(), f = pinned(); if (!isNaN(f)) d.setHours(Math.floor(f), (f % 1) * 60, 0, 0);
   const age = (((d.getTime() - Date.UTC(2000, 0, 6, 18, 14)) / 864e5) % 29.530589 + 29.530589) % 29.530589;   // days since new moon
   const amp = 0.11 + 0.05 * Math.cos(4 * Math.PI * age / 29.530589);              // springs 0.16 m, neaps 0.06 m
   const transit = 12 + age * 24 / 29.530589;                                       // the moon's crossing, local hours
   const hours = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
   return amp * Math.cos(2 * Math.PI * (hours - transit) / 12.42);
 }
-const hourNow = () => { if (!isNaN(forced)) return ((forced % 24) + 24) % 24; const d = new Date(); return d.getHours() + d.getMinutes() / 60; };
+const hourNow = () => { const f = pinned(); if (!isNaN(f)) return ((f % 24) + 24) % 24; const d = new Date(); return d.getHours() + d.getMinutes() / 60; };
 
 // ---------- the sea floor: shallow banks under the line, the station and the islets, deep water beyond ----------
 const PX = 0, PY = 1.4;                                            // where the porch stands (blender/assets/halt.py, centred)

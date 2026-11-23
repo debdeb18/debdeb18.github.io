@@ -19,6 +19,11 @@
     <button data-go="office">Office</button>
     <button data-go="market">Market</button>
   </nav>
+  <div id="clock" title="Time of day">
+    <span id="clockTime">--:--</span>
+    <input id="clockSlider" type="range" min="0" max="24" step="0.25" aria-label="Time of day">
+    <button id="clockReset" title="Follow the real time of day">Now</button>
+  </div>
 </div>
 
 <button id="prompt" hidden></button>

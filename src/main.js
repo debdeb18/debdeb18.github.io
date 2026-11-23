@@ -7,7 +7,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { uTime, uPlayer } from './kit.js';
 import { makeBlob } from './blob.js';
 import { CONTENT } from './content.js';
-import { buildTerminal } from './worlds/terminal.js';
+import { buildTerminal, clock as dayClock } from './worlds/terminal.js';
 import { buildHome } from './worlds/home.js';
 import { buildOffice } from './worlds/office.js';
 import { buildMarket } from './worlds/market.js';
@@ -286,3 +286,20 @@ const start = location.hash.slice(1);
 enter(worlds[start] ? start : 'terminal');
 window.portfolio = { go, worlds, player, get state() { return state; }, debug: { renderer, composer, bloom, paint, camera, joy, get speed() { return speed; }, view(y, p, d) { yaw = y; pitch = p; dist = d; }, lock(pos, at) { camLock = pos ? [pos, at] : null; } } };
 frame();
+
+// ---------- the time-of-day slider (top right): pick an hour, or 'Now' to follow the real clock again ----------
+{
+  const slider = document.getElementById('clockSlider'), label = document.getElementById('clockTime'), reset = document.getElementById('clockReset');
+  const fmt = (h) => { const m = Math.round(h * 60) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+  const realHour = () => { const d = new Date(); return d.getHours() + d.getMinutes() / 60; };
+  const show = () => {
+    const h = dayClock.hour !== null ? dayClock.hour : realHour();
+    label.textContent = fmt(h); reset.classList.toggle('on', dayClock.hour === null);
+    if (dayClock.hour === null && document.activeElement !== slider) slider.value = h;
+  };
+  slider.addEventListener('input', () => { dayClock.hour = parseFloat(slider.value) % 24; show(); });
+  reset.addEventListener('click', () => { dayClock.hour = null; show(); });
+  for (const el of [slider, reset]) el.addEventListener('keydown', (e) => e.stopPropagation());   // arrows move the slider, not the traveller
+  show(); setInterval(show, 30000);
+}
+

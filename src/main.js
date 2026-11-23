@@ -5,7 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { uTime, uPlayer } from './kit.js';
-import { makeBlob } from './blob.js';
+import { makeOrb } from './orb.js';
 import { CONTENT } from './content.js';
 import { buildTerminal, clock as dayClock } from './worlds/terminal.js';
 import { buildHome } from './worlds/home.js';
@@ -51,7 +51,7 @@ paint.enabled = !matchMedia('(pointer: coarse)').matches && new URLSearchParams(
 composer.addPass(renderPass); composer.addPass(paint); composer.addPass(bloom); composer.addPass(new OutputPass());
 
 // ---------- the little traveller ----------
-const player = makeBlob();
+const player = makeOrb();
 let sitting = false, speed = 0;
 const vel = new THREE.Vector3();
 
@@ -291,7 +291,8 @@ frame();
 {
   const slider = document.getElementById('clockSlider'), label = document.getElementById('clockTime'), reset = document.getElementById('clockReset');
   const fmt = (h) => { const m = Math.round(h * 60) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
-  const realHour = () => { const d = new Date(); return d.getHours() + d.getMinutes() / 60; };
+  const urlHour = parseFloat(new URLSearchParams(location.search).get('time'));
+  const realHour = () => { if (!isNaN(urlHour)) return ((urlHour % 24) + 24) % 24; const d = new Date(); return d.getHours() + d.getMinutes() / 60; };
   const show = () => {
     const h = dayClock.hour !== null ? dayClock.hour : realHour();
     label.textContent = fmt(h); reset.classList.toggle('on', dayClock.hour === null);

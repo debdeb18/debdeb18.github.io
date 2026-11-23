@@ -6,14 +6,25 @@ import math, random, bmesh
 from lib import *
 VIEW = dict(angle=-28, lift=0.22, res=(1200, 900), samples=128, zoom=1.0)
 BODY, CUP, PAD, BAND, EYE = 0xF4ECDD, 0x5C5F69, 0x3F424A, 0x6A6D77, 0x2B2728   # sandstone cream
-H, LIFT, R, SPLIT = 1.1, 0.12, 0.33, 0.50                                       # height, hover, head radius, where the strands begin
-STRANDS = 16
+H, LIFT, R, SPLIT = 1.1, 0.12, 0.30, 0.30                                       # height, hover, head radius, where the hem frays
+STRANDS, FOLDS = 18, 9
 
 def radius(z):
-    """The sheet: a round dome over the head, then hanging almost straight, flaring a little towards the bottom."""
+    """The sheet's outline: draped round over the head, then hanging below it, flaring out towards the hem."""
     t = z / H; t0 = 1 - R / H
     if t >= t0: return R * math.sqrt(max(0.0, 1 - ((t - t0) / (1 - t0)) ** 2))
-    return R * (1 + 0.14 * (t0 - t) / t0)
+    k = (t0 - t) / t0
+    return R * (0.97 + 0.30 * k ** 1.4)
+
+def fold(z, a):
+    """Soft vertical folds in the cloth, none over the head, deepening towards the hem, a little uneven."""
+    t0 = 1 - R / H; k = max(0.0, (t0 - z / H) / t0)
+    return 1 + 0.07 * k ** 1.2 * (math.sin(FOLDS * a + 1.3 * k) * 0.7 + math.sin(2.3 * FOLDS * a + 0.6) * 0.3)
+
+def at(z, a, extra=(0.0, 0.0, 0.0)):
+    """A point on the sheet at height z and angle a; the cloth trails back a little lower down, as it floats."""
+    rr = radius(z) * fold(z, a); k = max(0.0, 1 - z / (H * 0.6))
+    return (rr * math.cos(a) + extra[0], rr * math.sin(a) + 0.12 * k * k + extra[1], z + LIFT + extra[2])
 
 def sheet_mat():
     """Sandstone cream, partly see-through (clearer face-on), with a soft glow of the same colour at its edges."""
@@ -30,34 +41,27 @@ def sheet_mat():
     return m
 
 def body(r, rnd):
-    """The head and the upper sheet as one surface of revolution (open at the bottom); below it the frayed strands,
-    each a ribbon that narrows to a point and trails back and curls a little; all thickened slightly and smoothed."""
+    """The sheet as one piece of cloth: over the head and down to the hem (open at the bottom), its hem fraying into
+    short pointed wisps of different lengths that trail and curl a little; thickened slightly and smoothed."""
     bm = bmesh.new(); n = STRANDS * 4
     rings = []
-    for i in range(36, -1, -1):                                                   # from the top down to where the strands start
-        z = SPLIT + (H - SPLIT) * (i / 36) ** 0.85
-        rr = radius(z)
-        rings.append([bm.verts.new((rr * math.cos(2 * math.pi * k / n), rr * math.sin(2 * math.pi * k / n), z + LIFT)) for k in range(n)])
+    for i in range(48, -1, -1):
+        z = SPLIT + (H - SPLIT) * (i / 48) ** 0.9
+        rings.append([bm.verts.new(at(z, 2 * math.pi * k / n)) for k in range(n)])
     for i in range(len(rings) - 1):
         for k in range(n): bm.faces.new((rings[i][k], rings[i][(k + 1) % n], rings[i + 1][(k + 1) % n], rings[i + 1][k]))
     last = rings[-1]
-    for s in range(STRANDS):
-        L = rnd.uniform(0.22, 0.55) * (1.2 if math.sin(2 * math.pi * (s * 4 + 2) / n) > 0.3 else 1.0)   # longer behind
-        curl = rnd.uniform(-0.12, 0.12); m = 10
+    for s in range(STRANDS):                                                    # the frayed hem
+        L = rnd.uniform(0.1, 0.3) * (1.3 if math.sin(2 * math.pi * (s * 4 + 2) / n) > 0.3 else 1.0)   # longer behind
+        curl = rnd.uniform(-0.05, 0.05); m = 6
         prev = [last[(s * 4 + c) % n] for c in range(5)]
         for j in range(1, m + 1):
-            f = j / m; z = SPLIT - L * f
-            back, side = 0.22 * f ** 2.2, curl * f ** 2                            # trail back as it floats, and curl
-            rr = radius(SPLIT) * (1 + 0.08 * f)
-            if j == m:                                                             # the point
-                a = 2 * math.pi * (s * 4 + 2) / n
-                tip = bm.verts.new((rr * math.cos(a) + side, rr * math.sin(a) + back, z + LIFT + 0.06))
+            f = j / m; z = SPLIT - L * f; ex = (curl * f * f, 0.05 * f * f, 0.03 * f ** 3)
+            if j == m:
+                tip = bm.verts.new(at(z, 2 * math.pi * (s * 4 + 2) / n, ex))
                 for c in range(4): bm.faces.new((prev[c], prev[c + 1], tip))
                 break
-            row = []
-            for c in range(5):
-                a = 2 * math.pi * (s * 4 + 2 + (c - 2) * (1 - f) ** 0.9) / n
-                row.append(bm.verts.new((rr * math.cos(a) + side, rr * math.sin(a) + back, z + LIFT + 0.06 * f ** 3)))
+            row = [bm.verts.new(at(z, 2 * math.pi * (s * 4 + 2 + (c - 2) * (1 - f) ** 0.8) / n, ex)) for c in range(5)]
             for c in range(4): bm.faces.new((prev[c], prev[c + 1], row[c + 1], row[c]))
             prev = row
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
@@ -65,7 +69,7 @@ def body(r, rnd):
     for p in me.polygons: p.use_smooth = True
     o = bpy.data.objects.new('body', me); bpy.context.scene.collection.objects.link(o)
     o.data.materials.append(sheet_mat()); o.parent = r
-    so = o.modifiers.new('thick', 'SOLIDIFY'); so.thickness = 0.012
+    so = o.modifiers.new('thick', 'SOLIDIFY'); so.thickness = 0.01
     o.modifiers.new('smooth', 'SUBSURF').levels = 1
     return o
 
@@ -75,7 +79,7 @@ def build():
     body(r, rnd)
     ez = H - R * 0.95; er = radius(ez)                                         # big dark oval eyes
     for sx in (-1, 1):
-        x = sx * 0.12; y = -math.sqrt(er * er - x * x) + 0.025
+        x = sx * 0.11; y = -math.sqrt(er * er - x * x) - 0.004                        # on the cloth, not under it
         ball('_eye', 0.072, (x, y, ez + LIFT), (0.82, 0.35, 1.25), EYE, r, rough=0.6)   # rendered, not exported: the site draws its own
     cz = H - R * 0.55; cr = radius(cz)                                         # the headphones
     pts = []

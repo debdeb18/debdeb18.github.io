@@ -1,54 +1,46 @@
-"""The traveller as a little ghost: the blob's soft rounded dome (blender/assets/blob.py) with, instead of a flat base,
-a soft hem that flares out a little and ends in a few gentle waves, hollowed underneath, so it floats above the ground.
-Pale, cool white with a faint glow, two dot eyes, and the headphones over the top. About 1 m tall. Origin on the
-ground under it (it hovers a little above); it faces -Y."""
+"""The traveller as a little ghost: the blob's soft round head (blender/assets/blob.py), its body narrowing below into
+a soft pointed tail that curls back behind it, like a floating ghost. Pale, cool white with a faint glow, two dot eyes,
+and the headphones over the top. About 1 m from the tail's tip to the top; it floats, the tip a little above the
+ground. Origin on the ground under it; it faces -Y."""
 import math, bmesh
 from lib import *
-VIEW = dict(angle=-18, lift=0.28, res=(1200, 900), samples=96, zoom=1.1)
+VIEW = dict(angle=-55, lift=0.22, res=(1200, 900), samples=96, zoom=1.05)
 BODY, CUP, PAD, BAND, EYE = 0xF2F7FA, 0x5C5F69, 0x3F424A, 0x6A6D77, 0x1E1E24
-H, LIFT, T0 = 1.0, 0.12, 0.58                                                   # height, hover, where the dome begins
-WAVES, WAVE = 5, 0.045                                                          # the hem's waves
+H, LIFT, T0 = 1.0, 0.14, 0.58                                                   # height, hover, where the head's dome begins
 
 def radius(z):
-    """The radius of the body above the hem (as the blob, slim, with a low round dome)."""
+    """The radius at height z (0 the tail's tip, H the top): a round dome on top, widest at the head, then narrowing
+    smoothly to the pointed tip."""
     t = z / H
-    side = 0.40 - 0.04 * min(t, T0) / T0
-    return side * math.sqrt(max(0.0, 1 - max(0.0, (t - T0) / (1 - T0)) ** 2))
+    if t >= T0: return 0.40 * math.sqrt(max(0.0, 1 - ((t - T0) / (1 - T0)) ** 2))
+    return 0.40 * math.sin(math.pi / 2 * (t / T0)) ** 1.6                   # a long, thin, pointed tail
 
-def outline():
-    """The profile (r, z) from the middle of the hollow underside, out to the hem's rim, up the side and over the dome."""
-    pts = [(0.0, 0.16), (0.12, 0.15), (0.24, 0.12), (0.33, 0.07), (0.40, 0.025), (0.44, 0.0)]    # the hollow underneath
-    pts += [(0.445, 0.02), (0.43, 0.06), (0.41, 0.11)]                                          # the hem flaring out
-    for i in range(1, 33):
-        z = 0.14 + (H - 0.14) * (i / 32) ** 0.9
-        pts.append((max(radius(z), 0.0), z))
-    pts[-1] = (0.0, H)
-    return pts
+def bend(z):
+    """How far the body is pushed back (+Y) at height z: the tail curls back and a little up at its tip."""
+    k = max(0.0, 1 - (z / H) / 0.55)
+    return 0.38 * k ** 2.2
 
 def body(r):
-    """A surface of revolution of the outline; the hem's rim rises and falls in gentle waves; subdivided smooth."""
-    bm = bmesh.new(); n = 60; prof = outline(); rings = []
-    for (rr, z) in prof:
-        ring = []
-        for k in range(n):
-            a = 2 * math.pi * k / n
-            w = max(0.0, 1 - z / 0.2) * (1 if rr > 0.3 else 0.4)                  # waves strongest at the rim
-            zz = z + WAVE * w * math.cos(WAVES * a) + 0.012 * w * math.cos(2 * WAVES * a + 1)
-            ring.append(bm.verts.new((rr * math.cos(a), rr * math.sin(a), zz + LIFT)))
-        rings.append(ring)
-    for i in range(len(rings) - 1):
-        for k in range(n): bm.faces.new((rings[i][k], rings[i + 1][k], rings[i + 1][(k + 1) % n], rings[i][(k + 1) % n]))
+    """Rings of the radius above, each pushed back by the bend, joined into one smooth surface; subdivided."""
+    bm = bmesh.new(); n, rings = 48, 44
+    grid = []
+    for i in range(rings + 1):
+        z = H * (i / rings) ** 1.1
+        rr = radius(z); y0 = bend(z)
+        grid.append([bm.verts.new((rr * math.cos(2 * math.pi * k / n), y0 + rr * math.sin(2 * math.pi * k / n), z + LIFT)) for k in range(n)])
+    for i in range(rings):
+        for k in range(n): bm.faces.new((grid[i][k], grid[i][(k + 1) % n], grid[i + 1][(k + 1) % n], grid[i + 1][k]))
     bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=1e-4)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
     me = bpy.data.meshes.new('body'); bm.to_mesh(me); bm.free()
     for p in me.polygons: p.use_smooth = True
     o = bpy.data.objects.new('body', me); bpy.context.scene.collection.objects.link(o)
-    o.data.materials.append(mat(BODY, rough=0.9, emit=0.12)); o.parent = r
+    o.data.materials.append(mat(BODY, rough=0.9, emit=0.03)); o.parent = r
     o.modifiers.new('smooth', 'SUBSURF').levels = 2
     return o
 
 def build():
-    set_style(sky=(0.74, 0.84, 0.92), sky_power=1.0, ground=0xD2E3EA, sun=(1.0, 0.95, 0.9), sun_power=2.6, sun_height=48)
+    set_style(sky=(0.42, 0.55, 0.70), sky_power=0.9, ground=0x8FAABB, sun=(1.0, 0.95, 0.9), sun_power=3.0, sun_height=40)
     r = root('ghost')
     body(r)
     ez = 0.62 * H; er = radius(ez)                                              # the eyes: two small dots

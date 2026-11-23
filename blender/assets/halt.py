@@ -218,9 +218,11 @@ def ruin_tower(r, rnd):
         th = math.radians(wa); ex, ey = math.cos(th), math.sin(th); tx_, ty_ = -ey, ex
         ww = 0.7; rr = ww / 2; hb = wh - ws - rr
         cutter = arch_cutter(TX + ex * rm, TY + ey * rm, ex, ey, ws, wh, ww, TW + 0.6)
-        for (bt, bz, bh, objs) in built:
+        wider = arch_cutter(TX + ex * rm, TY + ey * rm, ex, ey, ws - 0.06, wh + 0.06, ww + 0.12, TW + 0.6)   # the mortar
+        for (bt, bz, bh, objs) in built:                                            # set back from the opening, out of sight
             if abs(((bt - th) + math.pi) % (2 * math.pi) - math.pi) < 0.45 and bz < wh + 0.05 and bz + bh > ws - 0.05:
-                cut_with(objs, cutter)
+                cut_with([o for o in objs if not o.name.startswith('mortar')], cutter)
+                cut_with([o for o in objs if o.name.startswith('mortar')], wider)
         pts = [(TX + ex * (TR + 0.015) + tx_ * rr * 1.08 * math.cos(math.pi * i / 10), TY + ey * (TR + 0.015) + ty_ * rr * 1.08 * math.cos(math.pi * i / 10), ws + hb + rr * 1.08 * math.sin(math.pi * i / 10)) for i in range(11)]
         tube('arch', [(pts[0][0], pts[0][1], ws)] + pts + [(pts[-1][0], pts[-1][1], ws)], 0.045, 'stone_c', r)   # a moulding round the arch
         painted_box('sill', (ww + 0.2, TW + 0.12, 0.09), (TX + rm * ex, TY + rm * ey, ws - 0.09), (0, 0, math.degrees(th) - 90), color='stone_c', parent=r, bevel=0.02, along='x', rough=1.5)
@@ -638,8 +640,40 @@ def build():
         l = min(rk.uniform(0.7, 1.4), LX / 2 - xa); c = xa + l / 2; xa += l
         if l < 0.15: continue
         ruin_block(r, rk, (l - 0.035, 0.3, 0.32 - 0.035), (c, WF + rk.uniform(-0.02, 0.005) + 0.12, TOP - 0.32), (0, rk.uniform(-0.6, 0.6), rk.uniform(-0.5, 0.5)), 'x', -1)
+    tuck_mortar()
     bake_cuts()
     return r
+
+def tuck_mortar():
+    """Each block has a dark mortar slab behind it, a little bigger than the block, so the joints between blocks read
+    deep. Where a block has no neighbour on a side (a broken end, the top of a wall, a gap, the nook), that slab would
+    show as a grey band, so on that side it is pulled back behind the block, out of sight."""
+    from mathutils import Vector
+    blocks = []
+    for o in bpy.data.objects:
+        if o.type == 'MESH' and o.name.startswith('ruin') and o.data.vertices:
+            vs = [v.co for v in o.data.vertices]
+            lo = Vector((min(v.x for v in vs), min(v.y for v in vs), min(v.z for v in vs))); hi = Vector((max(v.x for v in vs), max(v.y for v in vs), max(v.z for v in vs)))
+            blocks.append((o.matrix_world.inverted(), lo - Vector((0.035,) * 3), hi + Vector((0.035,) * 3)))
+    def solid(p):
+        for (inv, lo, hi) in blocks:
+            q = inv @ p
+            if lo.x <= q.x <= hi.x and lo.y <= q.y <= hi.y and lo.z <= q.z <= hi.z: return True
+        return False
+    bpy.context.view_layer.update()
+    for m in [o for o in bpy.data.objects if o.type == 'MESH' and o.name.startswith('mortar')]:
+        vs = m.data.vertices
+        if not vs: continue
+        x0, x1 = min(v.co.x for v in vs), max(v.co.x for v in vs); z0, z1 = min(v.co.z for v in vs), max(v.co.z for v in vs)
+        zm, mw = (z0 + z1) / 2, m.matrix_world
+        W = lambda x, z: mw @ Vector((x, 0.0, z))
+        right = solid(W(x1 + 0.03, zm)); left = solid(W(x0 - 0.03, zm))
+        top = all(solid(W(x0 + (x1 - x0) * f, z1 + 0.04)) for f in (0.2, 0.5, 0.8))
+        for v in vs:
+            if not right: v.co.x = min(v.co.x, x1 - 0.06)
+            if not left: v.co.x = max(v.co.x, x0 + 0.06)
+            if not top: v.co.z = min(v.co.z, z1 - 0.08)
+        m.data.update()
 
 def bake_cuts():
     """Apply the window cuts now and paint the new faces (the window reveals): a cut leaves them unpainted, black."""
